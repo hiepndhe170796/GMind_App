@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/GMind-Backend/">
+    <Project Path="GMind-Backend/GMind.API/GMind.API.csproj" />
+    <Project Path="GMind-Backend/GMind.Application/GMind.Application.csproj" />
+    <Project Path="GMind-Backend/GMind.Domain/GMind.Domain.csproj" />
+    <Project Path="GMind-Backend/GMind.Infrastructure/GMind.Infrastructure.csproj" />
+  </Folder>
+</Solution>

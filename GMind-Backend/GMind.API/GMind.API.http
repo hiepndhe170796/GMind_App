@@ -1,0 +1,11 @@
+@GMind.API_HostAddress = http://localhost:5194
+
+GET {{GMind.API_HostAddress}}/openapi/v1.json
+Accept: application/json
+
+###
+
+GET {{GMind.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

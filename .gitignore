@@ -426,3 +426,11 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# Node.js / Frontend
+GMind-Frontend/node_modules/
+GMind-Frontend/dist/
+GMind-Frontend/.env
+GMind-Frontend/.env.local
+GMind-Frontend/.env.*.local
+GMind-Frontend/vite.config.local.timestamp-*
