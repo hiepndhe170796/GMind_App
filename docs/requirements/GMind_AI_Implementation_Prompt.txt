@@ -1,0 +1,42 @@
+GMIND - AI IMPLEMENTATION PROMPT
+
+Bạn là Senior Business Analyst + Software Architect + Senior Full-stack Engineer. Hãy đọc toàn bộ file “GMind_Business_Analysis_Specification_v1.0.docx” trước khi sửa code. Đây là nguồn yêu cầu nghiệp vụ chính.
+
+MỤC TIÊU
+Xây dựng GMind - web app quản lý bài tập/dự án nhóm sinh viên. Phải làm cả thiết kế UI/UX và triển khai code thực tế. Trước khi code giao diện, lập sitemap, user flows, design system (màu, typography, spacing, component rules) và cấu trúc các màn hình theo BA; sau đó triển khai giao diện nhất quán, responsive và kết nối với API/database thật. Không chỉ tạo UI tĩnh: chức năng phải hoạt động qua backend/API, authorization, validation, error/loading/empty states và tests.
+
+QUY TẮC BẮT BUỘC
+1. Trước khi code, kiểm tra repository hiện có: framework/version, cấu trúc, cách chạy, DB, migrations và code đã có. Nếu repo đã dùng stack nào thì giữ stack đó trừ khi có lý do kỹ thuật rõ ràng. Không phá hoặc viết lại phần ổn định tùy tiện.
+2. Nếu repo trống và chưa có quyết định công nghệ, mặc định đề xuất ASP.NET Core Web API + EF Core + SQL Server ở backend/database và React + TypeScript ở frontend. Dùng OpenAPI/Swagger. Trình bày kiến trúc và các lệnh chạy trước khi triển khai.
+3. Đọc toàn bộ BA, đặc biệt ma trận quyền, business rules, data model, reminders, Marketplace và tiêu chí nghiệm thu. Nếu yêu cầu chưa chốt, làm theo mặc định được ghi trong BA và đánh dấu rõ; không tự phát minh chính sách quan trọng.
+4. Triển khai theo milestone nhỏ, mỗi milestone phải build/run/test được. Không tạo một khối code khổng lồ hoặc tất cả vào một file.
+5. Không dùng fake API hay dữ liệu hard-code giả làm production. Có thể tạo seed data cho demo nhưng phải ghi rõ cách seed và cách đăng nhập demo.
+6. Tất cả quyền phải kiểm tra ở backend. Không được tin role/userId gửi từ frontend. Đặc biệt Member không được đọc % tiến độ cá nhân của Member khác; chỉ Leader có quyền xem chi tiết tiến độ từng người trong nhóm.
+7. Password phải hash an toàn. Secrets/connection strings/OAuth keys không được commit. Validate input và chuẩn hóa lỗi API. Không trả stack trace hoặc secret ra frontend.
+8. Dùng database migrations có version; có FK/unique constraints/indexes hợp lý. Các thao tác Marketplace, review, thay đổi assignee và log/notification phải giữ tính toàn vẹn bằng transaction khi cần.
+9. Notification/reminder phải chống trùng. Khi deadline đổi hoặc task hoàn thành, cập nhật/bỏ reminder cũ. Job nền phải có hướng dẫn chạy và quan sát lỗi.
+10. Mỗi tính năng phải có loading, empty, error, success state; UI responsive; không để nút không hoạt động.
+11. Viết unit/integration tests cho business rules và authorization quan trọng. Ít nhất phải test các luồng E2E trong mục 13 của BA, đặc biệt IDOR, task submit/review, reminder deduplication và Marketplace accept/reject.
+12. Sau mỗi milestone, báo: file tạo/sửa, quyết định kiến trúc, migration, lệnh chạy, lệnh test và kết quả thực tế. Không tuyên bố test/build thành công nếu chưa chạy.
+
+THỨ TỰ TRIỂN KHAI
+Milestone 0: audit repo, đề xuất architecture/plan, kiểm tra môi trường và tạo README cấu hình.
+Milestone 0.5: tạo sitemap, user flows, design tokens, component inventory và wireframe/thiết kế màn hình chính (Dashboard, Group, Project, Task detail, Leader progress, Notifications, Marketplace, Settings); sau đó triển khai UI theo design system thay vì tạo từng trang không đồng bộ.
+Milestone 1: database model + migrations + authentication/profile.
+Milestone 2: groups, invitations, membership và authorization.
+Milestone 3: projects, tasks/subtasks, assignment, dashboard cá nhân và Leader.
+Milestone 4: comments, submit/review/approve, activity log.
+Milestone 5: in-app notifications + background deadline reminders với chống trùng.
+Milestone 6: Need Help/Transfer/Swap, approval transaction và notifications.
+Milestone 7: Calendar/Kanban, file upload trực tiếp, realtime chat và risk alerts chỉ sau khi luồng MVP ổn định hoặc khi BA/PO xác nhận ưu tiên.
+Milestone 8: chạy đầy đủ tests, sửa lỗi, rà soát bảo mật, cập nhật README và bàn giao.
+
+ĐẦU RA CẦN BÀN GIAO
+- Source code đầy đủ trong repo; frontend/backend có thể chạy theo README.
+- Database migrations và seed/demo data có hướng dẫn.
+- File cấu hình mẫu không chứa secret thật.
+- API docs/OpenAPI, mô tả cấu trúc thư mục và các quyết định chính.
+- Tests cùng kết quả chạy thực tế.
+- Danh sách chức năng đã hoàn thành, chưa hoàn thành, giới hạn và vấn đề còn mở.
+
+Bắt đầu bằng cách kiểm tra repository và báo cáo ngắn tình trạng hiện tại + kế hoạch milestone. Sau đó thực hiện từng milestone, không chỉ đưa code mẫu trong câu trả lời.
