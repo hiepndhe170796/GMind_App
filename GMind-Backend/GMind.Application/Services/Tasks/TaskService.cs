@@ -28,8 +28,13 @@ public record TaskDto(Guid Id, Guid ProjectId, Guid? ParentTaskId, string Title,
 public class TaskService : ITaskService
 {
     private readonly IApplicationDbContext _context;
+    private readonly Notifications.INotificationService _notifications;
 
-    public TaskService(IApplicationDbContext context) => _context = context;
+    public TaskService(IApplicationDbContext context, Notifications.INotificationService notifications)
+    {
+        _context = context;
+        _notifications = notifications;
+    }
 
     public async Task<TaskDto> CreateAsync(Guid userId, Guid projectId, string title, string? description, Guid? assigneeUserId, Priority priority, DateTime? deadlineAt, decimal? estimateHours, int? points, Guid? parentTaskId, CancellationToken ct = default)
     {
@@ -71,6 +76,11 @@ public class TaskService : ITaskService
         _context.Tasks.Add(task);
         _context.ActivityLogs.Add(Log(userId, project.GroupId, projectId, "Task", task.Id, "Create", $"Created task '{task.Title}'"));
         await _context.SaveChangesAsync(ct);
+
+        if (assigneeUserId != null && assigneeUserId != userId)
+            await _notifications.NotifyAsync(assigneeUserId.Value, project.GroupId, NotificationType.TaskAssigned,
+                "Task mới được giao", $"Bạn được giao task '{task.Title}'", "Task", task.Id, ct);
+
         return await GetDtoAsync(task.Id, ct);
     }
 
@@ -137,6 +147,11 @@ public class TaskService : ITaskService
         task.UpdatedAt = DateTime.UtcNow;
         _context.ActivityLogs.Add(Log(userId, task.Project.GroupId, task.ProjectId, "Task", task.Id, "Assign", $"Assigned task '{task.Title}' to {assigneeUserId}"));
         await _context.SaveChangesAsync(ct);
+
+        if (assigneeUserId != null && assigneeUserId != userId)
+            await _notifications.NotifyAsync(assigneeUserId.Value, task.Project.GroupId, NotificationType.TaskAssigned,
+                "Task mới được giao", $"Bạn được giao task '{task.Title}'", "Task", task.Id, ct);
+
         return await GetDtoAsync(taskId, ct);
     }
 
@@ -187,6 +202,28 @@ public class TaskService : ITaskService
 
         _context.ActivityLogs.Add(Log(userId, task.Project.GroupId, task.ProjectId, "Task", task.Id, "StatusChange", $"Task '{task.Title}' -> {newStatus}"));
         await _context.SaveChangesAsync(ct);
+
+        // Notifications per BA workflow
+        if (newStatus == TaskStatus.Submitted)
+        {
+            var leaders = await _context.GroupMembers
+                .Where(m => m.GroupId == task.Project.GroupId && m.Role == Role.Leader && m.IsActive && m.UserId != userId)
+                .Select(m => m.UserId).ToListAsync(ct);
+            foreach (var leaderId in leaders)
+                await _notifications.NotifyAsync(leaderId, task.Project.GroupId, NotificationType.TaskSubmitted,
+                    "Task chờ duyệt", $"Task '{task.Title}' đã được nộp để duyệt", "Task", task.Id, ct);
+        }
+        else if (newStatus == TaskStatus.Completed && task.AssigneeUserId != null)
+        {
+            await _notifications.NotifyAsync(task.AssigneeUserId.Value, task.Project.GroupId, NotificationType.TaskApproved,
+                "Task được duyệt", $"Task '{task.Title}' đã được duyệt", "Task", task.Id, ct);
+        }
+        else if (newStatus == TaskStatus.ChangesRequested && task.AssigneeUserId != null)
+        {
+            await _notifications.NotifyAsync(task.AssigneeUserId.Value, task.Project.GroupId, NotificationType.TaskChangesRequested,
+                "Task cần sửa lại", $"Task '{task.Title}' bị trả về: {reviewComment}", "Task", task.Id, ct);
+        }
+
         return await GetDtoAsync(taskId, ct);
     }
 

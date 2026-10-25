@@ -35,10 +35,12 @@ public record ActivityDto(Guid Id, string ActorName, string Action, string Entit
 public class GroupService : IGroupService
 {
     private readonly IApplicationDbContext _context;
+    private readonly Notifications.INotificationService _notifications;
 
-    public GroupService(IApplicationDbContext context)
+    public GroupService(IApplicationDbContext context, Notifications.INotificationService notifications)
     {
         _context = context;
+        _notifications = notifications;
     }
 
     public async Task<GroupDto> CreateGroupAsync(Guid userId, string name, string? description, CancellationToken ct = default)
@@ -153,6 +155,14 @@ public class GroupService : IGroupService
         _context.ActivityLogs.Add(Log(userId, invite.GroupId, null, "GroupMember", userId, "Join", $"{userId} joined group {invite.GroupId}"));
         await _context.SaveChangesAsync(ct);
 
+        var leaders = await _context.GroupMembers
+            .Where(m => m.GroupId == invite.GroupId && m.Role == Role.Leader && m.IsActive)
+            .Select(m => m.UserId).ToListAsync(ct);
+        var joinedName = await _context.Users.Where(u => u.Id == userId).Select(u => u.DisplayName).FirstAsync(ct);
+        foreach (var leaderId in leaders)
+            await _notifications.NotifyAsync(leaderId, invite.GroupId, NotificationType.MemberJoined,
+                "Thành viên mới", $"{joinedName} đã tham gia nhóm '{invite.Group.Name}'", "Group", invite.GroupId, ct);
+
         var count = await _context.GroupMembers.CountAsync(m => m.GroupId == invite.GroupId && m.IsActive, ct);
         return new GroupDto(invite.GroupId, invite.Group.Name, invite.Group.Description, count, "Member", invite.Group.CreatedAt);
     }
@@ -169,7 +179,8 @@ public class GroupService : IGroupService
     public async Task RemoveMemberAsync(Guid userId, Guid groupId, Guid memberUserId, CancellationToken ct = default)
     {
         await RequireLeaderAsync(userId, groupId, ct);
-        var target = await _context.GroupMembers.FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == memberUserId && m.IsActive, ct)
+        var target = await _context.GroupMembers.Include(m => m.Group)
+            .FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == memberUserId && m.IsActive, ct)
             ?? throw new NotFoundException("Member not found");
         if (target.Role == Role.Leader)
         {
@@ -179,6 +190,9 @@ public class GroupService : IGroupService
         target.IsActive = false;
         _context.ActivityLogs.Add(Log(userId, groupId, null, "GroupMember", memberUserId, "Remove", $"Removed member {memberUserId}"));
         await _context.SaveChangesAsync(ct);
+
+        await _notifications.NotifyAsync(memberUserId, groupId, NotificationType.MemberRemoved,
+            "Bạn đã bị xóa khỏi nhóm", $"Bạn không còn là thành viên của nhóm '{target.Group.Name}'", "Group", groupId, ct);
     }
 
     public async Task ChangeMemberRoleAsync(Guid userId, Guid groupId, Guid memberUserId, Role newRole, CancellationToken ct = default)

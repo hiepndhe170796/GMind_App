@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth';
+import { notificationsService } from '../services/notifications';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -9,6 +11,11 @@ interface MainLayoutProps {
 const MainLayout = ({ children }: MainLayoutProps) => {
   const navigate = useNavigate();
   const user = authService.currentUser();
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (user) notificationsService.unreadCount().then(setUnread).catch(() => {});
+  }, []);
 
   const logout = async () => {
     await authService.logout();
@@ -24,6 +31,9 @@ const MainLayout = ({ children }: MainLayoutProps) => {
             <nav className="flex items-center gap-4">
               <Link to="/dashboard" className="text-neutral-600 dark:text-neutral-400 hover:text-primary-600">Nhóm</Link>
               <Link to="/my-tasks" className="text-neutral-600 dark:text-neutral-400 hover:text-primary-600">Task của tôi</Link>
+              <Link to="/notifications" className="text-neutral-600 dark:text-neutral-400 hover:text-primary-600">
+                Thông báo{unread > 0 && <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-xs bg-danger-500 text-white rounded-full">{unread}</span>}
+              </Link>
               <span className="text-sm text-neutral-500">{user?.displayName}</span>
               <button onClick={logout} className="text-sm text-danger-600 hover:underline">Đăng xuất</button>
             </nav>

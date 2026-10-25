@@ -1,5 +1,6 @@
 using GMind.Application.Common;
 using GMind.Infrastructure.Persistence;
+using GMind.Infrastructure.Workers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,8 @@ public static class DependencyInjection
         );
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+
+        services.AddHostedService<ReminderWorker>();
 
         return services;
     }
