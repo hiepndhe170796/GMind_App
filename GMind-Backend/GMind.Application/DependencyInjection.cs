@@ -1,6 +1,7 @@
 using System.Reflection;
 using FluentValidation;
 using GMind.Application.Services.Auth;
+using GMind.Application.Services.Groups;
 using GMind.Domain.Interfaces;
 using Mapster;
 using MediatR;
@@ -19,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IGroupService, GroupService>();
 
         return services;
     }
