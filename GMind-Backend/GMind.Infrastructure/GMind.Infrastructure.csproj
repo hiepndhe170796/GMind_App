@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GMind.Domain\GMind.Domain.csproj" />
+    <ProjectReference Include="..\GMind.Application\GMind.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>
