@@ -23,12 +23,14 @@ public interface IGroupService
     Task RemoveMemberAsync(Guid userId, Guid groupId, Guid memberUserId, CancellationToken ct = default);
     Task ChangeMemberRoleAsync(Guid userId, Guid groupId, Guid memberUserId, Role newRole, CancellationToken ct = default);
     Task LeaveGroupAsync(Guid userId, Guid groupId, CancellationToken ct = default);
+    Task<List<ActivityDto>> GetActivityAsync(Guid userId, Guid groupId, int take, CancellationToken ct = default);
 }
 
 public record GroupDto(Guid Id, string Name, string? Description, int MemberCount, string MyRole, DateTime CreatedAt);
 public record GroupDetailDto(Guid Id, string Name, string? Description, int MemberCount, string MyRole, DateTime CreatedAt, List<MemberDto> Members);
 public record MemberDto(Guid UserId, string DisplayName, string? AvatarUrl, string Role, DateTime JoinedAt);
 public record InviteDto(Guid Id, string Code, string InviteLink, DateTime? ExpiresAt, int? MaxUses, int UsedCount);
+public record ActivityDto(Guid Id, string ActorName, string Action, string EntityType, string Summary, DateTime CreatedAt);
 
 public class GroupService : IGroupService
 {
@@ -206,6 +208,17 @@ public class GroupService : IGroupService
         membership.IsActive = false;
         _context.ActivityLogs.Add(Log(userId, groupId, null, "GroupMember", userId, "Leave", $"{userId} left group"));
         await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task<List<ActivityDto>> GetActivityAsync(Guid userId, Guid groupId, int take, CancellationToken ct = default)
+    {
+        await RequireMembershipAsync(userId, groupId, ct);
+        return await _context.ActivityLogs
+            .Where(a => a.GroupId == groupId)
+            .OrderByDescending(a => a.CreatedAt)
+            .Take(Math.Clamp(take, 1, 100))
+            .Select(a => new ActivityDto(a.Id, a.Actor.DisplayName, a.Action, a.EntityType, a.Summary, a.CreatedAt))
+            .ToListAsync(ct);
     }
 
     private async Task<GroupMember> RequireMembershipAsync(Guid userId, Guid groupId, CancellationToken ct)

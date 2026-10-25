@@ -5,6 +5,7 @@ import JoinGroup from './pages/JoinGroup';
 import Dashboard from './pages/Dashboard';
 import GroupDetail from './pages/GroupDetail';
 import ProjectDetail from './pages/ProjectDetail';
+import TaskDetail from './pages/TaskDetail';
 import MyTasks from './pages/MyTasks';
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/groups/:id" element={<GroupDetail />} />
         <Route path="/projects/:id" element={<ProjectDetail />} />
+        <Route path="/tasks/:id" element={<TaskDetail />} />
         <Route path="/my-tasks" element={<MyTasks />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

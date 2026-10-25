@@ -16,7 +16,7 @@ public interface ITaskService
     Task<TaskDto> GetAsync(Guid userId, Guid taskId, CancellationToken ct = default);
     Task<TaskDto> UpdateAsync(Guid userId, Guid taskId, string title, string? description, Priority priority, DateTime? deadlineAt, decimal? estimateHours, int? points, CancellationToken ct = default);
     Task<TaskDto> AssignAsync(Guid userId, Guid taskId, Guid? assigneeUserId, CancellationToken ct = default);
-    Task<TaskDto> ChangeStatusAsync(Guid userId, Guid taskId, TaskStatus newStatus, CancellationToken ct = default);
+    Task<TaskDto> ChangeStatusAsync(Guid userId, Guid taskId, TaskStatus newStatus, string? reviewComment = null, CancellationToken ct = default);
     Task DeleteAsync(Guid userId, Guid taskId, CancellationToken ct = default);
 }
 
@@ -140,7 +140,7 @@ public class TaskService : ITaskService
         return await GetDtoAsync(taskId, ct);
     }
 
-    public async Task<TaskDto> ChangeStatusAsync(Guid userId, Guid taskId, TaskStatus newStatus, CancellationToken ct = default)
+    public async Task<TaskDto> ChangeStatusAsync(Guid userId, Guid taskId, TaskStatus newStatus, string? reviewComment = null, CancellationToken ct = default)
     {
         var task = await LoadAsync(taskId, ct);
         var membership = await RequireMemberAsync(userId, task.Project.GroupId, ct);
@@ -161,6 +161,24 @@ public class TaskService : ITaskService
 
         if (!allowed)
             throw new BadRequestException($"Cannot transition task from {task.Status} to {newStatus} with your role");
+
+        // Leader decisions create a review record with optional comment
+        if (newStatus is TaskStatus.Completed or TaskStatus.ChangesRequested)
+        {
+            if (newStatus == TaskStatus.ChangesRequested && string.IsNullOrWhiteSpace(reviewComment))
+                throw new BadRequestException("Review comment is required when requesting changes");
+
+            var version = await _context.TaskReviews.CountAsync(r => r.TaskId == taskId, ct) + 1;
+            _context.TaskReviews.Add(new TaskReview
+            {
+                Id = Guid.NewGuid(),
+                TaskId = taskId,
+                ReviewerUserId = userId,
+                Decision = newStatus,
+                Comment = reviewComment,
+                SubmissionVersion = version
+            });
+        }
 
         task.Status = newStatus;
         task.UpdatedAt = DateTime.UtcNow;

@@ -51,6 +51,10 @@ public class GroupsController : ControllerBase
     public async Task<IActionResult> GetMembers(Guid id, CancellationToken ct)
         => Ok(await _groups.GetMembersAsync(User.GetUserId(), id, ct));
 
+    [HttpGet("{id:guid}/activity")]
+    public async Task<IActionResult> GetActivity(Guid id, [FromQuery] int take = 50, CancellationToken ct = default)
+        => Ok(await _groups.GetActivityAsync(User.GetUserId(), id, take, ct));
+
     [HttpDelete("{id:guid}/members/{memberUserId:guid}")]
     public async Task<IActionResult> RemoveMember(Guid id, Guid memberUserId, CancellationToken ct)
     {

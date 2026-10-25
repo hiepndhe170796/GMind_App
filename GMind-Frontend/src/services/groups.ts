@@ -23,4 +23,9 @@ export const groupsService = {
     const res = await api.post(`/api/groups/${id}/invites`, {});
     return res.data.data;
   },
+  async activity(id: string): Promise<ActivityDto[]> {
+    return (await api.get(`/api/groups/${id}/activity`)).data.data;
+  },
 };
+
+export interface ActivityDto { id: string; actorName: string; action: string; entityType: string; summary: string; createdAt: string }

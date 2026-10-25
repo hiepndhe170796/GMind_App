@@ -6,7 +6,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { groupsService } from '../services/groups';
+import { groupsService, type ActivityDto } from '../services/groups';
 import { projectsService, type ProjectDto } from '../services/projects';
 import { dashboardService, type GroupProgress } from '../services/dashboard';
 import { authService } from '../services/auth';
@@ -17,6 +17,7 @@ export default function GroupDetail() {
   const [group, setGroup] = useState<any>(null);
   const [projects, setProjects] = useState<ProjectDto[]>([]);
   const [progress, setProgress] = useState<GroupProgress | null>(null);
+  const [activity, setActivity] = useState<ActivityDto[]>([]);
   const [inviteCode, setInviteCode] = useState('');
   const [projName, setProjName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -26,7 +27,7 @@ export default function GroupDetail() {
 
   useEffect(() => {
     if (!authService.isLoggedIn()) { navigate('/login'); return; }
-    Promise.all([groupsService.get(id!), reloadProjects()])
+    Promise.all([groupsService.get(id!), reloadProjects(), groupsService.activity(id!).then(setActivity)])
       .then(([g]) => {
         setGroup(g);
         if (g.myRole === 'Leader') {
@@ -122,6 +123,19 @@ export default function GroupDetail() {
             <li key={m.userId} className="py-3 flex items-center justify-between">
               <span>{m.displayName}</span>
               <Badge variant={m.role === 'Leader' ? 'primary' : 'neutral'}>{m.role}</Badge>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      <Card className="mt-6">
+        <h2 className="font-semibold mb-4">Hoạt động gần đây</h2>
+        {activity.length === 0 && <p className="text-sm text-neutral-500">Chưa có hoạt động.</p>}
+        <ul className="space-y-2">
+          {activity.map(a => (
+            <li key={a.id} className="text-sm border-l-2 border-neutral-300 pl-3">
+              <b>{a.actorName}</b> — {a.summary}
+              <span className="text-neutral-400 text-xs ml-2">{new Date(a.createdAt).toLocaleString('vi-VN')}</span>
             </li>
           ))}
         </ul>

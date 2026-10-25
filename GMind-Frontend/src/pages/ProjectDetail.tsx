@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -99,7 +99,7 @@ export default function ProjectDetail() {
             <h3 className="text-sm font-semibold mb-2">{STATUS_LABEL[col]} ({topTasks.filter(t => t.status === col).length})</h3>
             {topTasks.filter(t => t.status === col).map(t => (
               <Card key={t.id} className="mb-2 !p-3">
-                <p className="text-sm font-medium">{t.title}</p>
+                <Link to={`/tasks/${t.id}`} className="text-sm font-medium hover:text-primary-600">{t.title}</Link>
                 <p className="text-xs text-neutral-500">{t.assigneeName || 'Chưa giao'} {t.deadlineAt && `· ${new Date(t.deadlineAt).toLocaleDateString('vi-VN')}`}</p>
                 <div className="flex gap-1 mt-2 flex-wrap">
                   {t.status === 'ToDo' && t.assigneeUserId === me?.id && <Button size="sm" onClick={() => changeStatus(t, TaskStatus.InProgress)}>Bắt đầu</Button>}
