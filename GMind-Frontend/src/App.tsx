@@ -9,6 +9,7 @@ import TaskDetail from './pages/TaskDetail';
 import MyTasks from './pages/MyTasks';
 import Notifications from './pages/Notifications';
 import Marketplace from './pages/Marketplace';
+import Calendar from './pages/Calendar';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/tasks/:id" element={<TaskDetail />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/groups/:groupId/marketplace" element={<Marketplace />} />
+        <Route path="/calendar" element={<Calendar />} />
         <Route path="/my-tasks" element={<MyTasks />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

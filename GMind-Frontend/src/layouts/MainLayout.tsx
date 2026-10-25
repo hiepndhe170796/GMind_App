@@ -31,6 +31,7 @@ const MainLayout = ({ children }: MainLayoutProps) => {
             <nav className="flex items-center gap-4">
               <Link to="/dashboard" className="text-neutral-600 dark:text-neutral-400 hover:text-primary-600">Nhóm</Link>
               <Link to="/my-tasks" className="text-neutral-600 dark:text-neutral-400 hover:text-primary-600">Task của tôi</Link>
+              <Link to="/calendar" className="text-neutral-600 dark:text-neutral-400 hover:text-primary-600">Lịch</Link>
               <Link to="/notifications" className="text-neutral-600 dark:text-neutral-400 hover:text-primary-600">
                 Thông báo{unread > 0 && <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-xs bg-danger-500 text-white rounded-full">{unread}</span>}
               </Link>

@@ -33,6 +33,7 @@ public class ReminderWorker : BackgroundService
             try
             {
                 await ProcessRemindersAsync(stoppingToken);
+                await ProcessStaleTasksAsync(stoppingToken);
             }
             catch (Exception ex)
             {
@@ -107,5 +108,59 @@ public class ReminderWorker : BackgroundService
 
         await db.SaveChangesAsync(ct);
         _logger.LogInformation("ReminderWorker processed {Count} tasks", tasks.Count);
+    }
+
+    /// <summary>Risk alert: notify leaders about tasks InProgress with no update for 3+ days (dedup once/day/task).</summary>
+    private async System.Threading.Tasks.Task ProcessStaleTasksAsync(CancellationToken ct)
+    {
+        using var scope = _services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var now = DateTime.UtcNow;
+        var staleThreshold = now.AddDays(-3);
+
+        var stale = await db.Tasks
+            .Include(t => t.Project)
+            .Where(t => t.Status == TaskStatus.InProgress && t.UpdatedAt < staleThreshold && t.Project.ArchivedAt == null)
+            .ToListAsync(ct);
+
+        foreach (var task in stale)
+        {
+            var dedupKey = $"stale:{task.Id}:{now:yyyyMMdd}";
+            if (await db.ReminderDeliveries.AnyAsync(r => r.DeduplicationKey == dedupKey, ct))
+                continue;
+
+            var leaders = await db.GroupMembers
+                .Where(m => m.GroupId == task.Project.GroupId && m.Role == Role.Leader && m.IsActive)
+                .Select(m => m.UserId).ToListAsync(ct);
+
+            foreach (var leaderId in leaders)
+            {
+                db.Notifications.Add(new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    RecipientUserId = leaderId,
+                    GroupId = task.Project.GroupId,
+                    Type = NotificationType.StaleTaskWarning,
+                    Title = "Task bị đình trệ",
+                    Body = $"Task '{task.Title}' không có cập nhật hơn 3 ngày",
+                    RelatedEntityType = "Task",
+                    RelatedEntityId = task.Id
+                });
+            }
+
+            db.ReminderDeliveries.Add(new ReminderDelivery
+            {
+                Id = Guid.NewGuid(),
+                TaskId = task.Id,
+                RecipientUserId = leaders.FirstOrDefault(),
+                ReminderType = ReminderType.Overdue,
+                ScheduledFor = now,
+                SentAt = now,
+                DeduplicationKey = dedupKey,
+                Status = "StaleWarning"
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
     }
 }

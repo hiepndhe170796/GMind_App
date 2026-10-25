@@ -14,5 +14,7 @@ public enum NotificationType
     OverdueAlert = 10,
     MemberInvited = 11,
     MemberJoined = 12,
-    MemberRemoved = 13
+    MemberRemoved = 13,
+    StaleTaskWarning = 14,
+    CommentAdded = 15
 }
