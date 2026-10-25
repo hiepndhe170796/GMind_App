@@ -1,7 +1,10 @@
 using System.Reflection;
 using FluentValidation;
 using GMind.Application.Services.Auth;
+using GMind.Application.Services.Dashboard;
 using GMind.Application.Services.Groups;
+using GMind.Application.Services.Projects;
+using GMind.Application.Services.Tasks;
 using GMind.Domain.Interfaces;
 using Mapster;
 using MediatR;
@@ -21,6 +24,9 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IGroupService, GroupService>();
+        services.AddScoped<IProjectService, ProjectService>();
+        services.AddScoped<ITaskService, TaskService>();
+        services.AddScoped<IDashboardService, DashboardService>();
 
         return services;
     }

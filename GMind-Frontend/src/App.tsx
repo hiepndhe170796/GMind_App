@@ -4,6 +4,8 @@ import Register from './pages/Register';
 import JoinGroup from './pages/JoinGroup';
 import Dashboard from './pages/Dashboard';
 import GroupDetail from './pages/GroupDetail';
+import ProjectDetail from './pages/ProjectDetail';
+import MyTasks from './pages/MyTasks';
 
 function App() {
   return (
@@ -15,6 +17,8 @@ function App() {
         <Route path="/join-group" element={<JoinGroup />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/groups/:id" element={<GroupDetail />} />
+        <Route path="/projects/:id" element={<ProjectDetail />} />
+        <Route path="/my-tasks" element={<MyTasks />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

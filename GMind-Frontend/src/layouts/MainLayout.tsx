@@ -1,38 +1,35 @@
 import type { ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { authService } from '../services/auth';
 
 interface MainLayoutProps {
   children: ReactNode;
 }
 
 const MainLayout = ({ children }: MainLayoutProps) => {
+  const navigate = useNavigate();
+  const user = authService.currentUser();
+
+  const logout = async () => {
+    await authService.logout();
+    navigate('/login');
+  };
+
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
-      {/* Header */}
       <header className="bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400">GMind</h1>
-            </div>
-            <nav className="flex items-center space-x-4">
-              <a href="#" className="text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400">
-                Dashboard
-              </a>
-              <a href="#" className="text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400">
-                Groups
-              </a>
-              <a href="#" className="text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400">
-                Tasks
-              </a>
-              <a href="#" className="text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400">
-                Notifications
-              </a>
+            <Link to="/dashboard" className="text-2xl font-bold text-primary-600 dark:text-primary-400">GMind</Link>
+            <nav className="flex items-center gap-4">
+              <Link to="/dashboard" className="text-neutral-600 dark:text-neutral-400 hover:text-primary-600">Nhóm</Link>
+              <Link to="/my-tasks" className="text-neutral-600 dark:text-neutral-400 hover:text-primary-600">Task của tôi</Link>
+              <span className="text-sm text-neutral-500">{user?.displayName}</span>
+              <button onClick={logout} className="text-sm text-danger-600 hover:underline">Đăng xuất</button>
             </nav>
           </div>
         </div>
       </header>
-
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
