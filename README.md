@@ -137,9 +137,10 @@ dotnet test
 ```
 
 ### Frontend Tests
+Frontend test runner (Vitest) chưa được cài đặt — dự kiến bổ sung ở phase sau.
 ```bash
 cd GMind-Frontend
-npm run test
+npm run build   # typecheck + production build
 ```
 
 ## 📦 Các Tính Năng (Theo BA Specification)
