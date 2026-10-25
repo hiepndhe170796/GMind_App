@@ -8,6 +8,7 @@ import ProjectDetail from './pages/ProjectDetail';
 import TaskDetail from './pages/TaskDetail';
 import MyTasks from './pages/MyTasks';
 import Notifications from './pages/Notifications';
+import Marketplace from './pages/Marketplace';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="/projects/:id" element={<ProjectDetail />} />
         <Route path="/tasks/:id" element={<TaskDetail />} />
         <Route path="/notifications" element={<Notifications />} />
+        <Route path="/groups/:groupId/marketplace" element={<Marketplace />} />
         <Route path="/my-tasks" element={<MyTasks />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

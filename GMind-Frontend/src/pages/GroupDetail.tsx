@@ -61,7 +61,10 @@ export default function GroupDetail() {
           <h1 className="text-3xl font-bold">{group.name}</h1>
           {group.description && <p className="text-neutral-600 dark:text-neutral-400 mt-1">{group.description}</p>}
         </div>
-        <Badge variant={isLeader ? 'primary' : 'neutral'}>{group.myRole}</Badge>
+        <div className="flex items-center gap-2">
+          <Link to={`/groups/${id}/marketplace`}><Button variant="secondary" size="sm">Marketplace</Button></Link>
+          <Badge variant={isLeader ? 'primary' : 'neutral'}>{group.myRole}</Badge>
+        </div>
       </div>
       {error && <p className="mb-4 text-sm text-danger-600">{error}</p>}
 
