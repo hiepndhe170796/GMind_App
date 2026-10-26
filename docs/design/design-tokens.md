@@ -255,3 +255,7 @@ Tất cả colors đều có dark mode variants thông qua Tailwind's dark mode:
 - Background colors chuyển sang neutral-950, neutral-900
 - Text colors chuyển sang neutral-100, neutral-300
 - Semantic colors có dark variants với độ sáng giảm
+
+## A2 overrides (light preview)
+- Light only: page bg `#f5f7fb`, cards white 1px `#e7ecf4`, rounded-2xl (18px), `shadow-card` subtle. Primary `#3679e5`; `darkMode:'class'` retained, dark utilities dormant.
+- Segoe UI/system stack (no remote fonts). Sidebar 232px white fixed; topbar sticky 64px; content max-w 1440 / px-8 desktop, px-4 mobile; mobile nav via native `<dialog>`.

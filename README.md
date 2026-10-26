@@ -221,3 +221,7 @@ Dự án được phát triển bởi [Tên đội nhóm].
 ### A1 Authorization (hiện tại)
 - Task privacy + Leader/Member theo membership đang hoạt động (nhóm/project chưa lưu trữ, user active). Marketplace, notifications, group role changes dùng cùng resource-access checks; thông báo nội bộ nhóm chỉ hiển thị với thành viên active (ngoại lệ MemberRemoved của chính người nhận). Session revocation qua `AuthVersion` + refresh rotation; guard frontend validate `/api/me` mỗi navigation.
 - Đã verify: backend session/membership tests, frontend workspace/session/component tests, live Edge smoke (login → refresh rotation → logout revoke). A1c regression suite deferred theo yêu cầu người dùng — sẽ bổ sung sau.
+
+### Bản xem trước giao diện A2
+- Shell xanh nhạt + sidebar trắng mới; Dashboard tổng quan, Project board/list, TaskDetail hai cột đã redesign light-only và responsive (mobile menu `<dialog>`).
+- Còn lại của A2 (profile, quên/đặt lại mật khẩu qua mailbox local) chưa làm — chờ duyệt thiết kế.
