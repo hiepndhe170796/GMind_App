@@ -44,6 +44,7 @@ public class MarketplaceController : ControllerBase
 public class MarketplaceRequestModel
 {
     [Required]
+    [EnumDataType(typeof(MarketplaceRequestType))]
     public MarketplaceRequestType RequestType { get; set; }
     [Required]
     public Guid TaskId { get; set; }

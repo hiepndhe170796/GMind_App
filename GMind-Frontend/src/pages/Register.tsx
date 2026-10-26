@@ -23,7 +23,7 @@ export default function Register() {
       await authService.register(form.displayName, form.email, form.password, form.confirmPassword);
       const result = await authService.login(form.email, form.password);
       authService.saveSession(result);
-      navigate('/join-group');
+      navigate('/join-group', { replace: true });
     } catch (err: any) {
       setError(err?.message || 'Đăng ký thất bại');
     } finally {

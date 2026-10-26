@@ -100,5 +100,6 @@ public class JoinRequest
 public class ChangeRoleRequest
 {
     [Required]
+    [EnumDataType(typeof(Role))]
     public Role Role { get; set; }
 }

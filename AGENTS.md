@@ -61,3 +61,11 @@ At the end of each milestone, report:
 - How to run the application locally, including environment variables and database setup, without exposing secrets.
 
 Work incrementally. Do not attempt to implement the entire product in one enormous change.
+
+## 8. Verified commands (A0)
+- Backend dev run: `dotnet run --project GMind-Backend/GMind.API --launch-profile http` (API at http://localhost:5194; HTTPS redirect is disabled in Development only).
+- Health: `GET /api/health/live`, `GET /api/health/ready` (200 only when SQL Server connects); via frontend proxy `http://localhost:5173/api/health/ready`.
+- Backend tests: `dotnet test GMind-Backend/GMind.Tests/GMind.Tests.csproj --filter FullyQualifiedName~<TestClass>`.
+- Frontend: `npm --prefix GMind-Frontend run dev|lint|build`; unit tests `npm --prefix GMind-Frontend run test -- --run <file>`.
+- Frontend project build: `dotnet build GMind-Frontend/GMind-Frontend.esproj` (JS SDK runs `npm run build` -> `dist/`).
+- Visual Studio configuration: open `GMind.slnx`, select startup profile `GMind - API + Frontend` (`GMind.slnLaunch`) for API (`http`) + Vite and http://localhost:5173. Project builds and proxy/login were verified; the actual GUI Run/F5 flow still needs confirmation.

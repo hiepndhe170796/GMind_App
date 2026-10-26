@@ -84,11 +84,22 @@ public class AuthService : IAuthService
     {
         var user = await _context.Users.FindAsync(new object[] { userId }, ct);
         if (user is null) return;
-
-        user.RefreshToken = null;
-        user.RefreshTokenExpiryTime = null;
-        user.UpdatedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync(ct);
+        for (var attempt = 0; ; attempt++)
+        {
+            user.RefreshToken = null;
+            user.RefreshTokenExpiryTime = null;
+            user.AuthVersion = checked(user.AuthVersion + 1);
+            user.UpdatedAt = DateTime.UtcNow;
+            try
+            {
+                await _context.SaveChangesAsync(ct);
+                return;
+            }
+            catch (DbUpdateConcurrencyException exception) when (attempt < 2)
+            {
+                foreach (var entry in exception.Entries) await entry.ReloadAsync(ct);
+            }
+        }
     }
 
     public async Task ForgotPasswordAsync(string email, CancellationToken ct = default)
@@ -113,12 +124,13 @@ public class AuthService : IAuthService
     {
         var tokenHash = HashToken(token);
         var user = await _context.Users.FirstOrDefaultAsync(
-            u => u.PasswordResetToken == tokenHash && u.PasswordResetTokenExpiry > DateTime.UtcNow, ct);
+            u => u.PasswordResetToken == tokenHash && u.PasswordResetTokenExpiry > DateTime.UtcNow && u.IsActive, ct);
 
         if (user is null)
             throw new BadRequestException("Invalid or expired reset token");
 
         user.PasswordHash = _passwordHasher.HashPassword(newPassword);
+        user.AuthVersion = checked(user.AuthVersion + 1);
         user.PasswordResetToken = null;
         user.PasswordResetTokenExpiry = null;
         user.RefreshToken = null;
@@ -159,6 +171,7 @@ public class AuthService : IAuthService
         // Invalidate existing sessions
         user.RefreshToken = null;
         user.RefreshTokenExpiryTime = null;
+        user.AuthVersion = checked(user.AuthVersion + 1);
         await _context.SaveChangesAsync(ct);
     }
 
@@ -172,7 +185,14 @@ public class AuthService : IAuthService
         user.RefreshToken = HashToken(refreshToken);
         user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(refreshExpiryDays);
         user.UpdatedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync(ct);
+        try
+        {
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new UnauthorizedException("Session changed. Sign in again.");
+        }
 
         return new AuthResult(accessToken, refreshToken, DateTime.UtcNow.AddMinutes(expiryMinutes), ToDto(user));
     }

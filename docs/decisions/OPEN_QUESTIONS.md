@@ -26,4 +26,4 @@ Mục này ghi nhận các quyết định nghiệp vụ/kỹ thuật chưa đư
 
 - `System.Security.Cryptography.Pkcs` 9.0.11 có NU1902/NU1903 warnings (transitive từ EF Core) — chờ upstream update.
 - .NET SDK đang dùng **11.0.100-rc.2 preview** — cân nhắc pin sang LTS (net8/net10) khi release chính thức.
-- Frontend chưa có protected-route guard chuyên dụng (check `isLoggedIn` trong từng page); refresh-token rotation endpoint chưa được gọi từ interceptor.
+- Thông báo nội bộ nhóm chỉ hiển thị/đánh dấu đã đọc khi người nhận còn là thành viên đang hoạt động của nhóm chưa lưu trữ. Ngoại lệ: thông báo MemberRemoved của chính người nhận vẫn hiển thị để biết quyền đã bị thu hồi. Đây là lựa chọn bảo thủ cho A1; không xóa lịch sử thông báo.

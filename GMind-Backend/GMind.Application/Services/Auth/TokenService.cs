@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -11,6 +12,8 @@ namespace GMind.Application.Services.Auth;
 
 public class TokenService : ITokenService
 {
+    public const string AuthVersionClaim = "auth_version";
+
     private readonly IConfiguration _configuration;
 
     public TokenService(IConfiguration configuration)
@@ -27,7 +30,8 @@ public class TokenService : ITokenService
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Name, user.DisplayName)
+            new(ClaimTypes.Name, user.DisplayName),
+            new(AuthVersionClaim, user.AuthVersion.ToString(CultureInfo.InvariantCulture))
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));

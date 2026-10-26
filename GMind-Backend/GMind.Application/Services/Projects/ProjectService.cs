@@ -23,8 +23,13 @@ public record ProjectDto(Guid Id, Guid GroupId, string Name, string? Description
 public class ProjectService : IProjectService
 {
     private readonly IApplicationDbContext _context;
+    private readonly IResourceAccess _access;
 
-    public ProjectService(IApplicationDbContext context) => _context = context;
+    public ProjectService(IApplicationDbContext context, IResourceAccess access)
+    {
+        _context = context;
+        _access = access;
+    }
 
     public async Task<ProjectDto> CreateAsync(Guid userId, Guid groupId, string name, string? description, string? subject, DateTime? deadlineAt, CancellationToken ct = default)
     {
@@ -96,17 +101,10 @@ public class ProjectService : IProjectService
     }
 
     private async Task RequireMemberAsync(Guid userId, Guid groupId, CancellationToken ct)
-    {
-        var ok = await _context.GroupMembers.AnyAsync(m => m.GroupId == groupId && m.UserId == userId && m.IsActive, ct);
-        if (!ok) throw new ForbiddenException("Not a member of this group");
-    }
+        => await _access.RequireMemberAsync(userId, groupId, ct);
 
     private async Task RequireLeaderAsync(Guid userId, Guid groupId, CancellationToken ct)
-    {
-        var m = await _context.GroupMembers.FirstOrDefaultAsync(x => x.GroupId == groupId && x.UserId == userId && x.IsActive, ct)
-            ?? throw new ForbiddenException("Not a member of this group");
-        if (m.Role != Role.Leader) throw new ForbiddenException("Leader role required");
-    }
+        => await _access.RequireLeaderAsync(userId, groupId, ct);
 
     private static ProjectDto ToDto(Project p, int total, int done)
         => new(p.Id, p.GroupId, p.Name, p.Description, p.Subject, p.DeadlineAt, p.Status.ToString(), total, done, p.CreatedAt);

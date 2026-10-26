@@ -18,8 +18,12 @@ const MainLayout = ({ children }: MainLayoutProps) => {
   }, []);
 
   const logout = async () => {
-    await authService.logout();
-    navigate('/login');
+    const result = await authService.logout();
+    if (authService.isLoggedIn()) return;
+    navigate('/login', {
+      replace: true,
+      state: result.serverRevoked ? undefined : { logoutWarning: 'Đã đăng xuất trên trình duyệt này. Chưa thể xác nhận thu hồi phiên trên máy chủ; vui lòng kiểm tra kết nối.' },
+    });
   };
 
   return (

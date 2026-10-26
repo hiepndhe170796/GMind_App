@@ -1,29 +1,35 @@
-import api from './api';
+import api, { authApi, logoutSession, waitForLogout, type LogoutResult } from './api';
+import { getSessionSnapshot, saveSession as persistSession, updateSessionUser } from './session';
+import type { AuthResult, UserInfo } from './session';
 
-export interface UserInfo { id: string; displayName: string; email: string; avatarUrl?: string }
-export interface AuthResult { accessToken: string; refreshToken: string; expiresAt: string; user: UserInfo }
+export type { AuthResult, UserInfo };
 
 export const authService = {
   async register(displayName: string, email: string, password: string, confirmPassword: string) {
-    const res = await api.post('/api/auth/register', { displayName, email, password, confirmPassword });
+    const res = await authApi.post('/api/auth/register', { displayName, email, password, confirmPassword });
     return res.data.data as UserInfo;
   },
   async login(email: string, password: string): Promise<AuthResult> {
-    const res = await api.post('/api/auth/login', { email, password });
+    await waitForLogout();
+    await authApi.get('/api/health/ready');
+    const res = await authApi.post('/api/auth/login', { email, password });
     return res.data.data;
   },
-  async logout() {
-    try { await api.post('/api/auth/logout'); } catch { /* ignore */ }
-    localStorage.clear();
+  async validateSession(): Promise<UserInfo> {
+    const id = getSessionSnapshot()?.id;
+    const res = await api.get('/api/me');
+    const user = res.data.data as UserInfo;
+    if (id) updateSessionUser(user, id);
+    return user;
+  },
+  logout(): Promise<LogoutResult> {
+    return logoutSession();
   },
   saveSession(r: AuthResult) {
-    localStorage.setItem('accessToken', r.accessToken);
-    localStorage.setItem('refreshToken', r.refreshToken);
-    localStorage.setItem('user', JSON.stringify(r.user));
+    persistSession(r);
   },
   currentUser(): UserInfo | null {
-    const raw = localStorage.getItem('user');
-    return raw ? JSON.parse(raw) : null;
+    return getSessionSnapshot()?.user ?? null;
   },
-  isLoggedIn() { return !!localStorage.getItem('accessToken'); },
+  isLoggedIn() { return !!getSessionSnapshot(); },
 };

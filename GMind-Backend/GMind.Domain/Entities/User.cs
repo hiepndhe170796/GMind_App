@@ -26,6 +26,7 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
+    public int AuthVersion { get; set; }
 
     [MaxLength(256)]
     public string? RefreshToken { get; set; }

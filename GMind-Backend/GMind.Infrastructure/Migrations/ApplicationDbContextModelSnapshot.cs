@@ -608,6 +608,12 @@ namespace GMind.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("AuthVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("AvatarUrl")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -634,6 +640,7 @@ namespace GMind.Infrastructure.Migrations
                         .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("PasswordResetToken")
+                        .IsConcurrencyToken()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
@@ -641,6 +648,7 @@ namespace GMind.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("RefreshToken")
+                        .IsConcurrencyToken()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 

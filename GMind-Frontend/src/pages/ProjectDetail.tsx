@@ -7,8 +7,8 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { projectsService, type ProjectDto } from '../services/projects';
-import { tasksService, TaskStatus, type TaskDto } from '../services/tasks';
-import { groupsService } from '../services/groups';
+import { tasksService, TaskStatus, type TaskSummaryDto } from '../services/tasks';
+import { groupsService, type GroupMemberDto } from '../services/groups';
 import { authService } from '../services/auth';
 
 const COLUMNS = ['ToDo', 'InProgress', 'Submitted', 'ChangesRequested', 'Completed'] as const;
@@ -22,8 +22,8 @@ export default function ProjectDetail() {
   const navigate = useNavigate();
   const me = authService.currentUser();
   const [project, setProject] = useState<ProjectDto | null>(null);
-  const [tasks, setTasks] = useState<TaskDto[]>([]);
-  const [members, setMembers] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<TaskSummaryDto[]>([]);
+  const [members, setMembers] = useState<GroupMemberDto[]>([]);
   const [myRole, setMyRole] = useState('Member');
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState('');
@@ -58,7 +58,7 @@ export default function ProjectDetail() {
     } catch (e: any) { setError(e?.message || 'Tạo task thất bại'); }
   };
 
-  const changeStatus = async (t: TaskDto, status: number) => {
+  const changeStatus = async (t: TaskSummaryDto, status: number) => {
     try { await tasksService.changeStatus(t.id, status); await reload(); }
     catch (e: any) { setError(e?.message || 'Không đổi được trạng thái'); }
   };
@@ -81,17 +81,19 @@ export default function ProjectDetail() {
       </div>
       {error && <p className="mb-4 text-sm text-danger-600">{error}</p>}
 
+      {isLeader && (
       <Card className="mb-6">
         <div className="flex flex-wrap gap-2 items-end">
           <div className="flex-1 min-w-40"><Input label="Task mới" value={title} onChange={e => setTitle(e.target.value)} placeholder="Tên task" /></div>
           <select className="border rounded-lg px-3 py-2 text-sm dark:bg-neutral-900" value={assignee} onChange={e => setAssignee(e.target.value)}>
             <option value="">Giao cho...</option>
-            {members.map((m: any) => <option key={m.userId} value={m.userId}>{m.displayName}</option>)}
+            {members.map(m => <option key={m.userId} value={m.userId}>{m.displayName}</option>)}
           </select>
           <input type="date" className="border rounded-lg px-3 py-2 text-sm dark:bg-neutral-900" value={deadline} onChange={e => setDeadline(e.target.value)} />
           <Button onClick={createTask}>Thêm</Button>
         </div>
       </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
         {COLUMNS.map(col => (

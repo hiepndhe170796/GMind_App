@@ -6,4 +6,10 @@
     <Project Path="GMind-Backend/GMind.Infrastructure/GMind.Infrastructure.csproj" />
     <Project Path="GMind-Backend/GMind.Tests/GMind.Tests.csproj" />
   </Folder>
+  <Folder Name="/GMind-Frontend/">
+    <Project Path="GMind-Frontend/GMind-Frontend.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
 </Solution>

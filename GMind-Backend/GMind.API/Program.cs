@@ -1,8 +1,10 @@
 using System.Text;
 using GMind.API;
+using GMind.API.Common;
 using GMind.Application;
 using GMind.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,9 +13,11 @@ builder.Services.AddPresentation();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructureSqlServer(builder.Configuration);
 
+builder.Services.AddScoped<SessionTokenValidator>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.EventsType = typeof(SessionTokenValidator);
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -29,6 +33,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddHealthChecks().AddCheck<DatabaseReadinessCheck>("database", tags: ["ready"]);
 
 builder.Services.AddCors(options =>
 {
@@ -57,9 +63,14 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("Frontend");
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+app.MapHealthChecks("/api/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
+app.MapHealthChecks("/api/health/ready", new HealthCheckOptions { Predicate = registration => registration.Tags.Contains("ready") }).AllowAnonymous();
+
 app.Run();
+
+public partial class Program { }

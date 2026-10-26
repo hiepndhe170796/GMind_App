@@ -27,20 +27,26 @@ public class MarketplaceService : IMarketplaceService
 {
     private readonly IApplicationDbContext _context;
     private readonly INotificationService _notifications;
+    private readonly IResourceAccess _access;
 
-    public MarketplaceService(IApplicationDbContext context, INotificationService notifications)
+    public MarketplaceService(IApplicationDbContext context, INotificationService notifications, IResourceAccess access)
     {
         _context = context;
         _notifications = notifications;
+        _access = access;
     }
 
     public async Task<MarketplaceDto> CreateAsync(Guid userId, Guid groupId, MarketplaceRequestType type, Guid taskId,
         Guid? targetUserId, Guid? relatedTaskId, string reason, CancellationToken ct = default)
     {
         await RequireMemberAsync(userId, groupId, ct);
+        if (!Enum.IsDefined(type)) throw new BadRequestException("Invalid marketplace request type");
+        if (string.IsNullOrWhiteSpace(reason) || reason.Length > 1000) throw new BadRequestException("A reason of up to 1000 characters is required");
+        if (taskId == Guid.Empty || targetUserId == Guid.Empty || relatedTaskId == Guid.Empty) throw new BadRequestException("Invalid task or member id");
+        if (type != MarketplaceRequestType.Swap && relatedTaskId != null) throw new BadRequestException("Related task is only allowed for Swap");
 
         var task = await _context.Tasks.Include(t => t.Project)
-            .FirstOrDefaultAsync(t => t.Id == taskId && t.Project.GroupId == groupId, ct)
+            .FirstOrDefaultAsync(t => t.Id == taskId && t.Project.GroupId == groupId && t.Project.ArchivedAt == null, ct)
             ?? throw new BadRequestException("Task not found in this group");
 
         if (task.AssigneeUserId != userId)
@@ -61,7 +67,7 @@ public class MarketplaceService : IMarketplaceService
         {
             if (relatedTaskId == null) throw new BadRequestException("Swap requires the other member's task");
             var other = await _context.Tasks.Include(t => t.Project)
-                .FirstOrDefaultAsync(t => t.Id == relatedTaskId && t.Project.GroupId == groupId, ct)
+                .FirstOrDefaultAsync(t => t.Id == relatedTaskId && t.Project.GroupId == groupId && t.Project.ArchivedAt == null, ct)
                 ?? throw new BadRequestException("Related task not found in this group");
             if (other.AssigneeUserId != targetUserId)
                 throw new BadRequestException("Related task must belong to the target member");
@@ -109,8 +115,12 @@ public class MarketplaceService : IMarketplaceService
         var q = _context.MarketplaceRequests
             .Where(r => r.GroupId == groupId)
             .AsQueryable();
-        if (Enum.TryParse<MarketplaceRequestStatus>(statusFilter, true, out var s))
+        if (!string.IsNullOrWhiteSpace(statusFilter))
+        {
+            if (!Enum.TryParse<MarketplaceRequestStatus>(statusFilter, true, out var s) || !Enum.IsDefined(s))
+                throw new BadRequestException("Invalid marketplace status");
             q = q.Where(r => r.Status == s);
+        }
         return await q.OrderByDescending(r => r.CreatedAt)
             .Take(100)
             .Select(r => new MarketplaceDto(r.Id, r.RequestType.ToString(), r.Status.ToString(),
@@ -127,9 +137,27 @@ public class MarketplaceService : IMarketplaceService
         if (req.Status != MarketplaceRequestStatus.Pending)
             throw new BadRequestException("Request is not pending");
 
-        var task = req.Task ?? throw new BadRequestException("Request has no task");
-        if (task.Status == TaskStatus.Completed)
-            throw new BadRequestException("Task is already completed");
+        if (!Enum.IsDefined(req.RequestType)) throw new BadRequestException("Invalid marketplace request type");
+        var task = req.Task ?? throw new ConflictException("Request task is no longer available");
+        if (task.Project.GroupId != req.GroupId || task.ProjectId != req.ProjectId || task.Project.ArchivedAt != null)
+            throw new ConflictException("Request task is no longer available in this group");
+        if (task.Status == TaskStatus.Completed || task.AssigneeUserId != req.RequestedByUserId)
+            throw new ConflictException("Task changed since this request was created");
+        await RequireMemberAsync(req.RequestedByUserId, req.GroupId, ct);
+        if (req.RequestType is MarketplaceRequestType.Transfer or MarketplaceRequestType.Swap && req.TargetUserId == null)
+            throw new BadRequestException("Target member is required");
+        if (req.TargetUserId != null) {
+            if (req.TargetUserId == req.RequestedByUserId) throw new BadRequestException("Target cannot be yourself");
+            await RequireMemberAsync(req.TargetUserId.Value, req.GroupId, ct);
+        }
+        TaskEntity? other = null;
+        if (req.RequestType == MarketplaceRequestType.Swap) {
+            other = await _context.Tasks.Include(t => t.Project)
+                .FirstOrDefaultAsync(t => t.Id == req.RelatedTaskId && t.Project.GroupId == req.GroupId && t.Project.ArchivedAt == null, ct)
+                ?? throw new ConflictException("Related task is no longer available in this group");
+            if (other.Id == task.Id || other.AssigneeUserId != req.TargetUserId || other.Status == TaskStatus.Completed)
+                throw new ConflictException("Related task changed since this request was created");
+        }
 
         switch (req.RequestType)
         {
@@ -141,11 +169,10 @@ public class MarketplaceService : IMarketplaceService
                 break;
 
             case MarketplaceRequestType.Swap:
-                var other = await _context.Tasks.FirstAsync(t => t.Id == req.RelatedTaskId, ct);
-                (task.AssigneeUserId, other.AssigneeUserId) = (other.AssigneeUserId, task.AssigneeUserId);
+                (task.AssigneeUserId, other!.AssigneeUserId) = (other.AssigneeUserId, task.AssigneeUserId);
                 task.UpdatedAt = other.UpdatedAt = DateTime.UtcNow;
                 _context.ActivityLogs.Add(Log(leaderId, req.GroupId, req.ProjectId, "Task", task.Id, "Swap",
-                    $"Swapped '{task.Title}' <-> '{other.Title}'"));
+                    $"Swapped '{task.Title}' <-> '{other!.Title}'"));
                 break;
 
             case MarketplaceRequestType.NeedHelp:
@@ -196,6 +223,7 @@ public class MarketplaceService : IMarketplaceService
     public async Task CancelAsync(Guid userId, Guid requestId, CancellationToken ct = default)
     {
         var req = await LoadAsync(requestId, ct);
+        await RequireMemberAsync(userId, req.GroupId, ct);
         if (req.RequestedByUserId != userId) throw new ForbiddenException("Only the requester can cancel");
         if (req.Status != MarketplaceRequestStatus.Pending)
             throw new BadRequestException("Request is not pending");
@@ -205,19 +233,15 @@ public class MarketplaceService : IMarketplaceService
 
     private async Task<MarketplaceRequest> LoadAsync(Guid requestId, CancellationToken ct)
         => await _context.MarketplaceRequests
-            .Include(r => r.Task).Include(r => r.RequestedBy).Include(r => r.TargetUser)
+            .Include(r => r.Task).ThenInclude(t => t!.Project).Include(r => r.RequestedBy).Include(r => r.TargetUser)
             .FirstOrDefaultAsync(r => r.Id == requestId, ct)
             ?? throw new NotFoundException("Request not found");
 
-    private async Task<GroupMember> RequireMemberAsync(Guid userId, Guid groupId, CancellationToken ct)
-        => await _context.GroupMembers.FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == userId && m.IsActive, ct)
-            ?? throw new ForbiddenException("Not a member of this group");
+    private Task<GroupMember> RequireMemberAsync(Guid userId, Guid groupId, CancellationToken ct)
+        => _access.RequireMemberAsync(userId, groupId, ct);
 
-    private async Task RequireLeaderAsync(Guid userId, Guid groupId, CancellationToken ct)
-    {
-        var m = await RequireMemberAsync(userId, groupId, ct);
-        if (m.Role != Role.Leader) throw new ForbiddenException("Leader role required");
-    }
+    private Task RequireLeaderAsync(Guid userId, Guid groupId, CancellationToken ct)
+        => _access.RequireLeaderAsync(userId, groupId, ct);
 
     private static MarketplaceDto ToDto(MarketplaceRequest r, string taskTitle, string requesterName, string? targetName)
         => new(r.Id, r.RequestType.ToString(), r.Status.ToString(), taskTitle, r.TaskId ?? Guid.Empty,

@@ -22,12 +22,12 @@ GMind là ứng dụng web hỗ trợ sinh viên tổ chức bài tập và dự
   - Mapster (object mapping)
 
 ### Frontend (React + TypeScript)
-- **Framework:** React 18 với TypeScript
+- **Framework:** React 19 với TypeScript
 - **Build Tool:** Vite
 - **Routing:** React Router
 - **Data Fetching:** TanStack Query
 - **HTTP Client:** Axios
-- **Styling:** (Chưa quyết định - Milestone 0.5 sẽ xác định)
+- **Styling:** Tailwind CSS 3
 
 ## 📁 Cấu trúc Dự án
 
@@ -56,50 +56,48 @@ GMind_App/
 ### Yêu cầu Môi trường
 
 **Backend:**
-- .NET 11 SDK (hoặc .NET 8 trở lên)
+- .NET 11 SDK
 - SQL Server 2022 (LocalDB hoặc Developer Edition)
 - SQL Server Management Studio (SSMS) - tùy chọn
 
 **Frontend:**
-- Node.js 20 LTS hoặc mới nhất
+- Node.js 24 LTS (đã kiểm tra với Node.js 24.15)
 - npm hoặc pnpm
 
 **Dev Tools:**
 - Git
-- Visual Studio 2022 hoặc VS Code với C# extension
+- Visual Studio (workload "ASP.NET and web development" + "Node.js development" để chạy `.esproj`) hoặc VS Code với C# extension
 - Postman hoặc Insomnia (để test API)
 
 ### Cài đặt Backend
 
 1. **Restore dependencies:**
 ```bash
-cd GMind-Backend
-dotnet restore
+dotnet restore GMind-Backend/GMind.API/GMind.API.csproj
 ```
 
-2. **Setup database connection:**
-   - Copy `GMind.API/.env.example` thành `GMind.API/.env`
-   - Cập nhật connection string trong `.env` file:
-   ```env
-   ConnectionStrings__DefaultConnection=Server=localhost;Database=GMindDB;Trusted_Connection=True;TrustServerCertificate=True;
+2. **Setup configuration/secrets:**
+   - ASP.NET Core không tự đọc file `.env`. Dùng **Manage User Secrets** trong Visual Studio (chuột phải `GMind.API`) hoặc environment variables (ví dụ `ConnectionStrings__DefaultConnection`, `Jwt__Secret`) cho giá trị riêng; không đặt secrets vào các file `appsettings` được theo dõi bởi Git.
+   - Connection string mặc định trỏ LocalDB `GMindDB`; override qua user secrets/environment khi cần, không commit secrets.
+
+3. **Apply database migration:**
+   - Migration `InitialCreate` đã có sẵn trong `GMind.Infrastructure/Migrations` — không tạo lại.
+   - Package Manager Console trong Visual Studio: chọn Default project `GMind.Infrastructure`, Startup project `GMind.API`, chạy `Update-Database`.
+   - Hoặc CLI:
+   ```bash
+   dotnet ef database update --project GMind-Backend/GMind.Infrastructure --startup-project GMind-Backend/GMind.API
    ```
-
-3. **Tạo và apply database migration:**
-```bash
-cd GMind.Infrastructure
-dotnet ef migrations add InitialCreate --startup-project ../GMind.API
-dotnet ef database update --startup-project ../GMind.API
-```
 
 4. **Chạy backend:**
 ```bash
-cd GMind.API
-dotnet run
+dotnet run --project GMind-Backend/GMind.API --launch-profile http
 ```
 
-Backend sẽ chạy tại `http://localhost:5000` (hoặc port khác được cấu hình trong `Properties/launchSettings.json`)
+Backend sẽ chạy tại `http://localhost:5194` (profile `http` trong `Properties/launchSettings.json`)
 
-API documentation có sẵn tại `http://localhost:5000/swagger`
+API documentation có sẵn tại `http://localhost:5194/swagger`
+
+Health checks: `GET /api/health/live` (process sống) và `GET /api/health/ready` (kết nối được SQL Server mới trả 200).
 
 ### Cài đặt Frontend
 
@@ -111,9 +109,9 @@ npm install
 
 2. **Setup environment variables:**
    - Copy `.env.example` thành `.env`
-   - Cập nhật API URL nếu cần:
+   - Mặc định dùng same-origin qua Vite dev proxy (`/api` -> `http://127.0.0.1:5194`), không cần đổi:
    ```env
-   VITE_API_URL=http://localhost:5000
+   VITE_API_URL=/
    ```
 
 3. **Chạy frontend (development):**
@@ -121,27 +119,43 @@ npm install
 npm run dev
 ```
 
-Frontend sẽ chạy tại `http://localhost:5173` (Vite default)
+Frontend sẽ chạy tại `http://localhost:5173` (strict port)
 
 4. **Build frontend (production):**
 ```bash
 npm run build
 ```
 
+### Chạy trong Visual Studio
+
+1. Mở `GMind.slnx`. Solution gồm backend (`GMind-Backend/*`) và frontend `GMind-Frontend/GMind-Frontend.esproj`.
+2. Nếu `.esproj` không load: cần workload **Node.js development** (JavaScript/TypeScript Project System) — cài qua Visual Studio Installer rồi mở lại solution.
+3. Chọn startup profile **"GMind - API + Frontend"** (định nghĩa trong `GMind.slnLaunch`) rồi Run/F5: API chạy profile `http` tại `http://localhost:5194`, frontend chạy `npm run dev` và mở `http://localhost:5173` trong Edge.
+4. Fallback nếu profile không hiện: chuột phải solution -> **Configure Startup Projects** -> Multiple startup projects: `GMind.API` (launch profile `http`) và `GMind-Frontend` (launch `GMind Frontend (Edge)` trong `.vscode/launch.json`).
+5. Khi API chưa chạy, request `/api` qua Vite proxy trả 503 `API_UNAVAILABLE` với thông báo tiếng Việt thay vì lỗi network chung chung.
+
+Các lệnh backend ở trên chạy từ thư mục gốc repository. Build project frontend, proxy và đăng nhập đã được kiểm tra; thao tác Run/F5 trong giao diện Visual Studio vẫn cần xác nhận trên máy người dùng. Cổng 5173 và 5194 phải chưa bị một phiên chạy khác chiếm khi khởi động bằng F5.
+
 ## 🧪 Testing
 
 ### Backend Tests
+Unit + WebApplicationFactory HTTP tests: auth/token service, health endpoints, task authorization (member privacy, Leader-only), session revocation/concurrency (logout/change/reset password, refresh rotation, `auth_version` claim).
 ```bash
 cd GMind-Backend/GMind.Tests
 dotnet test
 ```
 
 ### Frontend Tests
-Frontend test runner (Vitest) chưa được cài đặt — dự kiến bổ sung ở phase sau.
+Vitest: unit tests cho error normalizer (`src/services/api-errors.test.ts`), workspace loaders (`src/services/workspace.test.ts`) và session/axios refresh-rotation (`src/services/api-session.test.ts`); component tests cho privacy/permission-loss (`src/pages/workspace-access.test.tsx`) và ProtectedRoute/Login return-path (`src/components/ProtectedRoute.test.tsx`, jsdom). E2E tests chưa có.
+Protected routes qua `<ProtectedRoute>` (validate `/api/me` mỗi navigation, 401 → refresh rotation một lần, logout thu hồi server). Session lưu một record `gmind.session.v1`; session legacy (3 key cũ) không được migrate — đăng nhập lại một lần.
 ```bash
 cd GMind-Frontend
-npm run build   # typecheck + production build
+npm run test -- --run   # unit + component tests (vitest)
+npm run build           # typecheck + production build
 ```
+
+### Database
+Migration `AddAuthVersion` (thêm `Users.AuthVersion`, additive, không xóa dữ liệu) đã được tạo; apply bằng `Update-Database` trong Package Manager Console (Default project `GMind.Infrastructure`, Startup `GMind.API`). Sau migration, các phiên đăng nhập cũ bị thu hồi — người dùng cần đăng nhập lại. Luồng F5 trong Visual Studio GUI chưa được verify tự động (đã verify bằng CLI build + proxy/runtime).
 
 ## 📦 Các Tính Năng (Theo BA Specification)
 
@@ -203,3 +217,7 @@ Chưa xác định.
 ## 📞 Liên hệ
 
 Dự án được phát triển bởi [Tên đội nhóm].
+
+### A1 Authorization (hiện tại)
+- Task privacy + Leader/Member theo membership đang hoạt động (nhóm/project chưa lưu trữ, user active). Marketplace, notifications, group role changes dùng cùng resource-access checks; thông báo nội bộ nhóm chỉ hiển thị với thành viên active (ngoại lệ MemberRemoved của chính người nhận). Session revocation qua `AuthVersion` + refresh rotation; guard frontend validate `/api/me` mỗi navigation.
+- Đã verify: backend session/membership tests, frontend workspace/session/component tests, live Edge smoke (login → refresh rotation → logout revoke). A1c regression suite deferred theo yêu cầu người dùng — sẽ bổ sung sau.
