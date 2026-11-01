@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "GMind - API + Frontend",
+    "Projects": [
+      {
+        "Path": "GMind-Backend\\GMind.API\\GMind.API.csproj",
+        "Action": "Start",
+        "DebugTarget": "http"
+      },
+      {
+        "Path": "GMind-Frontend\\GMind-Frontend.esproj",
+        "Action": "Start",
+        "DebugTarget": "GMind Frontend (Edge)"
+      }
+    ]
+  }
+]

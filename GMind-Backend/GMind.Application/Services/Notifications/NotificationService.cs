@@ -26,9 +26,19 @@ public class NotificationService : INotificationService
 
     public NotificationService(IApplicationDbContext context) => _context = context;
 
+    private IQueryable<Notification> VisibleTo(Guid userId)
+        => _context.Notifications.Where(n => n.RecipientUserId == userId && n.Recipient.IsActive
+            && (n.GroupId == null || n.Type == NotificationType.MemberRemoved
+                || _context.GroupMembers.Any(m => m.GroupId == n.GroupId && m.UserId == userId
+                    && m.IsActive && m.User.IsActive && !m.Group.IsArchived)));
+
     public async Task NotifyAsync(Guid recipientUserId, Guid? groupId, NotificationType type, string title, string body,
         string? relatedEntityType = null, Guid? relatedEntityId = null, CancellationToken ct = default)
     {
+        if (!await _context.Users.AnyAsync(u => u.Id == recipientUserId && u.IsActive, ct)) return;
+        if (groupId != null && type != NotificationType.MemberRemoved
+            && !await _context.GroupMembers.AnyAsync(m => m.GroupId == groupId && m.UserId == recipientUserId
+                && m.IsActive && !m.Group.IsArchived, ct)) return;
         _context.Notifications.Add(new Notification
         {
             Id = Guid.NewGuid(),
@@ -45,7 +55,7 @@ public class NotificationService : INotificationService
 
     public async Task<List<NotificationDto>> GetMyAsync(Guid userId, bool unreadOnly, int take, CancellationToken ct = default)
     {
-        var q = _context.Notifications.Where(n => n.RecipientUserId == userId);
+        var q = VisibleTo(userId);
         if (unreadOnly) q = q.Where(n => n.ReadAt == null);
         return await q.OrderByDescending(n => n.CreatedAt)
             .Take(Math.Clamp(take, 1, 100))
@@ -55,11 +65,11 @@ public class NotificationService : INotificationService
     }
 
     public async Task<int> GetUnreadCountAsync(Guid userId, CancellationToken ct = default)
-        => await _context.Notifications.CountAsync(n => n.RecipientUserId == userId && n.ReadAt == null, ct);
+        => await VisibleTo(userId).CountAsync(n => n.ReadAt == null, ct);
 
     public async Task MarkReadAsync(Guid userId, Guid notificationId, CancellationToken ct = default)
     {
-        var n = await _context.Notifications.FirstOrDefaultAsync(x => x.Id == notificationId && x.RecipientUserId == userId, ct)
+        var n = await VisibleTo(userId).FirstOrDefaultAsync(x => x.Id == notificationId, ct)
             ?? throw new NotFoundException("Notification not found");
         n.ReadAt ??= DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
@@ -68,8 +78,8 @@ public class NotificationService : INotificationService
     public async Task<int> MarkAllReadAsync(Guid userId, CancellationToken ct = default)
     {
         var now = DateTime.UtcNow;
-        return await _context.Notifications
-            .Where(n => n.RecipientUserId == userId && n.ReadAt == null)
+        return await VisibleTo(userId)
+            .Where(n => n.ReadAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(n => n.ReadAt, now), ct);
     }
 }

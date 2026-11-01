@@ -241,3 +241,7 @@ Groups → [Group Name] → Activity
 ```
 
 Tất cả URLs nên sử dụng RESTful convention với snake_case cho segment names.
+
+## A2 additions
+- `/dashboard` — overview (stats, attention list, mini calendar, groups, upcoming deadlines).
+- `/groups` — group list cards; `/groups/:id` remains group detail.

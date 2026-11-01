@@ -35,11 +35,13 @@ public record ActivityDto(Guid Id, string ActorName, string Action, string Entit
 public class GroupService : IGroupService
 {
     private readonly IApplicationDbContext _context;
+    private readonly IResourceAccess _access;
     private readonly Notifications.INotificationService _notifications;
 
-    public GroupService(IApplicationDbContext context, Notifications.INotificationService notifications)
+    public GroupService(IApplicationDbContext context, IResourceAccess access, Notifications.INotificationService notifications)
     {
         _context = context;
+        _access = access;
         _notifications = notifications;
     }
 
@@ -71,7 +73,7 @@ public class GroupService : IGroupService
     public async Task<List<GroupDto>> GetMyGroupsAsync(Guid userId, CancellationToken ct = default)
     {
         return await _context.GroupMembers
-            .Where(m => m.UserId == userId && m.IsActive && !m.Group.IsArchived)
+            .Where(m => m.UserId == userId && m.IsActive && m.User.IsActive && !m.Group.IsArchived)
             .Select(m => new GroupDto(
                 m.GroupId, m.Group.Name, m.Group.Description,
                 m.Group.Members.Count(x => x.IsActive),
@@ -143,6 +145,7 @@ public class GroupService : IGroupService
         if (invite.RevokedAt != null || (invite.ExpiresAt != null && invite.ExpiresAt < DateTime.UtcNow)
             || (invite.MaxUses != null && invite.UsedCount >= invite.MaxUses))
             throw new BadRequestException("Invite is expired, revoked, or out of uses");
+        if (invite.Group.IsArchived) throw new BadRequestException("Group is archived");
 
         if (await _context.GroupMembers.AnyAsync(m => m.GroupId == invite.GroupId && m.UserId == userId && m.IsActive, ct))
             throw new ConflictException("Already a member of this group");
@@ -198,6 +201,7 @@ public class GroupService : IGroupService
     public async Task ChangeMemberRoleAsync(Guid userId, Guid groupId, Guid memberUserId, Role newRole, CancellationToken ct = default)
     {
         await RequireLeaderAsync(userId, groupId, ct);
+        if (!Enum.IsDefined(newRole)) throw new BadRequestException("Invalid member role");
         var target = await _context.GroupMembers.FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == memberUserId && m.IsActive, ct)
             ?? throw new NotFoundException("Member not found");
         if (target.Role == Role.Leader && newRole == Role.Member)
@@ -226,7 +230,7 @@ public class GroupService : IGroupService
 
     public async Task<List<ActivityDto>> GetActivityAsync(Guid userId, Guid groupId, int take, CancellationToken ct = default)
     {
-        await RequireMembershipAsync(userId, groupId, ct);
+        await RequireLeaderAsync(userId, groupId, ct);
         return await _context.ActivityLogs
             .Where(a => a.GroupId == groupId)
             .OrderByDescending(a => a.CreatedAt)
@@ -236,16 +240,10 @@ public class GroupService : IGroupService
     }
 
     private async Task<GroupMember> RequireMembershipAsync(Guid userId, Guid groupId, CancellationToken ct)
-        => await _context.GroupMembers.Include(m => m.Group)
-            .FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == userId && m.IsActive && !m.Group.IsArchived, ct)
-            ?? throw new ForbiddenException("Not a member of this group");
+        => await _access.RequireMemberAsync(userId, groupId, ct);
 
     private async Task<GroupMember> RequireLeaderAsync(Guid userId, Guid groupId, CancellationToken ct)
-    {
-        var m = await RequireMembershipAsync(userId, groupId, ct);
-        if (m.Role != Role.Leader) throw new ForbiddenException("Leader role required");
-        return m;
-    }
+        => await _access.RequireLeaderAsync(userId, groupId, ct);
 
     private static string GenerateCode()
     {

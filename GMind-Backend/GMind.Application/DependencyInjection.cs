@@ -1,5 +1,6 @@
 using System.Reflection;
 using FluentValidation;
+using GMind.Application.Common;
 using GMind.Application.Services.Auth;
 using GMind.Application.Services.Dashboard;
 using GMind.Application.Services.Groups;
@@ -22,6 +23,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
         services.AddMapster();
 
+        services.AddScoped<IResourceAccess, ResourceAccess>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();

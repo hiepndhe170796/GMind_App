@@ -35,6 +35,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasIndex(e => e.Email).IsUnique();
+            entity.Property(u => u.AuthVersion).HasDefaultValue(0).IsConcurrencyToken();
+            entity.Property(u => u.RefreshToken).IsConcurrencyToken();
+            entity.Property(u => u.PasswordResetToken).IsConcurrencyToken();
         });
 
         // Group -> creator

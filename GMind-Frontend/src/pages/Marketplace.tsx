@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { marketplaceService, type MarketplaceDto } from '../services/marketplace';
-import { groupsService } from '../services/groups';
+import { groupsService, type GroupMemberDto } from '../services/groups';
 import { projectsService } from '../services/projects';
-import { tasksService, type TaskDto } from '../services/tasks';
+import { tasksService, type TaskSummaryDto } from '../services/tasks';
 import { authService } from '../services/auth';
 
 const TYPE_LABEL: Record<string, string> = { NeedHelp: 'Cần hỗ trợ', Transfer: 'Chuyển giao', Swap: 'Đổi task' };
@@ -18,12 +18,22 @@ export default function Marketplace() {
   const navigate = useNavigate();
   const me = authService.currentUser();
   const [requests, setRequests] = useState<MarketplaceDto[]>([]);
-  const [myTasks, setMyTasks] = useState<TaskDto[]>([]);
-  const [members, setMembers] = useState<any[]>([]);
+  const [myTasks, setMyTasks] = useState<TaskSummaryDto[]>([]);
+  const [members, setMembers] = useState<GroupMemberDto[]>([]);
   const [myRole, setMyRole] = useState('Member');
   const [form, setForm] = useState({ type: 1, taskId: '', targetUserId: '', reason: '' });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [accessDenied, setAccessDenied] = useState(false);
+
+  const handleError = (e: unknown, fallback: string) => {
+    const failure = e as { status?: number; message?: string };
+    if (failure?.status === 403 || failure?.status === 404) {
+      setRequests([]); setMyTasks([]); setMembers([]); setMyRole('Member');
+      setForm({ type: 1, taskId: '', targetUserId: '', reason: '' }); setAccessDenied(true);
+    }
+    setError(failure?.message || fallback);
+  };
 
   const reload = () => marketplaceService.list(groupId!).then(setRequests);
 
@@ -33,12 +43,12 @@ export default function Marketplace() {
       .then(async g => {
         setMembers(g.members); setMyRole(g.myRole);
         const projects = await projectsService.list(groupId!);
-        const allTasks: TaskDto[] = [];
+        const allTasks: TaskSummaryDto[] = [];
         for (const p of projects) allTasks.push(...await tasksService.list(p.id));
         setMyTasks(allTasks.filter(t => t.assigneeUserId === me?.id && t.status !== 'Completed'));
         await reload();
       })
-      .catch(e => setError(e?.message || 'Lỗi tải dữ liệu'))
+      .catch(e => handleError(e, 'Lỗi tải dữ liệu'))
       .finally(() => setLoading(false));
   }, [groupId, navigate]);
 
@@ -52,7 +62,7 @@ export default function Marketplace() {
       });
       setForm({ type: 1, taskId: '', targetUserId: '', reason: '' });
       await reload();
-    } catch (e: any) { setError(e?.message || 'Tạo yêu cầu thất bại'); }
+    } catch (e: any) { handleError(e, 'Tạo yêu cầu thất bại'); }
   };
 
   const review = async (id: string, approve: boolean) => {
@@ -65,15 +75,21 @@ export default function Marketplace() {
         await marketplaceService.reject(id, comment);
       }
       await reload();
-    } catch (e: any) { setError(e?.message || 'Thao tác thất bại'); }
+    } catch (e: any) { handleError(e, 'Thao tác thất bại'); }
   };
 
   const cancel = async (id: string) => {
     try { await marketplaceService.cancel(id); await reload(); }
-    catch (e: any) { setError(e?.message || 'Hủy thất bại'); }
+    catch (e: any) { handleError(e, 'Hủy thất bại'); }
   };
 
   if (loading) return <MainLayout><LoadingSpinner /></MainLayout>;
+  if (accessDenied) return (
+    <MainLayout>
+      <p role="alert" className="text-sm text-danger-600">{error || 'Bạn không có quyền truy cập marketplace của nhóm này.'}</p>
+      <Link to="/dashboard" className="text-sm text-primary-600 hover:underline">Về trang tổng quan</Link>
+    </MainLayout>
+  );
   const isLeader = myRole === 'Leader';
 
   return (
@@ -96,7 +112,7 @@ export default function Marketplace() {
           {(form.type === 2 || form.type === 3) && (
             <select className="border rounded-lg px-3 py-2 text-sm dark:bg-neutral-900" value={form.targetUserId} onChange={e => setForm({ ...form, targetUserId: e.target.value })}>
               <option value="">Thành viên...</option>
-              {members.filter(m => m.userId !== me?.id).map((m: any) => <option key={m.userId} value={m.userId}>{m.displayName}</option>)}
+              {members.filter(m => m.userId !== me?.id).map(m => <option key={m.userId} value={m.userId}>{m.displayName}</option>)}
             </select>
           )}
           <input className="border rounded-lg px-3 py-2 text-sm dark:bg-neutral-900 flex-1 min-w-40" placeholder="Lý do..." value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} />

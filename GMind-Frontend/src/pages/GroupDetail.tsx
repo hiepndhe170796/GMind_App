@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import Card from '../components/ui/Card';
@@ -6,15 +6,16 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { groupsService, type ActivityDto } from '../services/groups';
+import { groupsService, type ActivityDto, type GroupDetailDto } from '../services/groups';
 import { projectsService, type ProjectDto } from '../services/projects';
-import { dashboardService, type GroupProgress } from '../services/dashboard';
+import { type GroupProgress } from '../services/dashboard';
+import { loadGroupWorkspace } from '../services/workspace';
 import { authService } from '../services/auth';
 
 export default function GroupDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [group, setGroup] = useState<any>(null);
+  const [group, setGroup] = useState<GroupDetailDto | null>(null);
   const [projects, setProjects] = useState<ProjectDto[]>([]);
   const [progress, setProgress] = useState<GroupProgress | null>(null);
   const [activity, setActivity] = useState<ActivityDto[]>([]);
@@ -23,34 +24,72 @@ export default function GroupDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const reloadProjects = () => projectsService.list(id!).then(setProjects);
-
+  const loadVersion = useRef(0);
+  const reload = useCallback(async () => {
+    const version = ++loadVersion.current;
+    setLoading(true); setError('');
+    setGroup(null); setProjects([]); setProgress(null); setActivity([]);
+    try {
+      const data = await loadGroupWorkspace(id!);
+      if (version !== loadVersion.current) return;
+      setGroup(data.group); setProjects(data.projects); setProgress(data.progress); setActivity(data.activity);
+    } catch (error: unknown) {
+      if (version === loadVersion.current) {
+        setError((error as { message?: string })?.message || 'Không tải được dữ liệu');
+        setGroup(null); setProjects([]); setProgress(null); setActivity([]);
+      }
+    } finally { if (version === loadVersion.current) setLoading(false); }
+  }, [id]);
   useEffect(() => {
     if (!authService.isLoggedIn()) { navigate('/login'); return; }
-    Promise.all([groupsService.get(id!), reloadProjects(), groupsService.activity(id!).then(setActivity)])
-      .then(([g]) => {
-        setGroup(g);
-        if (g.myRole === 'Leader') {
-          dashboardService.groupProgress(id!).then(setProgress).catch(() => {});
-        }
-      })
-      .catch(e => setError(e?.message || 'Không tải được nhóm'))
-      .finally(() => setLoading(false));
-  }, [id, navigate]);
+    setProjName(''); setInviteCode('');
+    void reload();
+    return () => { loadVersion.current++; };
+  }, [reload, navigate]);
+
+  const handleMutationError = (error: unknown, fallback: string) => {
+    const failure = error as { message?: string; status?: number };
+    if (failure?.status === 403 || failure?.status === 404) {
+      loadVersion.current++;
+      setGroup(null); setProjects([]); setProgress(null); setActivity([]);
+      setInviteCode(''); setProjName('');
+      setLoading(false);
+    }
+    setError(failure?.message || fallback);
+  };
 
   const createInvite = async () => {
-    try { const inv = await groupsService.createInvite(id!); setInviteCode(inv.code); }
-    catch (err: any) { setError(err?.message || 'Không tạo được mã mời'); }
+    const version = loadVersion.current;
+    try {
+      const inv = await groupsService.createInvite(id!);
+      if (version !== loadVersion.current) return;
+      setInviteCode(inv.code);
+    } catch (err: unknown) {
+      if (version !== loadVersion.current) return;
+      handleMutationError(err, 'Không tạo được mã mời');
+    }
   };
 
   const createProject = async () => {
     if (!projName.trim()) return;
-    try { await projectsService.create(id!, projName); setProjName(''); await reloadProjects(); }
-    catch (err: any) { setError(err?.message || 'Không tạo được project'); }
+    const version = loadVersion.current;
+    try {
+      await projectsService.create(id!, projName);
+      if (version !== loadVersion.current) return;
+      setProjName(''); await reload();
+    } catch (err: unknown) {
+      if (version !== loadVersion.current) return;
+      handleMutationError(err, 'Không tạo được project');
+    }
   };
 
   if (loading) return <MainLayout><LoadingSpinner /></MainLayout>;
-  if (error || !group) return <MainLayout><p className="text-danger-600">{error || 'Không tìm thấy nhóm'}</p></MainLayout>;
+  if (!group) return (
+    <MainLayout>
+      <p role="alert" className="text-danger-600">{error || 'Không tìm thấy nhóm'}</p>
+      <Button variant="secondary" size="sm" className="mt-2" onClick={() => void reload()}>Thử lại</Button>
+    </MainLayout>
+  );
 
   const isLeader = group.myRole === 'Leader';
 
@@ -66,7 +105,7 @@ export default function GroupDetail() {
           <Badge variant={isLeader ? 'primary' : 'neutral'}>{group.myRole}</Badge>
         </div>
       </div>
-      {error && <p className="mb-4 text-sm text-danger-600">{error}</p>}
+      {error && <p role="alert" className="mb-4 text-sm text-danger-600">{error}</p>}
 
       {isLeader && (
         <Card className="mb-6">
@@ -122,7 +161,7 @@ export default function GroupDetail() {
       <Card>
         <h2 className="font-semibold mb-4">Thành viên ({group.members?.length ?? 0})</h2>
         <ul className="divide-y divide-neutral-200 dark:divide-neutral-700">
-          {group.members?.map((m: any) => (
+          {group.members?.map(m => (
             <li key={m.userId} className="py-3 flex items-center justify-between">
               <span>{m.displayName}</span>
               <Badge variant={m.role === 'Leader' ? 'primary' : 'neutral'}>{m.role}</Badge>
@@ -131,18 +170,20 @@ export default function GroupDetail() {
         </ul>
       </Card>
 
-      <Card className="mt-6">
-        <h2 className="font-semibold mb-4">Hoạt động gần đây</h2>
-        {activity.length === 0 && <p className="text-sm text-neutral-500">Chưa có hoạt động.</p>}
-        <ul className="space-y-2">
-          {activity.map(a => (
-            <li key={a.id} className="text-sm border-l-2 border-neutral-300 pl-3">
-              <b>{a.actorName}</b> — {a.summary}
-              <span className="text-neutral-400 text-xs ml-2">{new Date(a.createdAt).toLocaleString('vi-VN')}</span>
-            </li>
-          ))}
-        </ul>
-      </Card>
+      {isLeader && (
+        <Card className="mt-6">
+          <h2 className="font-semibold mb-4">Hoạt động gần đây</h2>
+          {activity.length === 0 && <p className="text-sm text-neutral-500">Chưa có hoạt động.</p>}
+          <ul className="space-y-2">
+            {activity.map(a => (
+              <li key={a.id} className="text-sm border-l-2 border-neutral-300 pl-3">
+                <b>{a.actorName}</b> — {a.summary}
+                <span className="text-neutral-400 text-xs ml-2">{new Date(a.createdAt).toLocaleString('vi-VN')}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
     </MainLayout>
   );
 }

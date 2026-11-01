@@ -1,0 +1,7 @@
+.auth-surface .auth-submit { @apply min-h-11 bg-primary-600 text-base text-white; }
+.auth-surface .auth-submit:hover { @apply bg-primary-700; }
+.auth-surface input { @apply min-h-11 border-slate-500 text-base caret-primary-700; }
+.auth-surface input:focus { @apply border-primary-600 ring-primary-600; }
+.auth-surface input[aria-invalid="true"] { @apply border-danger-700; }
+.auth-surface :focus-visible { @apply outline-primary-700; }
+.auth-surface ::selection { @apply bg-primary-100 text-primary-900; }

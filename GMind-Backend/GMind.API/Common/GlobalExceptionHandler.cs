@@ -1,6 +1,7 @@
 using GMind.API.Models;
 using GMind.Application.Common.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 
 namespace GMind.API.Common;
 
@@ -25,6 +26,7 @@ public class GlobalExceptionHandler : IExceptionHandler
             ForbiddenException => (StatusCodes.Status403Forbidden, exception.Message),
             ConflictException => (StatusCodes.Status409Conflict, exception.Message),
             BadRequestException => (StatusCodes.Status400BadRequest, exception.Message),
+            DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "The resource changed. Reload and try again"),
             FluentValidation.ValidationException => (StatusCodes.Status400BadRequest, "Validation failed"),
             _ => (StatusCodes.Status500InternalServerError, "An error occurred processing your request")
         };
@@ -38,7 +40,7 @@ public class GlobalExceptionHandler : IExceptionHandler
             ? ve.Errors.Select(e => e.ErrorMessage).ToList()
             : statusCode >= 500
                 ? new List<string>()
-                : new List<string> { exception.Message };
+                : new List<string> { message };
 
         var response = new ApiResponse<object>
         {

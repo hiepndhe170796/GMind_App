@@ -39,6 +39,15 @@ public class TokenServiceTests
         => Assert.Null(_service.GetUserIdFromToken("not.a.jwt"));
 
     [Fact]
+    public void GenerateAccessToken_ContainsAuthVersionClaim()
+    {
+        var user = new User { Id = Guid.NewGuid(), Email = "a@b.c", DisplayName = "A", PasswordHash = "x", AuthVersion = 3 };
+        var token = _service.GenerateAccessToken(user);
+        var jwt = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(token);
+        Assert.Equal("3", jwt.Claims.First(c => c.Type == TokenService.AuthVersionClaim).Value);
+    }
+
+    [Fact]
     public void GenerateRefreshToken_UniqueAndRandom()
     {
         var t1 = _service.GenerateRefreshToken();

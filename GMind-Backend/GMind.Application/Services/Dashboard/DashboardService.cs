@@ -1,5 +1,4 @@
 using GMind.Application.Common;
-using GMind.Application.Common.Exceptions;
 using GMind.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Task = System.Threading.Tasks.Task;
@@ -20,13 +19,20 @@ public record GroupProgressDto(Guid GroupId, int TotalTasks, int CompletedTasks,
 public class DashboardService : IDashboardService
 {
     private readonly IApplicationDbContext _context;
+    private readonly IResourceAccess _access;
 
-    public DashboardService(IApplicationDbContext context) => _context = context;
+    public DashboardService(IApplicationDbContext context, IResourceAccess access)
+    {
+        _context = context;
+        _access = access;
+    }
 
     public async Task<List<MyTaskDto>> GetMyTasksAsync(Guid userId, CancellationToken ct = default)
     {
         return await _context.Tasks
-            .Where(t => t.AssigneeUserId == userId && t.Status != TaskStatus.Completed && t.Project.ArchivedAt == null)
+            .Where(t => t.AssigneeUserId == userId && t.Status != TaskStatus.Completed && t.Project.ArchivedAt == null
+                && !t.Project.Group.IsArchived
+                && t.Project.Group.Members.Any(m => m.UserId == userId && m.IsActive && m.User.IsActive))
             .OrderBy(t => t.DeadlineAt ?? DateTime.MaxValue)
             .Select(t => new MyTaskDto(t.Id, t.ProjectId, t.Project.Name, t.Title, t.Status.ToString(), t.Priority.ToString(), t.DeadlineAt))
             .ToListAsync(ct);
@@ -35,10 +41,7 @@ public class DashboardService : IDashboardService
     /// <summary>Leader-only view: per-member progress for a group.</summary>
     public async Task<GroupProgressDto> GetGroupProgressAsync(Guid userId, Guid groupId, CancellationToken ct = default)
     {
-        var membership = await _context.GroupMembers.FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == userId && m.IsActive, ct)
-            ?? throw new ForbiddenException("Not a member of this group");
-        if (membership.Role != Role.Leader)
-            throw new ForbiddenException("Leader role required");
+        await _access.RequireLeaderAsync(userId, groupId, ct);
 
         var memberProgress = await _context.Tasks
             .Where(t => t.Project.GroupId == groupId && t.AssigneeUserId != null && t.ParentTaskId == null && t.Project.ArchivedAt == null)

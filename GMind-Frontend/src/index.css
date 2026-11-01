@@ -3,20 +3,22 @@
 @tailwind utilities;
 
 @layer base {
+  html { min-height: 100%; }
   body {
-    @apply bg-white text-neutral-900 antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    @apply antialiased min-h-screen;
+    background-color: #f5f7fb;
+    color: #18253d;
+    font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
   }
-
-  @media (prefers-color-scheme: dark) {
-    body {
-      @apply bg-neutral-950 text-neutral-100;
-    }
+  h1, h2, h3, h4 { @apply font-semibold tracking-tight; }
+  input, select, textarea, button { font: inherit; }
+  :focus-visible {
+    outline: 2px solid #3679e5;
+    outline-offset: 2px;
+    border-radius: 6px;
   }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+  .text-balance { text-wrap: balance; }
 }
