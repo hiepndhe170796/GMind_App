@@ -15,6 +15,12 @@ export const authService = {
     const res = await authApi.post('/api/auth/login', { email, password });
     return res.data.data;
   },
+  async forgotPassword(email: string): Promise<void> {
+    await authApi.post('/api/auth/forgot-password', { email });
+  },
+  async resetPassword(token: string, newPassword: string, confirmPassword: string): Promise<void> {
+    await authApi.post('/api/auth/reset-password', { token, newPassword, confirmPassword });
+  },
   async validateSession(): Promise<UserInfo> {
     const id = getSessionSnapshot()?.id;
     const res = await api.get('/api/me');

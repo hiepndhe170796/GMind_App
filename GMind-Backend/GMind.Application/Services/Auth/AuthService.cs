@@ -19,19 +19,22 @@ public class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthService> _logger;
+    private readonly IPasswordResetDelivery? _passwordResetDelivery;
 
     public AuthService(
         IApplicationDbContext context,
         IPasswordHasher passwordHasher,
         ITokenService tokenService,
         IConfiguration configuration,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IPasswordResetDelivery? passwordResetDelivery = null)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
         _configuration = configuration;
         _logger = logger;
+        _passwordResetDelivery = passwordResetDelivery;
     }
 
     public async Task<UserDto> RegisterAsync(string displayName, string email, string password, CancellationToken ct = default)
@@ -104,6 +107,9 @@ public class AuthService : IAuthService
 
     public async Task ForgotPasswordAsync(string email, CancellationToken ct = default)
     {
+        if (_passwordResetDelivery is not { IsAvailable: true })
+            throw new BadRequestException("Password recovery is not configured");
+
         var normalizedEmail = email.Trim().ToLowerInvariant();
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail && u.IsActive, ct);
 
@@ -116,8 +122,8 @@ public class AuthService : IAuthService
         user.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
 
-        // Email delivery is out of scope for MVP milestone 1; log the token for dev reset flow.
-        _logger.LogInformation("Password reset token generated for {Email}", normalizedEmail);
+        await _passwordResetDelivery.SendAsync(normalizedEmail, token, user.PasswordResetTokenExpiry!.Value, ct);
+        _logger.LogInformation("Password reset delivery completed");
     }
 
     public async Task ResetPasswordAsync(string token, string newPassword, CancellationToken ct = default)

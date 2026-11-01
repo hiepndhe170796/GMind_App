@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
         services.AddHttpContextAccessor();
+        services.AddSingleton<GMind.Application.Services.Auth.IPasswordResetDelivery, Common.DevelopmentPasswordResetDelivery>();
 
         var config = TypeAdapterConfig.GlobalSettings;
         config.Scan(Assembly.GetExecutingAssembly());
