@@ -1,0 +1,8 @@
+.task-surface .task-primary { @apply bg-primary-600 text-white; }
+.task-surface .task-primary:hover { @apply bg-primary-700; }
+.task-surface input, .task-surface select, .task-surface textarea { @apply min-h-11 border-slate-500 text-base caret-primary-700; }
+.task-surface textarea { @apply min-h-24 py-2.5; }
+.task-surface input::placeholder, .task-surface textarea::placeholder { @apply text-slate-500; }
+.task-surface input:focus, .task-surface select:focus, .task-surface textarea:focus { @apply border-primary-600 ring-primary-600; }
+.task-surface :focus-visible { @apply outline-primary-700; }
+.task-surface ::selection { @apply bg-primary-100 text-primary-900; }

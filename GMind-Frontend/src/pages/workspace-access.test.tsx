@@ -78,9 +78,9 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function renderTaskRoutes(initial: string) {
+function renderTaskRoutes(initial: string, state?: unknown) {
   return render(
-    <MemoryRouter initialEntries={[initial]}>
+    <MemoryRouter initialEntries={[state === undefined ? initial : { pathname: initial, state }]}>
       <Routes>
         <Route path="/tasks/:id" element={<TaskDetail />} />
       </Routes>
@@ -246,5 +246,189 @@ describe('GroupDetail access handling', () => {
     expect(screen.queryByText('Hoạt động gần đây')).toBeNull();
     expect(screen.queryByText(/Tiến độ thành viên/)).toBeNull();
     expect(screen.queryByText('Tạo mã mời')).toBeNull();
+  });
+});
+
+describe('TaskDetail mutations', () => {
+  const ws = (over: Partial<TaskDetailDto> = {}, myRole = 'Member') => ({
+    task: { ...detailTask, ...over } as TaskDetailDto,
+    comments: [], links: [], reviews: [], myRole,
+  });
+  const header = () => document.querySelector('.task-surface header')!;
+
+  it.each([
+    ['ToDo', 'InProgress', 2, 'Bắt đầu làm', 'Đang làm'],
+    ['InProgress', 'Submitted', 3, 'Nộp để duyệt', 'Chờ duyệt'],
+    ['ChangesRequested', 'InProgress', 2, 'Làm lại', 'Đang làm'],
+  ] as const)('assignee %s -> posts %i via %s', async (from, next, code, label, badge) => {
+    vi.mocked(loadTaskWorkspace)
+      .mockResolvedValueOnce(ws({ status: from }))
+      .mockResolvedValue(ws({ status: next }));
+    const change = vi.spyOn(tasksService, 'changeStatus').mockResolvedValue({ ...detailTask, status: next });
+    renderTaskRoutes('/tasks/t1');
+    fireEvent.click(await screen.findByText(label));
+    await waitFor(() => expect(change).toHaveBeenCalledWith('t1', code, undefined));
+    await waitFor(() => expect(header().textContent).toContain(badge));
+    expect(change).toHaveBeenCalledTimes(1);
+  });
+
+  it('pending return locks both review buttons; double click still one POST', async () => {
+    vi.mocked(loadTaskWorkspace).mockResolvedValue(ws({ status: 'Submitted', assigneeUserId: 'u-x' }, 'Leader'));
+    const req = deferred<TaskDetailDto>();
+    const change = vi.spyOn(tasksService, 'changeStatus').mockReturnValue(req.promise);
+    renderTaskRoutes('/tasks/t1');
+    fireEvent.change(await screen.findByLabelText('Nhận xét duyệt'), { target: { value: 'note' } });
+    const ret = screen.getByText('Trả về sửa');
+    const ok = screen.getByText('Duyệt hoàn thành');
+    fireEvent.click(ret);
+    fireEvent.click(ret);
+    fireEvent.click(ok);
+    expect(change).toHaveBeenCalledTimes(1);
+    expect(change).toHaveBeenCalledWith('t1', 4, 'note');
+    expect((ok as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => { req.resolve({ ...detailTask, status: 'ChangesRequested' }); });
+    await waitFor(() => expect((ok as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it('status 500 keeps review draft; retry posts once and clears old error', async () => {
+    vi.mocked(loadTaskWorkspace).mockResolvedValue(ws({ status: 'Submitted', assigneeUserId: 'u-x' }, 'Leader'));
+    const change = vi.spyOn(tasksService, 'changeStatus')
+      .mockRejectedValueOnce({ status: 500, message: 'server err' })
+      .mockResolvedValue({ ...detailTask, status: 'ChangesRequested' });
+    renderTaskRoutes('/tasks/t1');
+    const note = await screen.findByLabelText('Nhận xét duyệt');
+    fireEvent.change(note, { target: { value: 'fix it' } });
+    fireEvent.click(screen.getByText('Trả về sửa'));
+    expect(await screen.findByText('server err')).toBeTruthy();
+    expect((note as HTMLTextAreaElement).value).toBe('fix it');
+    fireEvent.click(screen.getByText('Trả về sửa'));
+    await waitFor(() => expect(change).toHaveBeenCalledTimes(2));
+    await screen.findByText('Đã yêu cầu chỉnh sửa.');
+    expect(screen.queryByText('server err')).toBeNull();
+  });
+
+  it('comment validation: blank and overlength give aria-invalid+focus, no POST; ctrl+enter pending counts once', async () => {
+    vi.mocked(loadTaskWorkspace).mockResolvedValue(ws());
+    const req = deferred<CommentDto>();
+    const add = vi.spyOn(tasksService, 'addComment').mockReturnValue(req.promise);
+    renderTaskRoutes('/tasks/t1');
+    await screen.findByText('PRIVATE_TASK');
+    const box = screen.getByPlaceholderText('Viết bình luận...') as HTMLTextAreaElement;
+    fireEvent.click(screen.getByText('Gửi'));
+    expect(add).not.toHaveBeenCalled();
+    expect(box.getAttribute('aria-invalid')).toBe('true');
+    expect(document.activeElement).toBe(box);
+    expect(screen.getByText('Nhập nội dung bình luận.')).toBeTruthy();
+    fireEvent.change(box, { target: { value: 'y'.repeat(2001) } });
+    fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true });
+    expect(add).not.toHaveBeenCalled();
+    expect(screen.getByText('Bình luận tối đa 2.000 ký tự.')).toBeTruthy();
+    fireEvent.change(box, { target: { value: 'multi\nline' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(add).not.toHaveBeenCalled();
+    fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true });
+    expect(add).toHaveBeenCalledWith('t1', 'multi\nline');
+    fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true });
+    expect(add).toHaveBeenCalledTimes(1);
+    await act(async () => { req.resolve(privateComment); });
+  });
+
+  it('url validator shared: bad schemes no POST+focus, 500 keeps draft+focus, legacy link renders inert', async () => {
+    vi.mocked(loadTaskWorkspace).mockResolvedValue({
+      ...ws(), links: [{ id: 'l9', taskId: 't1', url: 'javascript:x', displayName: 'LEGACY', createdAt: '2026-01-01T00:00:00Z' }],
+    });
+    const add = vi.spyOn(tasksService, 'addLink').mockRejectedValue({ status: 500, message: 'net' });
+    renderTaskRoutes('/tasks/t1');
+    await screen.findByText('PRIVATE_TASK');
+    expect(screen.getByText('LEGACY').tagName).not.toBe('A');
+    const input = screen.getByPlaceholderText('https://...') as HTMLInputElement;
+    for (const bad of ['javascript:alert(1)', 'ftp://x', 'not a url']) {
+      fireEvent.change(input, { target: { value: bad } });
+      fireEvent.submit(input.closest('form')!);
+      expect(add).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(input);
+    }
+    fireEvent.change(input, { target: { value: 'https://ok.dev/doc' } });
+    screen.getByRole('button', { name: 'Thêm liên kết' }).focus();
+    fireEvent.submit(input.closest('form')!);
+    expect(add).toHaveBeenCalledWith('t1', 'https://ok.dev/doc');
+    await screen.findByRole('alert');
+    await waitFor(() => expect(document.activeElement).toBe(input));
+    expect(input.value).toBe('https://ok.dev/doc');
+  });
+
+  it('unmount before scheduled fetch issues no request', async () => {
+    vi.mocked(loadTaskWorkspace).mockClear();
+    const { unmount } = renderTaskRoutes('/tasks/t1');
+    unmount();
+    await act(async () => { await Promise.resolve(); });
+    expect(loadTaskWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('post-success quiet GET 403 clears private panels, drafts and success', async () => {
+    vi.mocked(loadTaskWorkspace)
+      .mockResolvedValueOnce(ws())
+      .mockRejectedValueOnce({ status: 403, message: 'Mất quyền' });
+    vi.spyOn(tasksService, 'addComment').mockResolvedValue(privateComment);
+    renderTaskRoutes('/tasks/t1');
+    await screen.findByText('PRIVATE_TASK');
+    fireEvent.change(screen.getByPlaceholderText('Viết bình luận...'), { target: { value: 'hi' } });
+    fireEvent.change(screen.getByPlaceholderText('https://...'), { target: { value: 'https://a.dev' } });
+    fireEvent.click(screen.getByText('Gửi'));
+    expect(await screen.findByRole('alert', {}, { timeout: 3000 })).toBeTruthy();
+    expect(screen.queryByText('PRIVATE_TASK')).toBeNull();
+    expect(screen.queryByText('Đã gửi bình luận.')).toBeNull();
+    expect(screen.queryByPlaceholderText('Viết bình luận...')).toBeNull();
+  });
+
+  it('manual refresh during pending write cannot interleave; controls stay locked', async () => {
+    const gate = deferred<Awaited<ReturnType<typeof loadTaskWorkspace>>>();
+    vi.mocked(loadTaskWorkspace)
+      .mockResolvedValueOnce(ws())
+      .mockRejectedValueOnce({ status: 500, message: 'get fail' })
+      .mockImplementation(() => gate.promise);
+    const add = vi.spyOn(tasksService, 'addComment').mockResolvedValue(privateComment);
+    renderTaskRoutes('/tasks/t1');
+    await screen.findByText('PRIVATE_TASK');
+    fireEvent.change(screen.getByPlaceholderText('Viết bình luận...'), { target: { value: 'kept' } });
+    fireEvent.click(screen.getByText('Gửi'));
+    await screen.findByRole('button', { name: 'Tải lại chi tiết' });
+    fireEvent.click(screen.getByRole('button', { name: 'Tải lại chi tiết' }));
+    await waitFor(() => expect((screen.getByPlaceholderText('Viết bình luận...') as HTMLTextAreaElement).disabled).toBe(true));
+    const box = screen.getByPlaceholderText('Viết bình luận...');
+    fireEvent.change(box, { target: { value: 'second' } });
+    fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi' }));
+    expect(add).toHaveBeenCalledTimes(1);
+    await act(async () => { gate.resolve(ws()); });
+    await waitFor(() => expect((screen.getByPlaceholderText('Viết bình luận...') as HTMLTextAreaElement).disabled).toBe(false));
+    expect(add).toHaveBeenCalledTimes(1);
+  });
+
+  it('summary task hides private panels even when arrays are populated', async () => {
+    vi.mocked(loadTaskWorkspace).mockResolvedValue({
+      task: summaryTask2, comments: [privateComment], links: [privateLink], reviews: [privateReview], myRole: 'Member',
+    });
+    renderTaskRoutes('/tasks/t2');
+    expect(await screen.findByText('Task T2')).toBeTruthy();
+    expect(screen.queryByText('PRIVATE_COMMENT')).toBeNull();
+    expect(screen.queryByText('PRIVATE_LINK')).toBeNull();
+    expect(screen.queryByText('PRIVATE_REVIEW')).toBeNull();
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.queryByPlaceholderText('Viết bình luận...')).toBeNull();
+  });
+
+  it.each([
+    ['/my-tasks?q=Build&page=2', '/my-tasks?q=Build&page=2'],
+    ['/my-tasks-invalid', '/my-tasks'],
+    [42, '/my-tasks'],
+    [undefined, '/dashboard'],
+  ])('returnTo %p resolves back link %p', async (ret, expected) => {
+    vi.mocked(loadTaskWorkspace).mockResolvedValue(ws());
+    const state = { navigationSection: ret === undefined ? '/dashboard' : '/my-tasks', returnTo: ret };
+    renderTaskRoutes('/tasks/t1', state);
+    await screen.findByText('PRIVATE_TASK');
+    const back = screen.getByRole('link', { name: /Về (Việc của tôi|Tổng quan)/ });
+    expect(back.getAttribute('href')).toBe(expected);
   });
 });
