@@ -1,0 +1,13 @@
+.dashboard-surface input, .dashboard-surface select { @apply min-h-11 border-slate-500 text-base caret-primary-700; }
+.dashboard-surface input::placeholder { @apply text-slate-500; }
+.dashboard-surface input:focus, .dashboard-surface select:focus { @apply border-primary-600 ring-primary-600; }
+.dashboard-surface :focus-visible { @apply outline-primary-700; }
+.dashboard-surface .dashboard-stat:focus-visible { outline-offset: -3px; }
+.dashboard-surface ::selection { @apply bg-primary-100 text-primary-900; }
+
+.dashboard-surface .dashboard-stat:nth-child(-n+2) { border-bottom: 1px solid #e2e8f0; }
+.dashboard-surface .dashboard-stat:nth-child(odd) { border-right: 1px solid #e2e8f0; }
+@media (min-width: 1024px) {
+  .dashboard-surface .dashboard-stat:nth-child(-n+2) { border-bottom: 0; }
+  .dashboard-surface .dashboard-stat:not(:last-child) { border-right: 1px solid #e2e8f0; }
+}
