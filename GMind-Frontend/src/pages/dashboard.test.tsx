@@ -140,8 +140,10 @@ describe('Dashboard filters', () => {
     await taskSection().findByText('Install app');
     const search = screen.getByLabelText('Tìm công việc') as HTMLInputElement;
     fireEvent.change(search, { target: { value: 'all' } });
-    await waitFor(() => expect(search.value).toBe('all'));
-    expect(loc.search).toContain('q=all');
+    expect(search.value).toBe('all');
+    expect(loc.search).not.toContain('q=');
+    fireEvent.keyDown(search, { key: 'Enter' });
+    await waitFor(() => expect(loc.search).toContain('q=all'));
     expect(taskSection().getByText('Install app')).toBeTruthy();
     expect(taskSection().queryByText('Write docs')).toBeNull();
     fireEvent.click(screen.getAllByRole('button', { name: 'Xóa bộ lọc' })[0]);
@@ -168,6 +170,7 @@ describe('Dashboard filters', () => {
     fireEvent.change(screen.getByLabelText('Dự án'), { target: { value: 'p1' } });
     fireEvent.change(screen.getByLabelText('Trạng thái'), { target: { value: 'InProgress' } });
     fireEvent.change(screen.getByLabelText('Tìm công việc'), { target: { value: 'Build' } });
+    fireEvent.keyDown(screen.getByLabelText('Tìm công việc'), { key: 'Enter' });
     await waitFor(() => expect(taskSection().queryByText('Build API')).toBeNull());
     expect(taskSection().getByText('Build UI')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Lọc công việc: Đang thực hiện' }));
@@ -196,6 +199,9 @@ describe('Dashboard filters', () => {
     expect(stat.getAttribute('aria-describedby')).toBe('dashboard-stat-count-overdue');
     expect(document.getElementById('dashboard-stat-count-overdue')!.textContent).toBe('1');
     fireEvent.change(screen.getByLabelText('Tìm công việc'), { target: { value: 'x' } });
+    expect(loc.search).not.toContain('q=');
+    fireEvent.keyDown(screen.getByLabelText('Tìm công việc'), { key: 'Enter' });
+    await waitFor(() => expect(loc.search).toContain('q=x'));
     expect(tasks).toHaveBeenCalledTimes(1);
   });
 });

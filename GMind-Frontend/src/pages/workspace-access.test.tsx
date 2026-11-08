@@ -7,7 +7,7 @@ import TaskDetail from './TaskDetail';
 import GroupDetail from './GroupDetail';
 import { loadGroupWorkspace, loadTaskWorkspace } from '../services/workspace';
 import { tasksService, type TaskDetailDto, type TaskSummaryDto, type CommentDto, type LinkDto, type ReviewDto } from '../services/tasks';
-import { groupsService, type GroupDetailDto, type ActivityDto } from '../services/groups';
+import { groupsService, type InviteDto, type GroupDetailDto, type ActivityDto } from '../services/groups';
 import { type GroupProgress } from '../services/dashboard';
 
 vi.mock('../layouts/MainLayout', () => ({
@@ -98,6 +98,13 @@ function renderGroupRoutes(initial: string) {
       <Link to="/groups/g2">go-g2</Link>
     </MemoryRouter>
   );
+}
+
+
+// jsdom lacks dialog.showModal/close
+if (typeof HTMLDialogElement !== 'undefined') {
+  (HTMLDialogElement.prototype).showModal ??= function () { this.setAttribute('open', ''); };
+  (HTMLDialogElement.prototype).close ??= function () { this.removeAttribute('open'); };
 }
 
 afterEach(() => {
@@ -191,23 +198,26 @@ describe('GroupDetail access handling', () => {
     vi.mocked(loadGroupWorkspace).mockResolvedValue({
       group: group('g1', 'Group One', 'Leader'), projects: [], progress: leaderProgress, activity: privateActivity,
     });
-    const invite = vi.spyOn(groupsService, 'createInvite')
-      .mockResolvedValueOnce({ id: 'i1', code: 'OLDCODE', inviteLink: '/join/OLDCODE' })
+    vi.spyOn(groupsService, 'createInvite')
+      .mockResolvedValueOnce({ id: 'i1', code: 'OLDCODE', inviteLink: '/join/OLDCODE', usedCount: 0 });
+    const { groupsManage } = await import('../services/groups');
+    const revoke = vi.spyOn(groupsManage, 'revokeInvite')
       .mockRejectedValueOnce({ status: 403, message: 'Không có quyền' });
     renderGroupRoutes('/groups/g1');
 
-    expect(await screen.findByText('Group One')).toBeTruthy();
+    expect(await screen.findByRole('heading',{name:'Group One'})).toBeTruthy();
     expect(screen.getByText(/PRIVATE_ACTIVITY/)).toBeTruthy();
     fireEvent.click(screen.getByText('Tạo mã mời'));
     expect(await screen.findByText('OLDCODE')).toBeTruthy();
 
-    fireEvent.click(screen.getByText('Tạo mã mời'));
+    fireEvent.click(screen.getByText('Thu hồi'));
+    fireEvent.click(screen.getAllByText('Thu hồi').find(el => el.closest('dialog'))!);
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
     expect(screen.getByText('Thử lại')).toBeTruthy();
     expect(screen.queryByText('OLDCODE')).toBeNull();
     expect(screen.queryByText(/PRIVATE_ACTIVITY/)).toBeNull();
-    expect(screen.queryByText('Group One')).toBeNull();
-    expect(invite).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('heading',{name:'Group One'})).toBeNull();
+    expect(revoke).toHaveBeenCalledWith('i1');
   });
 
   it('late invite result from a previous group does not leak into the new group', async () => {
@@ -215,24 +225,26 @@ describe('GroupDetail access handling', () => {
       group: group(id, id === 'g1' ? 'Group One' : 'Group Two', 'Leader'),
       projects: [], progress: leaderProgress, activity: [],
     }));
-    const pending = deferred<{ id: string; code: string; inviteLink: string }>();
+    const pending = deferred<InviteDto>();
     vi.spyOn(groupsService, 'createInvite').mockReturnValue(pending.promise);
     renderGroupRoutes('/groups/g1');
 
-    expect(await screen.findByText('Group One')).toBeTruthy();
-    fireEvent.change(screen.getByPlaceholderText('Tên project'), { target: { value: 'draft' } });
+    expect(await screen.findByRole('heading',{name:'Group One'})).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo dự án' }));
+    fireEvent.change(screen.getByLabelText('Tên dự án'), { target: { value: 'draft' } });
     fireEvent.click(screen.getByText('Tạo mã mời'));
     fireEvent.click(screen.getByText('go-g2'));
 
-    expect(await screen.findByText('Group Two')).toBeTruthy();
+    expect(await screen.findByRole('heading',{name:'Group Two'})).toBeTruthy();
     await act(async () => {
-      pending.resolve({ id: 'i1', code: 'OLDCODE', inviteLink: '/join/OLDCODE' });
+      pending.resolve({ id: 'i1', code: 'OLDCODE', inviteLink: '/join/OLDCODE', usedCount: 0 });
       await pending.promise;
     });
 
-    expect(screen.getByText('Group Two')).toBeTruthy();
+    expect(screen.getByRole('heading',{name:'Group Two'})).toBeTruthy();
     expect(screen.queryByText('OLDCODE')).toBeNull();
-    expect((screen.getByPlaceholderText('Tên project') as HTMLInputElement).value).toBe('');
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo dự án' }));
+    expect((screen.getByLabelText('Tên dự án') as HTMLInputElement).value).toBe('');
     expect(vi.mocked(loadGroupWorkspace).mock.calls).toEqual([['g1'], ['g2']]);
   });
 
@@ -242,7 +254,7 @@ describe('GroupDetail access handling', () => {
     });
     renderGroupRoutes('/groups/g1');
 
-    expect(await screen.findByText('Group One')).toBeTruthy();
+    expect(await screen.findByRole('heading',{name:'Group One'})).toBeTruthy();
     expect(screen.queryByText('Hoạt động gần đây')).toBeNull();
     expect(screen.queryByText(/Tiến độ thành viên/)).toBeNull();
     expect(screen.queryByText('Tạo mã mời')).toBeNull();

@@ -69,6 +69,14 @@ export default function Dashboard() {
 
   const model = useMemo(() => buildDashboardModel(tasksState.items, filters, now), [tasksState.items, filters, now]);
 
+  const [searchDraft, setSearchDraft] = useState(filters.search);
+  const [lastAppliedSearch, setLastAppliedSearch] = useState(filters.search);
+  if (lastAppliedSearch !== filters.search) {
+    setLastAppliedSearch(filters.search);
+    setSearchDraft(filters.search);
+  }
+  const commitSearch = () => { if (searchDraft !== filters.search) updateFilters({ q: searchDraft || null }); };
+
   const updateFilters = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(patch)) { if (!value) next.delete(key); else next.set(key, value); }
@@ -137,8 +145,11 @@ export default function Dashboard() {
 
   const filterControls = (
     <div className="mt-4 space-y-3">
-      <Input id="dashboard-search" label="Tìm công việc" type="search" value={filters.search}
-        placeholder="Tên công việc hoặc dự án" onChange={e => updateFilters({ q: e.target.value || null })}
+      <Input id="dashboard-search" label="Tìm công việc" type="search" value={searchDraft}
+        placeholder="Tên công việc hoặc dự án — nhấn Enter để lọc"
+        onChange={e => setSearchDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitSearch(); } }}
+        onBlur={commitSearch}
         className="rounded-xl" />
       <div className="grid gap-3 sm:grid-cols-2">
         <div>

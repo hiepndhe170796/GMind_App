@@ -30,7 +30,7 @@ public record GroupDto(Guid Id, string Name, string? Description, int MemberCoun
 public record GroupDetailDto(Guid Id, string Name, string? Description, int MemberCount, string MyRole, DateTime CreatedAt, List<MemberDto> Members);
 public record MemberDto(Guid UserId, string DisplayName, string? AvatarUrl, string Role, DateTime JoinedAt);
 public record InviteDto(Guid Id, string Code, string InviteLink, DateTime? ExpiresAt, int? MaxUses, int UsedCount);
-public record ActivityDto(Guid Id, string ActorName, string Action, string EntityType, string Summary, DateTime CreatedAt);
+public record ActivityDto(Guid Id, string ActorName, string Action, string EntityType, string Summary, DateTime CreatedAt, Guid? ProjectId);
 
 public class GroupService : IGroupService
 {
@@ -235,7 +235,7 @@ public class GroupService : IGroupService
             .Where(a => a.GroupId == groupId)
             .OrderByDescending(a => a.CreatedAt)
             .Take(Math.Clamp(take, 1, 100))
-            .Select(a => new ActivityDto(a.Id, a.Actor.DisplayName, a.Action, a.EntityType, a.Summary, a.CreatedAt))
+            .Select(a => new ActivityDto(a.Id, a.Actor.DisplayName, a.Action, a.EntityType, a.Summary, a.CreatedAt, a.ProjectId))
             .ToListAsync(ct);
     }
 
