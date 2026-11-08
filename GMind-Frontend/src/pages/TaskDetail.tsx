@@ -210,11 +210,18 @@ function TaskWorkspace({ id, userId }: { id: string; userId: string }) {
 
   const raw = location.state && typeof location.state === 'object' ? location.state as Record<string, unknown> : {};
   const candidate = raw.returnTo;
-  const returnTo = typeof candidate === 'string' && (candidate === '/my-tasks' || candidate.startsWith('/my-tasks?')) ? candidate : undefined;
-  const navigationSection = raw.navigationSection === '/dashboard' ? '/dashboard' : '/my-tasks';
+  const navigationSection = raw.navigationSection === '/dashboard' ? '/dashboard'
+    : raw.navigationSection === '/groups' ? '/groups' : '/my-tasks';
+  const projectBase = workspace?.task ? `/projects/${workspace.task.projectId}` : '';
+  const returnTo = typeof candidate === 'string' &&
+    (candidate === '/my-tasks' || candidate.startsWith('/my-tasks?') ||
+      (projectBase !== '' && (candidate === projectBase || candidate.startsWith(`${projectBase}?`))))
+    ? candidate : undefined;
   const navState = { navigationSection, ...(returnTo ? { returnTo } : {}) };
-  const backTo = returnTo ? { to: returnTo, label: 'Về Việc của tôi' }
+  const backTo = returnTo && projectBase && returnTo.startsWith(projectBase) ? { to: returnTo, label: 'Về dự án' }
+    : returnTo ? { to: returnTo, label: 'Về Việc của tôi' }
     : navigationSection === '/dashboard' ? { to: '/dashboard', label: 'Về Tổng quan' }
+    : navigationSection === '/groups' && projectBase ? { to: projectBase, label: 'Về dự án' }
     : { to: '/my-tasks', label: 'Về Việc của tôi' };
 
   const task = workspace?.task ?? null;

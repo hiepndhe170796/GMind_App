@@ -21,7 +21,8 @@ public interface IMarketplaceService
 }
 
 public record MarketplaceDto(Guid Id, string RequestType, string Status, string TaskTitle, Guid TaskId,
-    string RequestedByName, string? TargetName, string Reason, string? ReviewComment, DateTime CreatedAt, DateTime? ReviewedAt);
+    string RequestedByName, string? TargetName, string Reason, string? ReviewComment, DateTime CreatedAt, DateTime? ReviewedAt,
+    Guid RequestedByUserId, Guid? TargetUserId, Guid? RelatedTaskId, string? RelatedTaskTitle);
 
 public class MarketplaceService : IMarketplaceService
 {
@@ -57,16 +58,19 @@ public class MarketplaceService : IMarketplaceService
         if (type is MarketplaceRequestType.Transfer or MarketplaceRequestType.Swap && targetUserId == null)
             throw new BadRequestException("Target member is required for Transfer/Swap");
 
+        string? targetName = null;
         if (targetUserId != null)
         {
             await RequireMemberAsync(targetUserId.Value, groupId, ct);
             if (targetUserId == userId) throw new BadRequestException("Target cannot be yourself");
+            targetName = await _context.Users.Where(u => u.Id == targetUserId.Value).Select(u => u.DisplayName).FirstAsync(ct);
         }
 
+        TaskEntity? other = null;
         if (type == MarketplaceRequestType.Swap)
         {
             if (relatedTaskId == null) throw new BadRequestException("Swap requires the other member's task");
-            var other = await _context.Tasks.Include(t => t.Project)
+            other = await _context.Tasks.Include(t => t.Project)
                 .FirstOrDefaultAsync(t => t.Id == relatedTaskId && t.Project.GroupId == groupId && t.Project.ArchivedAt == null, ct)
                 ?? throw new BadRequestException("Related task not found in this group");
             if (other.AssigneeUserId != targetUserId)
@@ -106,7 +110,7 @@ public class MarketplaceService : IMarketplaceService
                 $"Yêu cầu {type}", $"{requesterName} tạo yêu cầu {type} cho task '{task.Title}'",
                 "MarketplaceRequest", request.Id, ct);
 
-        return ToDto(request, task.Title, requesterName, null);
+        return ToDto(request, task.Title, requesterName, targetName, other?.Title);
     }
 
     public async Task<List<MarketplaceDto>> ListAsync(Guid userId, Guid groupId, string? statusFilter, CancellationToken ct = default)
@@ -126,7 +130,9 @@ public class MarketplaceService : IMarketplaceService
             .Select(r => new MarketplaceDto(r.Id, r.RequestType.ToString(), r.Status.ToString(),
                 r.Task != null ? r.Task.Title : "", r.TaskId ?? Guid.Empty,
                 r.RequestedBy.DisplayName, r.TargetUser != null ? r.TargetUser.DisplayName : null,
-                r.Reason, r.ReviewComment, r.CreatedAt, r.ReviewedAt))
+                r.Reason, r.ReviewComment, r.CreatedAt, r.ReviewedAt,
+                r.RequestedByUserId, r.TargetUserId, r.RelatedTaskId,
+                r.RelatedTask != null ? r.RelatedTask.Title : null))
             .ToListAsync(ct);
     }
 
@@ -234,6 +240,7 @@ public class MarketplaceService : IMarketplaceService
     private async Task<MarketplaceRequest> LoadAsync(Guid requestId, CancellationToken ct)
         => await _context.MarketplaceRequests
             .Include(r => r.Task).ThenInclude(t => t!.Project).Include(r => r.RequestedBy).Include(r => r.TargetUser)
+            .Include(r => r.RelatedTask)
             .FirstOrDefaultAsync(r => r.Id == requestId, ct)
             ?? throw new NotFoundException("Request not found");
 
@@ -243,9 +250,10 @@ public class MarketplaceService : IMarketplaceService
     private Task RequireLeaderAsync(Guid userId, Guid groupId, CancellationToken ct)
         => _access.RequireLeaderAsync(userId, groupId, ct);
 
-    private static MarketplaceDto ToDto(MarketplaceRequest r, string taskTitle, string requesterName, string? targetName)
+    private static MarketplaceDto ToDto(MarketplaceRequest r, string taskTitle, string requesterName, string? targetName, string? relatedTaskTitle = null)
         => new(r.Id, r.RequestType.ToString(), r.Status.ToString(), taskTitle, r.TaskId ?? Guid.Empty,
-            requesterName, targetName, r.Reason, r.ReviewComment, r.CreatedAt, r.ReviewedAt);
+            requesterName, targetName, r.Reason, r.ReviewComment, r.CreatedAt, r.ReviewedAt,
+            r.RequestedByUserId, r.TargetUserId, r.RelatedTaskId, relatedTaskTitle ?? r.RelatedTask?.Title);
 
     private static ActivityLog Log(Guid actor, Guid groupId, Guid? projectId, string entityType, Guid? entityId, string action, string summary)
         => new() { Id = Guid.NewGuid(), ActorUserId = actor, GroupId = groupId, ProjectId = projectId, EntityType = entityType, EntityId = entityId, Action = action, Summary = summary };

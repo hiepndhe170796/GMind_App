@@ -1,0 +1,11 @@
+.workspace-surface .workspace-primary { @apply bg-primary-600 text-white; }
+.workspace-surface .workspace-primary:hover { @apply bg-primary-700; }
+.workspace-surface input, .workspace-surface select, .workspace-surface textarea { @apply min-h-11 border-slate-500 text-base caret-primary-700; }
+.workspace-surface textarea { @apply min-h-24 py-2.5; }
+.workspace-surface input::placeholder, .workspace-surface textarea::placeholder { @apply text-slate-500; }
+.workspace-surface input:focus, .workspace-surface select:focus, .workspace-surface textarea:focus { @apply border-primary-600 ring-primary-600; }
+.workspace-surface [aria-invalid="true"] { @apply border-danger-600; }
+.workspace-surface :focus-visible { @apply outline-primary-700; }
+.workspace-surface ::selection { @apply bg-primary-100 text-primary-900; }
+.workspace-surface dialog { @apply rounded-2xl p-0 border-0 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] w-[26rem]; }
+.workspace-surface dialog::backdrop { @apply bg-slate-900/40; }

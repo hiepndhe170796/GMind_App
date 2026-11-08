@@ -21,7 +21,7 @@ export const groupsService = {
     const res = await api.get(`/api/groups/${id}`);
     return res.data.data;
   },
-  async createInvite(id: string) {
+  async createInvite(id: string): Promise<InviteDto> {
     const res = await api.post(`/api/groups/${id}/invites`, {});
     return res.data.data;
   },
@@ -30,4 +30,25 @@ export const groupsService = {
   },
 };
 
-export interface ActivityDto { id: string; actorName: string; action: string; entityType: string; summary: string; createdAt: string }
+export interface ActivityDto { id: string; actorName: string; action: string; entityType: string; summary: string; createdAt: string; projectId?: string | null }
+
+// Phase 3 additive wrappers
+export interface InviteDto { id: string; code: string; inviteLink: string; expiresAt?: string | null; maxUses?: number | null; usedCount: number }
+
+export const groupsManage = {
+  async update(groupId: string, name: string, description?: string): Promise<GroupDto> {
+    return (await api.patch(`/api/groups/${groupId}`, { name, description })).data.data;
+  },
+  async revokeInvite(inviteId: string) {
+    return (await api.delete(`/api/groups/invites/${inviteId}`)).data;
+  },
+  async changeRole(groupId: string, userId: string, role: number) {
+    return (await api.patch(`/api/groups/${groupId}/members/${userId}`, { role })).data;
+  },
+  async removeMember(groupId: string, userId: string) {
+    return (await api.delete(`/api/groups/${groupId}/members/${userId}`)).data;
+  },
+  async leave(groupId: string) {
+    return (await api.post(`/api/groups/${groupId}/leave`, {})).data;
+  },
+};

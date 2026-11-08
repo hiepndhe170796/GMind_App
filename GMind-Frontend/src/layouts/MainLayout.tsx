@@ -81,7 +81,7 @@ const MainLayout = ({ children }: MainLayoutProps) => {
 
   const hint = (location.state as { navigationSection?: unknown } | null)?.navigationSection;
   const section = location.pathname.startsWith('/tasks/')
-    ? (hint === '/dashboard' ? '/dashboard' : '/my-tasks')
+    ? (hint === '/dashboard' ? '/dashboard' : hint === '/groups' ? '/groups' : '/my-tasks')
     : /^(\/groups(?:\/|$)|\/projects\/|\/join-group(?:\/|$))/.test(location.pathname) ? '/groups'
     : NAV.find(item => location.pathname === item.to || location.pathname.startsWith(item.to + '/'))?.to;
 
