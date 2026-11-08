@@ -211,16 +211,23 @@ function TaskWorkspace({ id, userId }: { id: string; userId: string }) {
   const raw = location.state && typeof location.state === 'object' ? location.state as Record<string, unknown> : {};
   const candidate = raw.returnTo;
   const navigationSection = raw.navigationSection === '/dashboard' ? '/dashboard'
-    : raw.navigationSection === '/groups' ? '/groups' : '/my-tasks';
+    : raw.navigationSection === '/groups' ? '/groups'
+    : raw.navigationSection === '/calendar' ? '/calendar' : raw.navigationSection === '/notifications' ? '/notifications' : '/my-tasks';
   const projectBase = workspace?.task ? `/projects/${workspace.task.projectId}` : '';
   const returnTo = typeof candidate === 'string' &&
     (candidate === '/my-tasks' || candidate.startsWith('/my-tasks?') ||
+      candidate === '/calendar' || candidate.startsWith('/calendar?') ||
+      candidate === '/notifications' || candidate.startsWith('/notifications?') ||
       (projectBase !== '' && (candidate === projectBase || candidate.startsWith(`${projectBase}?`))))
     ? candidate : undefined;
   const navState = { navigationSection, ...(returnTo ? { returnTo } : {}) };
   const backTo = returnTo && projectBase && returnTo.startsWith(projectBase) ? { to: returnTo, label: 'Về dự án' }
+    : returnTo && (returnTo === '/calendar' || returnTo.startsWith('/calendar?')) ? { to: returnTo, label: 'Về Lịch công việc' }
+    : returnTo && (returnTo === '/notifications' || returnTo.startsWith('/notifications?')) ? { to: returnTo, label: 'Về Thông báo' }
     : returnTo ? { to: returnTo, label: 'Về Việc của tôi' }
     : navigationSection === '/dashboard' ? { to: '/dashboard', label: 'Về Tổng quan' }
+    : navigationSection === '/calendar' ? { to: '/calendar', label: 'Về Lịch công việc' }
+    : navigationSection === '/notifications' ? { to: '/notifications', label: 'Về Thông báo' }
     : navigationSection === '/groups' && projectBase ? { to: projectBase, label: 'Về dự án' }
     : { to: '/my-tasks', label: 'Về Việc của tôi' };
 

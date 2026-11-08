@@ -18,7 +18,7 @@ public interface INotificationService
 }
 
 public record NotificationDto(Guid Id, string Type, string Title, string Body, string? RelatedEntityType,
-    Guid? RelatedEntityId, bool IsRead, DateTime CreatedAt);
+    Guid? RelatedEntityId, bool IsRead, DateTime CreatedAt, Guid? GroupId = null);
 
 public class NotificationService : INotificationService
 {
@@ -60,7 +60,7 @@ public class NotificationService : INotificationService
         return await q.OrderByDescending(n => n.CreatedAt)
             .Take(Math.Clamp(take, 1, 100))
             .Select(n => new NotificationDto(n.Id, n.Type.ToString(), n.Title, n.Body,
-                n.RelatedEntityType, n.RelatedEntityId, n.ReadAt != null, n.CreatedAt))
+                n.RelatedEntityType, n.RelatedEntityId, n.ReadAt != null, n.CreatedAt, n.GroupId))
             .ToListAsync(ct);
     }
 

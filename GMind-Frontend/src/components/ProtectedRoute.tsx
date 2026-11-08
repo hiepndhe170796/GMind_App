@@ -14,7 +14,9 @@ export default function ProtectedRoute() {
   const navigate = useNavigate();
   const [attempt, setAttempt] = useState(0);
   const [check, setCheck] = useState<Check | null>(null);
-  const key = session ? `${session.id}:${location.key}:${attempt}` : null;
+  // These pages store view filters in the query, not a different protected resource.
+  const routeKey = (location.pathname === '/calendar' || location.pathname === '/notifications') ? location.pathname : location.key;
+  const key = session ? `${session.id}:${routeKey}:${attempt}` : null;
 
   useEffect(() => {
     if (!key) return;

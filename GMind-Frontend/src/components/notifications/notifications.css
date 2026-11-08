@@ -1,0 +1,13 @@
+.notifications-surface { @apply selection:bg-primary-100 selection:text-primary-900; }
+.notifications-surface :focus-visible { @apply outline outline-2 outline-offset-2 outline-primary-600; }
+.notification-row { @apply grid grid-cols-[32px_minmax(0,1fr)_44px] items-start gap-x-2.5 px-3 py-3 sm:grid-cols-[36px_minmax(0,1fr)_44px] sm:gap-x-3 sm:px-5 sm:py-3.5; }
+.notification-row[data-read="false"] { @apply bg-primary-50/40; }
+.notification-icon { @apply mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg sm:h-9 sm:w-9; }
+.notification-title { @apply rounded-sm text-sm leading-snug [overflow-wrap:anywhere]; }
+.notification-meta { @apply mt-1 flex flex-wrap items-center gap-x-3 gap-y-0 text-xs leading-relaxed text-slate-600; }
+.notification-link { @apply inline-flex min-h-11 items-center gap-0.5 rounded text-xs font-medium text-primary-700 hover:underline underline-offset-4; }
+.notification-read { @apply flex h-11 w-11 items-center justify-center rounded-xl text-primary-700 hover:bg-primary-100 disabled:cursor-wait disabled:opacity-50; }
+.notifications-surface .notification-bulk { @apply min-h-11 shrink-0 px-1.5 text-xs; }
+@screen sm {
+  .notifications-surface .notification-bulk { @apply px-3 text-sm; }
+}

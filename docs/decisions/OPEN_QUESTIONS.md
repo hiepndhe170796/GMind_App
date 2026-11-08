@@ -34,3 +34,19 @@ Mục này ghi nhận các quyết định nghiệp vụ/kỹ thuật chưa đư
 - **Điểm đóng góp chưa được chốt.** Dòng giả định cũ “hiện tính theo số task Completed” ở trên không phải công thức được phê duyệt; tỷ lệ hoàn thành và điểm đóng góp phải được phân biệt. Không nghiệm thu contribution trước khi có quy tắc và kiểm chứng riêng.
 - **Cảnh báo nguy cơ dùng mặc định BA đã thống nhất:** còn ≤8 giờ và tiến độ <70%, hoặc task đang làm không cập nhật trong 24 giờ; phần cho Leader chỉnh ngưỡng nằm trong cài đặt nhóm. Giả định cũ 3 ngày ở trên ghi nhận cách làm trước đây, không phải tiêu chí nghiệm thu cuối; việc đồng bộ implementation thuộc A5.
 - `PRODUCT.md` ghi lại mục tiêu, ràng buộc và quyết định sản phẩm; không xác nhận rằng A2 hay toàn bộ bản lõi đã hoàn thành.
+
+## Phase 5 — Notifications
+
+- **Khi nào tự đánh dấu đã đọc:** BA NOT-05/UI-09 yêu cầu trạng thái và thao tác
+  đánh dấu, nhưng không quy định mở liên kết tài nguyên có tự đọc hay không.
+  Giữ cách bảo thủ của API hiện có: chỉ POST đọc một mục/đọc tất cả mới cập nhật
+  ReadAt; mở task/project/group không tự thay đổi. PO có thể xác nhận một luồng
+  tự đọc riêng sau, không coi đó là hành vi đã được phê duyệt.
+- **Lịch sử cũ hơn 100 mục:** BA 11.3 nêu pagination cho list API; endpoint
+  Notifications hiện chỉ có unreadOnly/take, không có cursor/page. Phase 5 công
+  khai giới hạn 100 mục theo bộ lọc, không dựng nút tải thêm hoặc giả phân trang.
+  Đây là phần backend còn thiếu so với định hướng BA, không phải lịch sử đã được
+  tải đầy đủ. Cần chốt hợp đồng pagination trước khi mở rộng API.
+- **Phạm vi đọc tất cả:** endpoint hiện áp dụng toàn bộ thông báo chưa đọc còn
+  hiển thị theo quyền của người nhận, không chỉ 100 hàng đang xem. Dialog nói rõ
+  phạm vi này và việc chưa có API hoàn tác/đánh dấu chưa đọc.
