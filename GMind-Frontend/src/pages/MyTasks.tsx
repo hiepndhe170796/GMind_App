@@ -62,6 +62,13 @@ export default function MyTasks() {
     if (p <= 1) next.delete('page'); else next.set('page', String(p));
     setParams(next, { replace: true });
   };
+  const [searchDraft, setSearchDraft] = useState(filters.search);
+  const [lastAppliedSearch, setLastAppliedSearch] = useState(filters.search);
+  if (lastAppliedSearch !== filters.search) {
+    setLastAppliedSearch(filters.search);
+    setSearchDraft(filters.search);
+  }
+  const commitSearch = () => { if (searchDraft !== filters.search) updateFilters({ q: searchDraft || null }); };
   const projectMissing = filters.project && !model.projects.some(p => p.id === filters.project);
   const chips: string[] = [];
   if (filters.period === 'today') chips.push('Hôm nay');
@@ -134,8 +141,11 @@ export default function MyTasks() {
           ) : (
             <>
               <div className="mt-4 space-y-3">
-                <Input id="mytasks-search" label="Tìm công việc" type="search" value={filters.search}
-                  placeholder="Tên công việc hoặc dự án" onChange={e => updateFilters({ q: e.target.value || null })}
+                <Input id="mytasks-search" label="Tìm công việc" type="search" value={searchDraft}
+                  placeholder="Tên công việc hoặc dự án — nhấn Enter để lọc"
+                  onChange={e => setSearchDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitSearch(); } }}
+                  onBlur={commitSearch}
                   className="rounded-xl" />
                 <div className="grid gap-3 md:grid-cols-3 min-w-0">
                   <div className="min-w-0">

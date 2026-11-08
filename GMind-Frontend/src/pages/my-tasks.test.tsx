@@ -69,7 +69,9 @@ describe('MyTasks', () => {
     vi.spyOn(dashboardService, 'myTasks').mockResolvedValue([t('x', { deadlineAt: undefined })]);
     renderTasks();
     expect(await screen.findByText('Chưa đặt hạn')).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Tìm công việc'), { target: { value: 'zzz' } });
+    const search = screen.getByLabelText('Tìm công việc');
+    fireEvent.change(search, { target: { value: 'zzz' } });
+    fireEvent.keyDown(search, { key: 'Enter' });
     expect(await screen.findByText('Không có công việc khớp bộ lọc')).toBeTruthy();
     fireEvent.click(screen.getAllByRole('button', { name: 'Xóa bộ lọc' })[0]);
     await waitFor(() => expect(screen.queryByText('Không có công việc khớp bộ lọc')).toBeNull());
@@ -94,7 +96,9 @@ describe('MyTasks', () => {
     await waitFor(() => expect(loc().search).toBe(''));
     expect(tasks).toHaveBeenCalledTimes(1);
     // keep q through pagination + Back
-    fireEvent.change(screen.getByLabelText('Tìm công việc'), { target: { value: 'Task' } });
+    const searchInput = screen.getByLabelText('Tìm công việc');
+    fireEvent.change(searchInput, { target: { value: 'Task' } });
+    fireEvent.keyDown(searchInput, { key: 'Enter' });
     await waitFor(() => expect(loc().search).toContain('q=Task'));
     fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
     await waitFor(() => expect(loc().search).toContain('page=2'));
