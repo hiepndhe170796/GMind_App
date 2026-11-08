@@ -200,3 +200,85 @@ describe('Login return path', () => {
       expect(await screen.findByText('DASH')).toBeTruthy();
     });
 });
+
+describe('Calendar query navigation', () => {
+  function renderCalendarGuard() {
+    return render(
+      <MemoryRouter initialEntries={['/calendar?date=2026-01-01']}>
+        <Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/calendar" element={<input aria-label="draft" data-mount="1" />} />
+            <Route path="/other" element={<div>PRIVATE_OTHER</div>} />
+          </Route>
+        </Routes>
+        <Link to="/calendar?date=2026-02-01">change-query</Link>
+        <Link to="/other">go-other</Link>
+      </MemoryRouter>
+    );
+  }
+
+  it('query change on /calendar keeps the leaf mounted (no revalidation)', async () => {
+    saveSession(session('s1'));
+    const validate = vi.spyOn(authService, 'validateSession').mockResolvedValue(USER);
+    renderCalendarGuard();
+    const input = await screen.findByLabelText('draft');
+    fireEvent.change(input, { target: { value: 'Keep this draft' } });
+    expect(await screen.findByLabelText('draft')).toBe(input);
+    fireEvent.click(screen.getByRole('link', { name: 'change-query' }));
+    await act(async () => { });
+    expect(screen.getByLabelText('draft')).toBe(input); // SAME DOM node — no remount
+    expect((input as HTMLInputElement).value).toBe('Keep this draft');
+    expect(validate).toHaveBeenCalledTimes(1); // no revalidation for query-only change
+  });
+
+  it('navigating to a different path revalidates', async () => {
+    saveSession(session('s1'));
+    const validate = vi.spyOn(authService, 'validateSession').mockResolvedValue(USER);
+    renderCalendarGuard();
+    await screen.findByLabelText('draft');
+    fireEvent.click(screen.getByRole('link', { name: 'go-other' }));
+    await screen.findByText('PRIVATE_OTHER');
+    await act(async () => { });
+    expect(validate.mock.calls.length).toBeGreaterThanOrEqual(2); // new path = new key = revalidate
+  });
+});
+
+describe('Notifications query navigation', () => {
+  function renderNotificationsGuard() {
+    return render(
+      <MemoryRouter initialEntries={['/notifications']}>
+        <Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/notifications" element={<input aria-label="inbox draft" />} />
+            <Route path="/my-tasks" element={<div>PRIVATE_MY_TASKS</div>} />
+          </Route>
+        </Routes>
+        <Link to="/notifications?unread=1">filter-inbox</Link>
+        <Link to="/my-tasks">leave-inbox</Link>
+      </MemoryRouter>
+    );
+  }
+
+  it('filter query preserves the guarded node and only validates once', async () => {
+    saveSession(session('inbox'));
+    const validate = vi.spyOn(authService, 'validateSession').mockResolvedValue(USER);
+    renderNotificationsGuard();
+    const input = await screen.findByLabelText('inbox draft');
+    fireEvent.change(input, { target: { value: 'Preserved' } });
+    fireEvent.click(screen.getByRole('link', { name: 'filter-inbox' }));
+    await act(async () => {});
+    expect(screen.getByLabelText('inbox draft')).toBe(input);
+    expect((input as HTMLInputElement).value).toBe('Preserved');
+    expect(validate).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaving the notification pathname still validates the protected destination', async () => {
+    saveSession(session('inbox'));
+    const validate = vi.spyOn(authService, 'validateSession').mockResolvedValue(USER);
+    renderNotificationsGuard();
+    await screen.findByLabelText('inbox draft');
+    fireEvent.click(screen.getByRole('link', { name: 'leave-inbox' }));
+    await screen.findByText('PRIVATE_MY_TASKS');
+    expect(validate.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+});

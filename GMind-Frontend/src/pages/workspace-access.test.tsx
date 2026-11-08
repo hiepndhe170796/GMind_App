@@ -320,7 +320,7 @@ describe('TaskDetail mutations', () => {
   });
 
   it('comment validation: blank and overlength give aria-invalid+focus, no POST; ctrl+enter pending counts once', async () => {
-    vi.mocked(loadTaskWorkspace).mockResolvedValue(ws());
+    vi.mocked(loadTaskWorkspace).mockResolvedValue(taskWorkspace(detailTask));
     const req = deferred<CommentDto>();
     const add = vi.spyOn(tasksService, 'addComment').mockReturnValue(req.promise);
     renderTaskRoutes('/tasks/t1');
@@ -436,11 +436,44 @@ describe('TaskDetail mutations', () => {
     [42, '/my-tasks'],
     [undefined, '/dashboard'],
   ])('returnTo %p resolves back link %p', async (ret, expected) => {
-    vi.mocked(loadTaskWorkspace).mockResolvedValue(ws());
+    vi.mocked(loadTaskWorkspace).mockResolvedValue(taskWorkspace(detailTask));
     const state = { navigationSection: ret === undefined ? '/dashboard' : '/my-tasks', returnTo: ret };
     renderTaskRoutes('/tasks/t1', state);
     await screen.findByText('PRIVATE_TASK');
     const back = screen.getByRole('link', { name: /Về (Việc của tôi|Tổng quan)/ });
     expect(back.getAttribute('href')).toBe(expected);
+  });
+});
+
+describe('calendar TaskDetail navigation', () => {
+  it.each([
+    ['/calendar', '/calendar'],
+    ['/calendar?month=2026-12&date=2026-12-15&view=list&q=x', '/calendar?month=2026-12&date=2026-12-15&view=list&q=x'],
+    ['/calendar/evil', '/calendar'],
+    ['//evil.example', '/calendar'],
+    ['https://evil.example', '/calendar'],
+    ['/calendar#x', '/calendar'],
+  ])('calendar returnTo %p resolves back link %p', async (ret, expected) => {
+    vi.mocked(loadTaskWorkspace).mockResolvedValue(taskWorkspace(detailTask));
+    renderTaskRoutes('/tasks/t1', { navigationSection: '/calendar', returnTo: ret });
+    await screen.findByText('PRIVATE_TASK');
+    const back = screen.getByRole('link', { name: 'Về Lịch công việc' });
+    expect(back.getAttribute('href')).toBe(expected);
+  });
+});
+
+describe('notification TaskDetail navigation', () => {
+  it.each([
+    ['/notifications', '/notifications'],
+    ['/notifications?source=bell&unread=1', '/notifications?source=bell&unread=1'],
+    ['/notifications/evil', '/notifications'],
+    ['/notifications#unexpected', '/notifications'],
+    ['https://evil.example/notifications', '/notifications'],
+    ['//evil.example', '/notifications'],
+  ])('returnTo %p uses the correct notification label and safe path %p', async (ret, expected) => {
+    vi.mocked(loadTaskWorkspace).mockResolvedValue(taskWorkspace(detailTask));
+    renderTaskRoutes('/tasks/t1', { navigationSection: '/notifications', returnTo: ret });
+    await screen.findByText('PRIVATE_TASK');
+    expect(screen.getByRole('link', { name: 'Về Thông báo' }).getAttribute('href')).toBe(expected);
   });
 });

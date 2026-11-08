@@ -2,11 +2,13 @@ import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth';
-import { notificationsService } from '../services/notifications';
+import { NotificationCountProvider } from '../components/notifications/NotificationCountProvider';
+import { useNotificationCount } from '../components/notifications/useNotificationCount';
 import Icon, { type IconName } from '../components/ui/Icon';
 
 interface MainLayoutProps {
   children: ReactNode;
+  contentWidth?: 'standard' | 'fluid';
 }
 
 const NAV: { to: string; label: string; icon: IconName }[] = [
@@ -69,11 +71,11 @@ const NavItems = ({ section, onNavigate }: { section?: string; onNavigate?: () =
   </nav>
 );
 
-const MainLayout = ({ children }: MainLayoutProps) => {
+const MainLayoutShell = ({ children, contentWidth }: MainLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const user = authService.currentUser();
-  const [unread, setUnread] = useState<number | null>(null);
+  const { count: unread, error: unreadError } = useNotificationCount();
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -81,7 +83,7 @@ const MainLayout = ({ children }: MainLayoutProps) => {
 
   const hint = (location.state as { navigationSection?: unknown } | null)?.navigationSection;
   const section = location.pathname.startsWith('/tasks/')
-    ? (hint === '/dashboard' ? '/dashboard' : hint === '/groups' ? '/groups' : '/my-tasks')
+    ? (hint === '/dashboard' ? '/dashboard' : hint === '/groups' ? '/groups' : hint === '/calendar' ? '/calendar' : hint === '/notifications' ? '/notifications' : '/my-tasks')
     : /^(\/groups(?:\/|$)|\/projects\/|\/join-group(?:\/|$))/.test(location.pathname) ? '/groups'
     : NAV.find(item => location.pathname === item.to || location.pathname.startsWith(item.to + '/'))?.to;
 
@@ -90,16 +92,6 @@ const MainLayout = ({ children }: MainLayoutProps) => {
     if (menuOpen) setMenuOpen(false);
   }
 
-  const userId = user?.id;
-  useEffect(() => {
-    let cancelled = false;
-    if (userId) {
-      notificationsService.unreadCount()
-        .then(n => { if (!cancelled) setUnread(n); })
-        .catch(() => { if (!cancelled) setUnread(null); });
-    }
-    return () => { cancelled = true; };
-  }, [userId, location.pathname]);
   useEffect(() => {
     if (menuOpen) dialogRef.current?.showModal(); else if (dialogRef.current?.open) dialogRef.current?.close();
     return undefined;
@@ -162,7 +154,8 @@ const MainLayout = ({ children }: MainLayoutProps) => {
             <h1 className="text-lg font-semibold text-slate-900 truncate">{title}</h1>
             <p className="hidden sm:block text-xs text-slate-600 capitalize">{today}</p>
           </div>
-          <Link to="/notifications" aria-label={unread != null && unread > 0 ? `Thông báo, ${unread} chưa đọc` : 'Thông báo'}
+          <Link to="/notifications" aria-label={unread == null ? 'Thông báo, chưa cập nhật số chưa đọc' : `Thông báo, ${unread} chưa đọc${unreadError ? ', số liệu chưa làm mới' : ''}`}
+            title={unreadError ? 'Chưa làm mới được số thông báo chưa đọc' : 'Mở thông báo'}
             className="relative p-2 rounded-lg text-slate-600 hover:bg-slate-100 min-h-11 min-w-11 flex items-center justify-center">
             <Icon name="bell" size={20} />
             {unread != null && unread > 0 && (
@@ -170,7 +163,7 @@ const MainLayout = ({ children }: MainLayoutProps) => {
             )}
           </Link>
         </header>
-        <main id="main-content" tabIndex={-1} className="flex-1 w-full max-w-[1440px] mx-auto px-4 sm:px-8 py-6 min-w-0">
+        <main id="main-content" tabIndex={-1} className={`flex-1 w-full ${contentWidth === 'fluid' ? 'max-w-none' : 'max-w-[1440px]'} mx-auto px-4 sm:px-8 py-6 min-w-0`}>
           {children}
         </main>
       </div>
@@ -193,5 +186,11 @@ const MainLayout = ({ children }: MainLayoutProps) => {
     </div>
   );
 };
+
+const MainLayout = ({ children, contentWidth }: MainLayoutProps) => (
+  <NotificationCountProvider key={authService.currentUser()?.id ?? ''} userId={authService.currentUser()?.id ?? ''}>
+    <MainLayoutShell contentWidth={contentWidth}>{children}</MainLayoutShell>
+  </NotificationCountProvider>
+);
 
 export default MainLayout;

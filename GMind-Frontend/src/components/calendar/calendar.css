@@ -1,0 +1,77 @@
+/* Phase 4 redesign — continuous plane calendar workspace (R2) */
+.calendar-surface { @apply text-slate-700; }
+.calendar-surface input[type="search"], .calendar-surface input[type="month"], .calendar-surface select { @apply min-h-11 border-slate-500 text-base caret-primary-700; }
+.calendar-surface input::placeholder { @apply text-slate-500; }
+.calendar-surface input:focus, .calendar-surface select:focus { @apply border-primary-600 ring-primary-600; }
+.calendar-surface :focus-visible { @apply outline-primary-700; }
+.calendar-surface ::selection { @apply bg-primary-100 text-primary-900; }
+.calendar-surface .cal-count { @apply tabular-nums; }
+
+/* Compact controls keep the calendar, rather than form chrome, in view. */
+.calendar-surface .gcal-page-header { @apply grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1; }
+.calendar-surface .gcal-page-description { @apply col-span-2 text-sm text-slate-600; }
+.calendar-surface .gcal-header { @apply grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 p-3; }
+.calendar-surface .gcal-period-navigation { @apply col-span-2 flex min-w-0 items-center justify-between gap-2; }
+.calendar-surface .gcal-view { justify-self: end; }
+.calendar-surface .gcal-search-row { @apply flex flex-wrap items-center gap-2; }
+.calendar-surface .gcal-search-form { @apply flex w-full min-w-0 items-center gap-2; }
+.calendar-surface .gcal-search-form > div { @apply min-w-0 flex-1; }
+.calendar-surface #cal-month::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+@media (min-width: 360px) {
+  .calendar-surface .gcal-search-row { flex-wrap: nowrap; }
+  .calendar-surface .gcal-search-form { flex: 1 1 0%; max-width: 360px; }
+}
+@media (min-width: 640px) {
+  .calendar-surface .gcal-header { @apply flex; }
+  .calendar-surface .gcal-period-navigation { @apply justify-start; }
+  .calendar-surface .gcal-view { margin-left: auto; }
+}
+
+/* workspace shell */
+.calendar-surface .gcal-workspace { @apply rounded-2xl border border-slate-200 bg-white overflow-hidden; }
+.calendar-surface .gcal-section + .gcal-section { @apply border-t border-slate-200; }
+
+/* continuous grid: 7 equal cols, 0 gap, 1px rules, EXPLICIT fixed rows */
+.calendar-surface .gcal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.calendar-surface .gcal-cell { @apply relative min-w-0 overflow-hidden border-r border-b border-slate-200; height: 64px; }
+@media (min-width: 768px) { .calendar-surface .gcal-cell { height: 104px; } }
+@media (min-width: 1280px) { .calendar-surface .gcal-cell { height: 112px; } }
+.calendar-surface .gcal-cell:nth-child(7n) { @apply border-r-0; }
+.calendar-surface .gcal-cell[data-outside] { @apply bg-slate-50/70; }
+.calendar-surface .gcal-cell[data-outside] .gcal-date-pill { @apply text-slate-500; }
+.calendar-surface .gcal-cell[data-weekend] { @apply bg-slate-50/40; }
+.calendar-surface .gcal-cell[data-selected] { @apply bg-primary-50; box-shadow: inset 0 0 0 1px theme('colors.primary.500'); }
+
+/* full-cell background button (interactive only via foreground) */
+.calendar-surface .gcal-day-btn { @apply absolute inset-0 w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-600; }
+.calendar-surface .gcal-date-pill {
+  @apply absolute left-1 top-1 flex h-7 w-7 items-center justify-center rounded-full text-sm tabular-nums text-slate-700;
+}
+.calendar-surface .gcal-cell[data-today] .gcal-date-pill { @apply bg-primary-600 font-bold text-white; }
+.calendar-surface .gcal-cell[data-selected]:not([data-today]) .gcal-date-pill { @apply text-primary-700 ring-2 ring-primary-500; }
+
+/* foreground events: above bg button, pointer-events on links only */
+.calendar-surface .gcal-events { @apply absolute inset-x-0 bottom-0 top-[32px] hidden flex-col gap-0.5 px-0.5 pb-0.5 pointer-events-none; }
+@media (min-width: 768px) { .calendar-surface .gcal-events { display: flex; } }
+.calendar-surface .gcal-event {
+  @apply pointer-events-auto flex items-center gap-1 min-h-[22px] max-h-[22px] truncate rounded px-1.5 text-xs leading-none hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600;
+}
+.calendar-surface .gcal-event::before { content: ''; @apply h-1.5 w-1.5 shrink-0 rounded-full bg-current; }
+.calendar-surface .gcal-event[data-status="ToDo"] { @apply bg-slate-100 text-slate-700; }
+.calendar-surface .gcal-event[data-status="InProgress"] { @apply bg-primary-100 text-primary-700; }
+.calendar-surface .gcal-event[data-status="Submitted"] { @apply bg-warning-100 text-warning-700; }
+.calendar-surface .gcal-event[data-status="ChangesRequested"] { @apply bg-danger-100 text-danger-700; }
+.calendar-surface .gcal-event[data-overdue] { @apply font-medium; }
+.calendar-surface .gcal-overflow {
+  @apply pointer-events-auto min-h-[24px] rounded px-1.5 text-left text-xs font-medium leading-[24px] text-primary-700 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600;
+}
+/* mobile indicators: real count + status dots INSIDE cell, desktop-hidden */
+.calendar-surface .gcal-dots { display: none; }
+@media (max-width: 767.98px) {
+  .calendar-surface .gcal-dots { @apply pointer-events-none absolute bottom-1 left-1 flex items-center gap-1 text-xs font-semibold text-slate-600; }
+}
+.calendar-surface .gcal-dots i { @apply inline-block h-1.5 w-1.5 rounded-full bg-primary-500; }
+.calendar-surface .gcal-dots i[data-overdue] { @apply bg-danger-500; }
+
+/* joined day agenda */
+.calendar-surface .gcal-agenda-title { @apply border-b border-slate-200 bg-slate-50/60 px-4 py-2.5 text-sm font-semibold text-slate-900; }
