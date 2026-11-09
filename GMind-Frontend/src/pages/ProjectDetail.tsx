@@ -216,8 +216,8 @@ function ProjectWorkspace({ id, userId }: { id: string; userId: string }) {
 
   const navState = { navigationSection: '/groups', returnTo: `/projects/${id}${params.size ? `?${params}` : ``}` };
   const taskLink = (t: TaskSummaryDto, label?: string) => (
-    <Link to={`/tasks/${t.id}`} state={navState}
-      className="min-w-0 font-medium text-slate-900 hover:text-primary-700 [overflow-wrap:anywhere]">{label ?? t.title}</Link>
+    <Link to={`/tasks/${t.id}`} state={navState} title={t.title}
+      className="line-clamp-2 min-w-0 font-medium text-slate-900 hover:text-primary-700 [overflow-wrap:anywhere]">{label ?? t.title}</Link>
   );
   const actions = (t: TaskSummaryDto) => (
     <span className="flex gap-2 flex-wrap">
@@ -292,8 +292,8 @@ function ProjectWorkspace({ id, userId }: { id: string; userId: string }) {
               </Card>
             )}
 
-            <div className="flex flex-wrap items-center gap-3">
-              <form role="search" className="flex items-end gap-2 min-w-0 w-full sm:flex-1 sm:max-w-sm" onSubmit={e => { e.preventDefault(); updateFilters({ q: q.trim() || null }); }}>
+            <div className="flex flex-wrap items-end gap-3">
+              <form role="search" className="flex w-full min-w-0 flex-[1_1_18rem] items-end gap-2 sm:max-w-sm" onSubmit={e => { e.preventDefault(); updateFilters({ q: q.trim() || null }); }}>
                 <div className="min-w-0 flex-1">
                   <label htmlFor="ptask-q" className="block text-sm font-medium text-slate-700 mb-1">Tìm công việc</label>
                   <input id="ptask-q" type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Tên hoặc người phụ trách"
@@ -302,18 +302,18 @@ function ProjectWorkspace({ id, userId }: { id: string; userId: string }) {
                 <Button type="submit" variant="secondary" className="min-h-11">Tìm</Button>
               </form>
               <select aria-label="Lọc trạng thái" value={filters.status} onChange={e => updateFilters({ status: e.target.value || null })}
-                className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                className="min-h-11 min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-3 py-2">
                 <option value="">Tất cả trạng thái</option>
                 {COLUMNS.map(c => <option key={c} value={c}>{STATUS_LABEL[c]}</option>)}
               </select>
               <select aria-label="Lọc người phụ trách" value={filters.assignee} onChange={e => updateFilters({ assignee: e.target.value || null })}
-                className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                className="min-h-11 min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-3 py-2">
                 <option value="">Mọi người</option>
                 <option value="unassigned">Chưa giao</option>
                 {ws!.members.map(m => <option key={m.userId} value={m.userId}>{m.displayName}</option>)}
               </select>
               <select aria-label="Lọc ưu tiên" value={filters.priority} onChange={e => updateFilters({ priority: e.target.value || null })}
-                className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                className="min-h-11 min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-3 py-2">
                 <option value="">Mọi ưu tiên</option>
                 {(['Low', 'Medium', 'High', 'Urgent'] as const).map(p => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
               </select>

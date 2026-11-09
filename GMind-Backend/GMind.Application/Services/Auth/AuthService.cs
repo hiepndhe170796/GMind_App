@@ -158,7 +158,7 @@ public class AuthService : IAuthService
             ?? throw new NotFoundException("User not found");
 
         user.DisplayName = displayName.Trim();
-        user.AvatarUrl = avatarUrl;
+        user.AvatarUrl = avatarUrl?.Trim();
         user.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
         return ToDto(user);
@@ -170,13 +170,15 @@ public class AuthService : IAuthService
             ?? throw new NotFoundException("User not found");
 
         if (!_passwordHasher.VerifyPassword(currentPassword, user.PasswordHash))
-            throw new UnauthorizedException("Current password is incorrect");
+            throw new BadRequestException("Current password is incorrect");
 
         user.PasswordHash = _passwordHasher.HashPassword(newPassword);
         user.UpdatedAt = DateTime.UtcNow;
-        // Invalidate existing sessions
+        // Invalidate existing sessions + any outstanding reset token
         user.RefreshToken = null;
         user.RefreshTokenExpiryTime = null;
+        user.PasswordResetToken = null;
+        user.PasswordResetTokenExpiry = null;
         user.AuthVersion = checked(user.AuthVersion + 1);
         await _context.SaveChangesAsync(ct);
     }

@@ -213,6 +213,27 @@ public class PasswordResetDeliveryTests : IDisposable
         var user = await _db.Users.FirstAsync(u => u.Email == "u5@test.dev");
         Assert.Null(user.PasswordResetToken);
     }
+
+    [Fact]
+    public async Task AuthenticatedChange_InvalidatesOutstandingReset_OnlyAfterCorrectCurrentPassword()
+    {
+        var registered = await _service.RegisterAsync("Account", "change-reset@test.dev", "Password123!");
+        await _service.ForgotPasswordAsync("change-reset@test.dev");
+        var oldToken = _delivery.Token!;
+        var user = await _db.Users.SingleAsync(u => u.Id == registered.Id);
+        var hash = user.PasswordResetToken;
+        var version = user.AuthVersion;
+        await Assert.ThrowsAsync<BadRequestException>(() =>
+            _service.ChangePasswordAsync(user.Id, "Incorrect123!", "NewPass123!"));
+        Assert.Equal(hash, user.PasswordResetToken);
+        Assert.Equal(version, user.AuthVersion);
+        await _service.ChangePasswordAsync(user.Id, "Password123!", "NewPass123!");
+        Assert.Null(user.PasswordResetToken);
+        Assert.Null(user.PasswordResetTokenExpiry);
+        Assert.Equal(version + 1, user.AuthVersion);
+        await Assert.ThrowsAsync<BadRequestException>(() => _service.ResetPasswordAsync(oldToken, "Attacker123!"));
+        Assert.NotNull(await _service.LoginAsync("change-reset@test.dev", "NewPass123!"));
+    }
 }
 
 public class DevelopmentPasswordResetDeliveryTests : IDisposable

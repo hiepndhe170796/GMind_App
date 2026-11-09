@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth';
+import { getSessionSnapshot, subscribeSession, type UserInfo } from '../services/session';
 import { NotificationCountProvider } from '../components/notifications/NotificationCountProvider';
+import UserAvatar from '../components/account/UserAvatar';
 import { useNotificationCount } from '../components/notifications/useNotificationCount';
 import Icon, { type IconName } from '../components/ui/Icon';
 
@@ -28,6 +30,8 @@ const TITLES: [RegExp, string][] = [
   [/^\/notifications/, 'Thông báo'],
   [/^\/calendar/, 'Lịch công việc'],
   [/^\/join-group/, 'Tham gia nhóm'],
+  [/^\/profile(?:\/|$)/, 'Hồ sơ'],
+  [/^\/settings(?:\/|$)/, 'Cài đặt'],
 ];
 
 const Brand = ({ className = '' }: { className?: string }) => (
@@ -40,21 +44,27 @@ const Brand = ({ className = '' }: { className?: string }) => (
   </Link>
 );
 
-const UserFooter = ({ user, onLogout, pending }: { user: { displayName: string; email: string } | null; onLogout: () => void; pending: boolean }) => (
-  <div className="border-t border-[#e7ecf4] p-4 flex items-center gap-3 min-w-0 shrink-0">
-    <span className="flex items-center justify-center w-9 h-9 rounded-full bg-primary-100 text-primary-700 text-sm font-semibold shrink-0">
-      {(user?.displayName || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-    </span>
-    <span className="min-w-0 flex-1">
-      <span className="block truncate text-sm font-medium text-slate-800">{user?.displayName}</span>
-      <span className="block truncate text-xs text-slate-600">{user?.email}</span>
-    </span>
+const UserFooter = ({ user, onLogout, pending }: { user: UserInfo | null; onLogout: () => void; pending: boolean }) => {
+  const { pathname } = useLocation();
+  const active = pathname === '/profile' || pathname === '/settings';
+  return (
+  <div className="border-t border-[#e7ecf4] p-4 flex items-center gap-2 min-w-0 shrink-0">
+    <Link to="/profile" aria-label="Hồ sơ và cài đặt" aria-current={pathname === '/profile' ? 'page' : undefined}
+      title="Hồ sơ và cài đặt"
+      className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 ${active ? 'bg-primary-50' : 'hover:bg-slate-50'}`}>
+      <UserAvatar name={user?.displayName ?? '?'} url={user?.avatarUrl} size={36} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium text-slate-800">{user?.displayName}</span>
+        <span className="block truncate text-xs text-slate-600">{user?.email}</span>
+      </span>
+    </Link>
     <button onClick={onLogout} aria-label="Đăng xuất" title="Đăng xuất" disabled={pending}
       className="p-2.5 min-w-11 min-h-11 rounded-lg text-slate-600 hover:text-danger-700 hover:bg-slate-50 transition-colors disabled:opacity-50">
       <Icon name="logout" size={18} />
     </button>
   </div>
-);
+  );
+};
 
 const NavItems = ({ section, onNavigate }: { section?: string; onNavigate?: () => void }) => (
   <nav aria-label="Điều hướng chính" className="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-1">
@@ -74,7 +84,8 @@ const NavItems = ({ section, onNavigate }: { section?: string; onNavigate?: () =
 const MainLayoutShell = ({ children, contentWidth }: MainLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const user = authService.currentUser();
+  const session = useSyncExternalStore(subscribeSession, getSessionSnapshot);
+  const user = session?.user ?? null;
   const { count: unread, error: unreadError } = useNotificationCount();
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);

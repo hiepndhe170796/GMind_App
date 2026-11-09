@@ -204,7 +204,7 @@ public class SessionAuthorizationTests
         var (access, _) = await f.LoginAsync();
         var change = await f.Client(access).PatchAsJsonAsync("/api/me/password",
             new { currentPassword = "WrongPass1!", newPassword = "NewPass123!", confirmPassword = "NewPass123!" });
-        Assert.Equal(HttpStatusCode.Unauthorized, change.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, change.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await f.Client(access).GetAsync("/api/me")).StatusCode);
     }
 

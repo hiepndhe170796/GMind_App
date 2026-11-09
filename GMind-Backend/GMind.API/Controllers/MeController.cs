@@ -43,15 +43,24 @@ public class MeController : ControllerBase
     }
 }
 
-public class UpdateProfileRequest
+public class UpdateProfileRequest : IValidatableObject
 {
     [Required]
     [MaxLength(100)]
     public string DisplayName { get; set; } = string.Empty;
 
     [MaxLength(500)]
-    [Url]
     public string? AvatarUrl { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext _)
+    {
+        if (AvatarUrl is null) yield break;
+        if (string.IsNullOrWhiteSpace(AvatarUrl) || !Uri.TryCreate(AvatarUrl, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            || string.IsNullOrWhiteSpace(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo)
+            || AvatarUrl.Any(char.IsControl))
+            yield return new ValidationResult("Avatar URL must be a valid http(s) URL", new[] { nameof(AvatarUrl) });
+    }
 }
 
 public class ChangePasswordRequest

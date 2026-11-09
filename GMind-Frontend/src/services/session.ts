@@ -1,4 +1,4 @@
-export interface UserInfo { id: string; displayName: string; email: string; avatarUrl?: string }
+export interface UserInfo { id: string; displayName: string; email: string; avatarUrl?: string | null }
 export interface AuthResult { accessToken: string; refreshToken: string; expiresAt: string; user: UserInfo }
 export interface SessionRecord extends AuthResult { id: string }
 
@@ -10,6 +10,9 @@ const storage = (): Storage | null =>
 
 const listeners = new Set<() => void>();
 let snapshot: SessionRecord | null = readSnapshot();
+let sessionEndReason: 'passwordChanged' | null = null;
+
+export const getSessionEndReason = () => sessionEndReason;
 
 function isValidRecord(value: unknown): value is SessionRecord {
   if (!value || typeof value !== 'object') return false;
@@ -56,6 +59,7 @@ export function synchronizeSession(): SessionRecord | null {
   const next = readSnapshot();
   if (JSON.stringify(next) !== JSON.stringify(snapshot)) {
     snapshot = next;
+    sessionEndReason = null;
     notify();
   }
   return snapshot;
@@ -73,6 +77,7 @@ export function saveSession(result: AuthResult): void {
   store.setItem(SESSION_STORAGE_KEY, JSON.stringify(record));
   removeLegacy();
   snapshot = record;
+  sessionEndReason = null;
   notify();
 }
 
@@ -100,12 +105,13 @@ export function updateSessionUser(user: UserInfo, expectedId: string): void {
   notify();
 }
 
-export function clearSession(expectedId?: string): void {
+export function clearSession(expectedId?: string, reason?: 'passwordChanged'): void {
   const current = synchronizeSession();
   if (expectedId && current?.id !== expectedId) return;
   const store = storage();
   store?.removeItem(SESSION_STORAGE_KEY);
   removeLegacy();
+  sessionEndReason = reason ?? null;
   if (snapshot !== null) { snapshot = null; notify(); }
 }
 

@@ -31,6 +31,16 @@ export const authService = {
   logout(): Promise<LogoutResult> {
     return logoutSession();
   },
+  async updateProfile(displayName: string, avatarUrl: string | null): Promise<UserInfo> {
+    const id = getSessionSnapshot()?.id;
+    const res = await api.patch('/api/me', { displayName, avatarUrl });
+    const user = res.data.data as UserInfo;
+    if (id) updateSessionUser(user, id);
+    return user;
+  },
+  async changePassword(currentPassword: string, newPassword: string, confirmPassword: string): Promise<void> {
+    await api.patch('/api/me/password', { currentPassword, newPassword, confirmPassword });
+  },
   saveSession(r: AuthResult) {
     persistSession(r);
   },

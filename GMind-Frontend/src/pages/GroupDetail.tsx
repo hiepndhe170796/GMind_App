@@ -210,15 +210,15 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
                   <span className="text-sm text-slate-600">{group.members.length} thành viên</span>
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-1">
-                <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col items-start gap-1 sm:items-end">
+                <div className="flex flex-wrap gap-2 sm:justify-end">
                   <Link to={`/groups/${id}/marketplace`} className="min-h-11 inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50">Marketplace</Link>
                   {isLeader && <Button variant="secondary" className="min-h-11" disabled={busy}
                     onClick={() => { setEditName(group.name); setEditDesc(group.description ?? ''); setEditError(''); setEditOpen(v => !v); }}>Sửa nhóm</Button>}
                   <Button variant="secondary" className="min-h-11 text-danger-700" disabled={busy || (isLeader && leaderCount <= 1)}
                     onClick={() => setDialog({ kind: 'leave' })}>Rời nhóm</Button>
                 </div>
-                {isLeader && leaderCount <= 1 && <p className="text-xs text-slate-600">Bạn là Trưởng nhóm duy nhất — không thể rời hoặc hạ vai trò chính mình.</p>}
+                {isLeader && leaderCount <= 1 && <p className="text-xs text-slate-600 sm:text-right">Bạn là Trưởng nhóm duy nhất — không thể rời hoặc hạ vai trò chính mình.</p>}
               </div>
             </header>
             {routeNotice && <p role="status" className="text-sm font-medium text-success-700">{routeNotice}</p>}
@@ -340,12 +340,12 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
                             {isMe && soleLeader && <span className="mt-0.5 block text-xs text-slate-600">Trưởng nhóm duy nhất — không thể hạ vai trò hoặc rời.</span>}
                           </span>
                           {isLeader && !isMe && (
-                            <span className="flex gap-1.5">
-                              <Button size="sm" variant="secondary" className="min-h-9" disabled={busy}
+                            <span className="flex w-full flex-wrap justify-end gap-1.5 pl-10">
+                              <Button size="sm" variant="secondary" className="min-h-11" disabled={busy}
                                 onClick={() => setDialog({ kind: 'role', memberId: m.userId, memberName: m.displayName, toRole: m.role === 'Leader' ? ROLE_NUM.Member : ROLE_NUM.Leader })}>
                                 {m.role === 'Leader' ? 'Hạ vai trò' : 'Làm trưởng nhóm'}
                               </Button>
-                              <Button size="sm" variant="secondary" className="min-h-9 text-danger-700" disabled={busy || soleLeader}
+                              <Button size="sm" variant="secondary" className="min-h-11 text-danger-700" disabled={busy || soleLeader}
                                 onClick={() => setDialog({ kind: 'remove', memberId: m.userId, memberName: m.displayName })}>Xóa</Button>
                             </span>
                           )}
