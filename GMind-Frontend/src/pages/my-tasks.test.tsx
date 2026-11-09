@@ -41,6 +41,17 @@ const renderTasks = (entry = '/my-tasks') => render(
 afterEach(() => { cleanup(); vi.restoreAllMocks(); clearSession(); localStorage.clear(); });
 
 describe('MyTasks', () => {
+  it('keeps full task names but does not override the two-line preview display', async () => {
+    const title = 'Một nhiệm vụ có tên dài '.repeat(9).slice(0, 200).trim();
+    vi.spyOn(dashboardService, 'myTasks').mockResolvedValue([t('long', { title, deadlineAt: undefined })]);
+    renderTasks();
+    const preview = await screen.findByText(title, { exact: true });
+    expect(preview.getAttribute('title')).toBe(title);
+    expect(preview.classList.contains('line-clamp-2')).toBe(true);
+    expect(preview.classList.contains('block')).toBe(false);
+    expect(preview.closest('a')?.getAttribute('href')).toBe('/tasks/long');
+  });
+
   it('error shows retry and no empty state; retry recovers', async () => {
     const tasks = vi.spyOn(dashboardService, 'myTasks').mockRejectedValue({ message: 'fail' });
     renderTasks();

@@ -66,6 +66,18 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); clearSession(); localStorage.clear(); });
 
 describe('Dashboard resources', () => {
+  it('keeps full task names but does not override the two-line preview display', async () => {
+    const title = 'Một nhiệm vụ có tên dài '.repeat(9).slice(0, 200).trim();
+    vi.spyOn(dashboardService, 'myTasks').mockResolvedValue([t('long', { title, deadlineAt: undefined })]);
+    vi.spyOn(groupsService, 'myGroups').mockResolvedValue([]);
+    renderApp();
+    const preview = await screen.findByText(title, { exact: true });
+    expect(preview.getAttribute('title')).toBe(title);
+    expect(preview.classList.contains('line-clamp-2')).toBe(true);
+    expect(preview.classList.contains('block')).toBe(false);
+    expect(preview.closest('a')?.getAttribute('href')).toBe('/tasks/long');
+  });
+
   it('refresh rejection clears stats+rows but keeps groups; task retry alone recovers', async () => {
     const tasks = vi.spyOn(dashboardService, 'myTasks').mockResolvedValue(fixture9());
     const groups = vi.spyOn(groupsService, 'myGroups').mockResolvedValue([G]);

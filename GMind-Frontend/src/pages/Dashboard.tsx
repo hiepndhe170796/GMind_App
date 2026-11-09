@@ -6,6 +6,7 @@ import Badge from '../components/ui/Badge';
 import Icon from '../components/ui/Icon';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
+import ResponsiveFilters from '../components/ui/ResponsiveFilters';
 import MiniCalendar from '../components/dashboard/MiniCalendar';
 import '../components/dashboard/dashboard.css';
 import { dashboardService, type MyTaskDto } from '../services/dashboard';
@@ -127,7 +128,7 @@ export default function Dashboard() {
         <Link to={`/tasks/${t.id}`} state={NAV_STATE}
           className="group grid grid-cols-[minmax(0,1fr)_20px] items-center gap-x-3 gap-y-2 rounded-lg px-2 py-4 hover:bg-slate-50">
           <span className="min-w-0">
-            <span title={t.title} className="block text-base font-semibold text-slate-900 group-hover:text-primary-700 [overflow-wrap:anywhere] line-clamp-2">{t.title}</span>
+            <span title={t.title} className="text-base font-semibold text-slate-900 group-hover:text-primary-700 [overflow-wrap:anywhere] line-clamp-2">{t.title}</span>
             <span title={t.projectName} className="mt-0.5 block truncate text-sm text-slate-600">{t.projectName}</span>
           </span>
           <Icon name="chevron-right" size={18} className="col-start-2 row-start-1 row-span-2 text-slate-500" />
@@ -145,12 +146,14 @@ export default function Dashboard() {
 
   const filterControls = (
     <div className="mt-4 space-y-3">
+      <ResponsiveFilters activeCount={[filters.project, filters.status].filter(Boolean).length} search={
       <Input id="dashboard-search" label="Tìm công việc" type="search" value={searchDraft}
-        placeholder="Tên công việc hoặc dự án — nhấn Enter để lọc"
+        placeholder="Tên việc hoặc dự án" title="Nhấn Enter hoặc rời ô để áp dụng tìm kiếm"
         onChange={e => setSearchDraft(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitSearch(); } }}
         onBlur={commitSearch}
         className="rounded-xl" />
+      }>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor="dashboard-project" className="block text-sm font-medium text-slate-700 mb-1">Dự án</label>
@@ -170,6 +173,7 @@ export default function Dashboard() {
           </select>
         </div>
       </div>
+      </ResponsiveFilters>
       {model.hasFilters && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-slate-600">Đang lọc</span>

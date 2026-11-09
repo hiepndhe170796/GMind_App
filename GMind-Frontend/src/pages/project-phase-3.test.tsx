@@ -46,6 +46,22 @@ if (typeof HTMLDialogElement !== 'undefined') {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); clearSession(); });
 
 describe('ProjectDetail', () => {
+  it('keeps full task titles and destinations while clamping list and board previews', async () => {
+    const title = 'Một công việc có tên dài để kiểm tra bố cục '.repeat(6).slice(0, 200);
+    setup('Member', [task('long', { title })]);
+    renderAt();
+    const link = await screen.findByRole('link', { name: title });
+    expect(link.getAttribute('href')).toBe('/tasks/long');
+    expect(link.getAttribute('title')).toBe(title);
+    expect(link.classList.contains('line-clamp-2')).toBe(true);
+    expect(screen.getByRole('search').classList.contains('flex-[1_1_18rem]')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Bảng' }));
+    const boardLink = await screen.findByRole('link', { name: title });
+    expect(boardLink.getAttribute('title')).toBe(title);
+    expect(boardLink.getAttribute('href')).toBe('/tasks/long');
+    expect(boardLink.classList.contains('line-clamp-2')).toBe(true);
+  });
+
   it('member: no private activity fetch, no leader actions', async () => {
     const { act } = setup('Member');
     renderAt();

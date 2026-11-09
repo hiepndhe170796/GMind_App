@@ -1,0 +1,24 @@
+.account-surface {
+  --account-accent: #2f66c4;
+  --account-ink: #2852a0;
+  --account-border: #7c8ca6;
+}
+.account-surface input {
+  min-height: 44px;
+  border-radius: 12px;
+  font-size: 16px;
+}
+.account-surface input:not([aria-invalid="true"]) { border-color: var(--account-border); }
+.account-surface input[aria-invalid="true"] { border-color: #b91c1c; }
+.account-surface input::placeholder { color: #64748b; }
+.account-surface :is(a, button, input):focus-visible {
+  outline: 2px solid var(--account-ink);
+  outline-offset: 3px;
+}
+.account-surface input:focus { --tw-ring-color: var(--account-accent); }
+.account-surface button { min-height: 44px; }
+.account-surface .account-primary { background-color: var(--account-accent); }
+.account-surface .account-primary:hover { background-color: var(--account-ink); }
+@media (min-width: 640px) {
+  .account-surface input { font-size: 14px; }
+}

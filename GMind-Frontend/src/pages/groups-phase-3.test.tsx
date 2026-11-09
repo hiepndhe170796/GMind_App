@@ -46,6 +46,20 @@ if (typeof HTMLDialogElement !== 'undefined') {
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); clearSession(); localStorage.clear(); });
 
+describe('Member card layout', () => {
+  it('keeps identity intact and places leader actions on their own full-width row', async () => {
+    vi.mocked(loadGroupWorkspace).mockResolvedValue(ws());
+    renderAt(<GroupDetail />, '/groups/g1');
+    expect(await screen.findByText('Member One', { exact: true })).toBeTruthy();
+    const promote = screen.getByRole('button', { name: 'Làm trưởng nhóm' });
+    const remove = screen.getByRole('button', { name: 'Xóa' });
+    expect(promote.parentElement?.classList.contains('w-full')).toBe(true);
+    expect(promote.parentElement).toBe(remove.parentElement);
+    expect(promote.classList.contains('min-h-11')).toBe(true);
+    expect(remove.classList.contains('min-h-11')).toBe(true);
+  });
+});
+
 describe('Groups', () => {
   it('loading -> error retry -> list; search commits on Enter only', async () => {
     const my = vi.spyOn(groupsService, 'myGroups').mockRejectedValueOnce({ message: 'x' }).mockResolvedValue([g('g1', 'Alpha'), g('g2', 'Beta', 'Member')]);

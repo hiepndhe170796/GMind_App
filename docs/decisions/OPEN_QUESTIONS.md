@@ -50,3 +50,21 @@ Mục này ghi nhận các quyết định nghiệp vụ/kỹ thuật chưa đư
 - **Phạm vi đọc tất cả:** endpoint hiện áp dụng toàn bộ thông báo chưa đọc còn
   hiển thị theo quyền của người nhận, không chỉ 100 hàng đang xem. Dialog nói rõ
   phạm vi này và việc chưa có API hoàn tác/đánh dấu chưa đọc.
+
+## Phase 6 - Account Capability Boundaries
+
+- User confirmed separate Profile/Settings pages using the current API.
+  AUTH-05 email changes require a verification policy/API that does not exist;
+  email remains read-only. Avatar is a URL, not an upload: format/length are
+  validated but remote image MIME/byte-size limits are not supported.
+- NOT-04 reminder preferences have a database entity but no public settings
+  contract. Do not present nonfunctional toggles or imply the requirement was
+  completed. Timezone, active-device management and OAuth controls are likewise
+  not invented as editable settings.
+- Password mismatch is business validation (400), not failed JWT authentication
+  (401). Successful authenticated change must invalidate outstanding reset links
+  as well as existing sessions. These are correctness/security fixes, not a new
+  password-strength policy.
+- User approved compatible security patch updates through official NuGet sources.
+  Pkcs 9.0.21 is the chosen same-major patch; final audit/build results must be
+  recorded before the older NU1902/NU1903 item can be considered resolved.

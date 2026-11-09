@@ -11,6 +11,8 @@ import Groups from './pages/Groups';
 import ProjectDetail from './pages/ProjectDetail';
 import TaskDetail from './pages/TaskDetail';
 import MyTasks from './pages/MyTasks';
+import Profile from './pages/Profile';
+import Settings from './pages/Settings';
 import Notifications from './pages/Notifications';
 import Marketplace from './pages/Marketplace';
 import Calendar from './pages/Calendar';
@@ -32,6 +34,8 @@ function App() {
           <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/tasks/:id" element={<TaskDetail />} />
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="/groups/:groupId/marketplace" element={<Marketplace />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/my-tasks" element={<MyTasks />} />

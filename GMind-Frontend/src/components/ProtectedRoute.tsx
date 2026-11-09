@@ -1,12 +1,14 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout';
 import Card from './ui/Card';
 import Button from './ui/Button';
 import { authService } from '../services/auth';
-import { getSessionSnapshot, subscribeSession } from '../services/session';
+import { getSessionEndReason, getSessionSnapshot, subscribeSession } from '../services/session';
 
-type Check = { key: string; status: 'ready' } | { key: string; status: 'error'; message: string };
+type Check = { key: ValidationScope; status: 'ready' } | { key: ValidationScope; status: 'error'; message: string };
+
+type ValidationScope = { sessionId: string; path: string; attempt: number };
 
 export default function ProtectedRoute() {
   const session = useSyncExternalStore(subscribeSession, getSessionSnapshot);
@@ -14,16 +16,22 @@ export default function ProtectedRoute() {
   const navigate = useNavigate();
   const [attempt, setAttempt] = useState(0);
   const [check, setCheck] = useState<Check | null>(null);
-  // These pages store view filters in the query, not a different protected resource.
-  const routeKey = (location.pathname === '/calendar' || location.pathname === '/notifications') ? location.pathname : location.key;
-  const key = session ? `${session.id}:${routeKey}:${attempt}` : null;
+  const sessionId = session?.id;
+  // Query/hash are filter state, not a new protected resource — the object identity is
+  // stable for query-only changes but new on path/session/retry, so a stale ready-check
+  // can never be reused across a genuine navigation.
+  const key = useMemo<ValidationScope | null>(
+    () => (sessionId ? { sessionId, path: location.pathname, attempt } : null),
+    [sessionId, location.pathname, attempt],
+  );
 
   useEffect(() => {
     if (!key) return;
     let cancelled = false;
+    const scope = key;
     authService.validateSession().then(
-      () => { if (!cancelled) setCheck({ key, status: 'ready' }); },
-      (e: unknown) => { if (!cancelled) setCheck({ key, status: 'error', message: (e as { message?: string })?.message || 'Không kiểm tra được phiên đăng nhập' }); },
+      () => { if (!cancelled) setCheck({ key: scope, status: 'ready' }); },
+      (e: unknown) => { if (!cancelled) setCheck({ key: scope, status: 'error', message: (e as { message?: string })?.message || 'Không kiểm tra được phiên đăng nhập' }); },
     );
     return () => { cancelled = true; };
   }, [key]);
@@ -31,7 +39,10 @@ export default function ProtectedRoute() {
   const currentCheck = check?.key === key ? check : null;
 
   if (!session) {
-    return <Navigate to="/login" replace state={{ from: location.pathname + location.search + location.hash, sessionExpired: true }} />;
+    const state = getSessionEndReason() === 'passwordChanged'
+      ? { passwordChanged: true }
+      : { from: location.pathname + location.search + location.hash, sessionExpired: true };
+    return <Navigate to="/login" replace state={state} />;
   }
   if (currentCheck?.status === 'error') {
     return (

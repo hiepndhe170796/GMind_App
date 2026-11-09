@@ -282,3 +282,65 @@ describe('Notifications query navigation', () => {
     expect(validate.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe('Protected filter navigation scopes', () => {
+  it.each(['/dashboard', '/my-tasks', '/groups', '/projects/project-a', '/groups/group-a/marketplace'])(
+    'keeps the same focused draft when only filters change on %s', async path => {
+      saveSession(session('filter-scope'));
+      const validate = vi.spyOn(authService, 'validateSession').mockResolvedValue(USER);
+      render(
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route element={<ProtectedRoute />}>
+              <Route path={path} element={<input aria-label="saved draft" />} />
+            </Route>
+          </Routes>
+          <Link to={`${path}?status=InProgress#results`}>change-filter</Link>
+        </MemoryRouter>,
+      );
+      const draft = await screen.findByLabelText('saved draft');
+      fireEvent.change(draft, { target: { value: 'Unsubmitted draft' } });
+      draft.focus();
+      fireEvent.click(screen.getByRole('link', { name: 'change-filter' }));
+      await act(async () => {});
+      expect(screen.getByLabelText('saved draft')).toBe(draft);
+      expect((draft as HTMLInputElement).value).toBe('Unsubmitted draft');
+      expect(document.activeElement).toBe(draft);
+      expect(validate).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('revalidates resource paths and never reuses a previous ready scope during A -> B -> A', async () => {
+    saveSession(session('resource-scope'));
+    const first = deferred<UserInfo>(), other = deferred<UserInfo>(), latest = deferred<UserInfo>();
+    const validate = vi.spyOn(authService, 'validateSession')
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(other.promise)
+      .mockReturnValueOnce(latest.promise);
+    render(
+      <MemoryRouter initialEntries={['/projects/a']}>
+        <Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/projects/a" element={<div>RESOURCE_A</div>} />
+            <Route path="/projects/b" element={<div>RESOURCE_B</div>} />
+          </Route>
+        </Routes>
+        <Link to="/projects/b">resource-b</Link>
+        <Link to="/projects/a">resource-a</Link>
+      </MemoryRouter>,
+    );
+    await act(async () => { first.resolve(USER); await first.promise; });
+    expect(screen.getByText('RESOURCE_A')).toBeTruthy();
+    fireEvent.click(screen.getByRole('link', { name: 'resource-b' }));
+    expect(screen.queryByText('RESOURCE_A')).toBeNull();
+    expect(screen.queryByText('RESOURCE_B')).toBeNull();
+    fireEvent.click(screen.getByRole('link', { name: 'resource-a' }));
+    expect(screen.queryByText('RESOURCE_A')).toBeNull();
+    expect(validate).toHaveBeenCalledTimes(3);
+    await act(async () => { latest.resolve(USER); await latest.promise; });
+    expect(screen.getByText('RESOURCE_A')).toBeTruthy();
+    await act(async () => { other.resolve(USER); await other.promise; });
+    expect(screen.getByText('RESOURCE_A')).toBeTruthy();
+    expect(screen.queryByText('RESOURCE_B')).toBeNull();
+  });
+});
