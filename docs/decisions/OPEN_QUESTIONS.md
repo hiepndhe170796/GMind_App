@@ -68,3 +68,30 @@ Mục này ghi nhận các quyết định nghiệp vụ/kỹ thuật chưa đư
 - User approved compatible security patch updates through official NuGet sources.
   Pkcs 9.0.21 is the chosen same-major patch; final audit/build results must be
   recorded before the older NU1902/NU1903 item can be considered resolved.
+  Resolved 2026-11-09: `dotnet list package --vulnerable` reports none (PR #6).
+
+## Stage 1 Discovery — chờ quyết định (2026-11-09)
+
+Báo cáo: `docs/discovery/stage-1-discovery-report.md`. Chủ sản phẩm đã bỏ giới hạn
+"UI cơ bản" và yêu cầu hoàn thiện toàn bộ tính năng.
+
+**Đã trả lời 09/11/2026:** chấp nhận toàn bộ cột "Đề xuất" cho Q1–Q11. Q8 chọn A
+(nâng cấp sáng/xanh) và bổ sung **màu tím** làm màu nhấn; được dùng thêm yếu tố bản
+sắc mới (B) nếu làm app đẹp hơn. Các ràng buộc bản demo cơ bản trong `PRODUCT.md`
+được gỡ bỏ. Roadmap: `docs/discovery/stage-2-roadmap.md`.
+
+| # | Câu hỏi | Loại | Đề xuất |
+|---|---|---|---|
+| Q1 | Mục tiêu phát hành: demo local, sẵn sàng triển khai, hay triển khai online | BLOCKING | Demo local + cấu hình sẵn sàng triển khai, chưa deploy |
+| Q2 | Tính năng "Later" làm ngay: kanban kéo-thả, realtime + thảo luận dự án, upload file, timeline, email thật, Google login | BLOCKING | Kéo-thả, realtime SignalR + thảo luận dự án, upload file lưu local; hoãn email thật/Google |
+| Q3 | Transfer/Swap: người nhận có phải đồng ý trước khi Leader duyệt; có Claim (chuyển mở) | BLOCKING | Người nhận đồng ý → Leader duyệt; có Claim |
+| Q4 | Need Help: người hỗ trợ có quyền gì | BLOCKING | Được ghi tên trên task, xem chi tiết và bình luận; không đổi trạng thái |
+| Q5 | Thành viên rời/bị xóa còn task đang mở | BLOCKING | Task về "Chưa giao" + báo Leader; dialog nêu số task |
+| Q6 | Leader tự duyệt task/yêu cầu của chính mình | BLOCKING | Cần Leader khác nếu nhóm có; nhóm một Leader thì cho phép và ghi log |
+| Q7 | Điểm đóng góp | BLOCKING cho tính năng điểm | Leader đặt points; cộng khi Approved; Need Help không chia điểm |
+| Q8 | Hướng thị giác và quyền thay đổi điều hướng chính | BLOCKING cho redesign | Nâng cấp light/blue thành design system premium; được thêm mục điều hướng; chưa dark mode |
+| Q9 | Member tự tạo task | NON-BLOCKING | Giữ Leader tạo task; assignee tạo subtask cho task của mình |
+| Q10 | Cho phép nhiều thiết bị đăng nhập đồng thời | NON-BLOCKING | Có (bảng refresh session riêng) |
+| Q11 | Cách giao nhận Git theo milestone | NON-BLOCKING | Commit local theo milestone trên nhánh feature; không push/merge khi chưa duyệt |
+
+Giả định mặc định nếu NON-BLOCKING chưa được trả lời: dùng cột "Đề xuất".

@@ -17,7 +17,7 @@ web
 
 GMind tập trung nhóm, dự án, công việc, deadline và trao đổi vào cùng một ứng dụng. Member cần biết hôm nay làm gì; Leader cần biết việc nào cần duyệt, có nguy cơ trễ hoặc cần phân công lại.
 
-Mục tiêu trước mắt do chủ sản phẩm xác nhận ngày 01/11/2026 là **demo và nghiệm thu đồ án trên máy local**. Bản nghiệm thu phải thực hiện được nghiệp vụ qua giao diện, API và database thật, giữ dữ liệu sau refresh và đăng nhập lại. Chưa đặt mục tiêu vận hành trực tuyến cho đợt nghiệm thu này.
+Từ 09/11/2026 chủ sản phẩm chuyển mục tiêu từ bản demo cơ bản sang **sản phẩm hoàn chỉnh, cohesive, chất lượng SaaS cao cấp**. Các giới hạn "giao diện đủ dùng" trước đây được bỏ. Bản phát hành: chạy và nghiệm thu trên máy local, cấu hình sẵn sàng để triển khai sau (biến môi trường, storage, email provider có thể thay), chưa deploy. Mọi nghiệp vụ chạy qua giao diện, API và database thật, giữ dữ liệu sau refresh và đăng nhập lại.
 
 ## Operating Context
 
@@ -40,22 +40,24 @@ Các mục sau là yêu cầu của bản lõi cần hoàn thiện, không phả
 - Dashboard cá nhân, mini-calendar trên trang chủ, lịch công việc và dashboard Leader phải dùng dữ liệu thật. Thống kê task cha/con cần quy tắc nhất quán; không đếm trùng hoặc tự đồng nhất tỷ lệ hoàn thành với điểm đóng góp.
 - Thông báo trong ứng dụng, nhắc hạn, preferences, cảnh báo và lịch sử là phần của bản lõi. Nhắc hạn theo BA: 3 ngày, 1 ngày, 3 giờ trước hạn và khi quá hạn; chống trùng và xử lý lại khi deadline đổi hoặc task hoàn thành.
 - Cảnh báo nguy cơ theo quyết định dùng mặc định BA: còn ≤8 giờ và tiến độ <70%, hoặc task đang làm không cập nhật trong 24 giờ. Khả năng Leader chỉnh ngưỡng thuộc cài đặt nhóm cần hoàn thiện.
-- Need Help giữ assignee chính và ghi người/phần việc hỗ trợ. Transfer/Claim cần luồng nhận việc và duyệt. Swap xác định đủ hai task và hai người. Duyệt phải kiểm tra lại membership, assignee, trạng thái hiện tại, cập nhật nhất quán và lưu lịch sử.
+- Need Help giữ assignee chính; người hỗ trợ được ghi tên trên task, xem chi tiết và bình luận, không đổi trạng thái. Transfer/Swap: người nhận phải đồng ý trước, sau đó Leader duyệt. Claim: chuyển mở, một thành viên nhận rồi Leader duyệt. Swap xác định đủ hai task và hai người. Duyệt phải kiểm tra lại membership, assignee, trạng thái hiện tại, cập nhật nhất quán và lưu lịch sử. Hủy yêu cầu giữ bản ghi với trạng thái đã hủy.
+- Thành viên rời hoặc bị xóa khi còn task chưa hoàn thành: các task đó về "Chưa giao", Leader được thông báo; dialog nêu số task bị ảnh hưởng.
+- Tự duyệt: Leader không duyệt task hoặc yêu cầu Marketplace của chính mình khi nhóm còn Leader khác; nhóm một Leader thì được phép và ghi log.
+- Leader tạo/sửa/giao/xóa task; người phụ trách được tạo subtask cho task của mình.
 - Quyền đọc/ghi phải được kiểm tra ở backend theo membership hiện tại. Ẩn nút không thay thế authorization; mất quyền hoặc đổi trang không được giữ lại dữ liệu riêng tư cũ.
-- Ưu tiên phần lõi trước. Chat dự án realtime, upload/download file nhị phân, tính điểm đóng góp và các tích hợp mở rộng thuộc giai đoạn sau; task comments và URL tài liệu là khả năng phối hợp ban đầu.
+- Trong phạm vi: kanban kéo-thả theo quyền, realtime (SignalR) cho thông báo và thảo luận theo dự án, upload file lưu local có giới hạn loại/dung lượng, điểm đóng góp, nhiều thiết bị đăng nhập đồng thời. Hoãn: email production, Google login, timeline.
 
 ## Open Decisions and Acceptance Boundaries
 
-- Công thức điểm đóng góp, cách chia điểm Help/Transfer và xử lý lịch sử điểm chưa được chủ sản phẩm chốt. Không dùng số task hoàn thành làm công thức đóng góp chính thức.
+- Điểm đóng góp (chốt 09/11/2026): Leader đặt points cho từng task; khi task được duyệt Completed, points được cộng cho người phụ trách tại thời điểm duyệt; Need Help không chia điểm. Tỷ lệ hoàn thành và điểm đóng góp là hai chỉ số riêng.
 - Công thức thống kê tiến độ và quy tắc tính task cha/con cần được ghi rõ, kiểm chứng trước khi nghiệm thu dashboard; đề xuất trong BA không tự trở thành quyết định đã duyệt.
-- Dịch vụ email production, storage cho file nhị phân, OAuth và môi trường triển khai trực tuyến chưa được lựa chọn cho bản nghiệm thu local.
-- Các giả định cũ trong `docs/decisions/OPEN_QUESTIONS.md` về điểm đóng góp và cảnh báo sau 3 ngày không thay thế các quyết định nêu trên. Chênh lệch giữa yêu cầu và implementation cần được xử lý ở milestone tương ứng.
-- Bản UI A2 là mốc xem trước Dashboard, Project và Task Detail; hồ sơ sản phẩm này không thay cho việc chủ sản phẩm duyệt giao diện hoặc nghiệm thu chức năng.
+- Email production và OAuth chưa chọn nhà cung cấp; email dùng hộp thư development có thể thay bằng SMTP qua cấu hình. File lưu local qua lớp storage thay được.
+- Các giả định cũ trong `docs/decisions/OPEN_QUESTIONS.md` về điểm đóng góp và cảnh báo sau 3 ngày không thay thế các quyết định nêu trên.
 
 ## Brand Commitments
 
 - Tên sản phẩm: **GMind**.
-- Hướng đã được chủ sản phẩm chọn: giao diện sáng, xanh nhẹ, clean nhưng đủ đẹp; ưu tiên dễ dùng, rõ thứ bậc và nhất quán.
+- Hướng thị giác (chốt 09/11/2026): nâng cấp nền sáng, xanh hiện tại thành một design system cao cấp, có thêm **tím** làm màu nhấn thương hiệu; được bổ sung yếu tố bản sắc mới khi làm app đẹp hơn. Ưu tiên dễ dùng, rõ thứ bậc, nhất quán; chưa làm dark mode. Được điều chỉnh điều hướng chính khi phục vụ luồng sản phẩm.
 - Nội dung thao tác và trạng thái hướng tới sinh viên, bằng tiếng Việt dễ hiểu. Giữ thuật ngữ Leader/Member và ý nghĩa nghiệp vụ Need Help, Transfer/Claim, Swap.
 
 ## Evidence on Hand
@@ -89,7 +91,5 @@ Yêu cầu bổ sung được chủ sản phẩm cung cấp ngày 01/11/2026, ư
 - Login và Register phải là hai trang với layout riêng. Hai layout vẫn dùng chung thương hiệu GMind và các thành phần nền tảng để giữ nhất quán.
 - Register có Confirm Password và kiểm tra Password/Confirm Password khớp nhau. Giữ validation frontend/backend hiện có, làm rõ phản hồi lỗi tại trường nhập.
 - Có điều hướng rõ Login ↔ Register. Forgot Password là một luồng riêng, gồm yêu cầu đặt lại và đặt lại mật khẩu; nghiệm thu theo hộp thư local đã thống nhất.
-- Hoàn thiện nhóm Auth trước, sau đó lần lượt theo sidebar hiện hành: Tổng quan → Việc của tôi → Nhóm của tôi → Lịch công việc → Thông báo. Hoàn thành từng menu và các trang liên quan trước khi sang mục tiếp theo; tái sử dụng các trang chung.
-- Giữ nhất quán layout, khoảng cách, typography, components và thứ bậc điều hướng. Không phát triển đồng thời các trang không liên quan.
-- Phạm vi hiện tại là critique và kế hoạch cải thiện có trọng tâm; giữ chức năng, kiến trúc và hướng nhận diện đã chốt. Chưa yêu cầu redesign toàn ứng dụng.
-- Kế hoạch chi tiết: `docs/design/ui-improvement-plan.md`. Hồ sơ/đổi mật khẩu vẫn thuộc A2, không bị loại khỏi yêu cầu khi sắp xếp lại thứ tự UI.
+- Giữ nhất quán layout, khoảng cách, typography, components và thứ bậc điều hướng trên toàn ứng dụng.
+- Từ 09/11/2026 được redesign toàn ứng dụng theo roadmap `docs/discovery/stage-2-roadmap.md`; thứ tự triển khai theo milestone, không còn ràng buộc làm tuần tự từng menu.
