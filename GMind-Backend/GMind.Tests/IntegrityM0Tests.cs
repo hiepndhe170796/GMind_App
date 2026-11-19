@@ -342,4 +342,22 @@ public class IntegrityM0Tests
         Assert.Contains("\"success\":false", body); Assert.Contains("\"message\":", body);
         await factory.DisposeAsync();
     }
+
+    // ── ChangeRole: no lazy User navigation on a fresh context ──
+    [Fact] public async Task ChangeMemberRole_NoNavigationNre_VietnameseSummary()
+    {
+        var db = NewDb();
+        var l = NewUser("Leader"); var m = NewUser("MemberB");
+        var g = NewGroup(l.Id);
+        db.Users.AddRange(l, m); db.Groups.Add(g);
+        db.GroupMembers.AddRange(Member(g.Id, l.Id, Role.Leader), Member(g.Id, m.Id));
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var svc = NewGroupService(db);
+        await svc.ChangeMemberRoleAsync(l.Id, g.Id, m.Id, Role.Leader);
+        var target = await db.GroupMembers.FirstAsync(x => x.UserId == m.Id);
+        Assert.Equal(Role.Leader, target.Role);
+        var log = await db.ActivityLogs.FirstOrDefaultAsync(x => x.Action == "ChangeRole");
+        Assert.Equal($"Đổi vai trò của {m.DisplayName}: Thành viên → Trưởng nhóm", log!.Summary);
+    }
 }

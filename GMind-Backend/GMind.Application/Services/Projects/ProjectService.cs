@@ -45,7 +45,7 @@ public class ProjectService : IProjectService
             CreatedByUserId = userId
         };
         _context.Projects.Add(project);
-        _context.ActivityLogs.Add(Log(userId, groupId, project.Id, "Project", project.Id, "Create", $"Created project '{project.Name}'"));
+        _context.ActivityLogs.Add(Log(userId, groupId, project.Id, "Project", project.Id, "Create", $"Tạo dự án '{project.Name}'"));
         await _context.SaveChangesAsync(ct);
         return ToDto(project, 0, 0, 0);
     }
@@ -69,7 +69,7 @@ public class ProjectService : IProjectService
     public async Task<ProjectDto> GetAsync(Guid userId, Guid projectId, CancellationToken ct = default)
     {
         var p = await _context.Projects.FirstOrDefaultAsync(x => x.Id == projectId && x.ArchivedAt == null, ct)
-            ?? throw new NotFoundException("Project not found");
+            ?? throw new NotFoundException("Không tìm thấy dự án này.");
         await RequireMemberAsync(userId, p.GroupId, ct);
         var total = await _context.Tasks.CountAsync(t => t.ProjectId == projectId && t.ParentTaskId == null, ct);
         var done = await _context.Tasks.CountAsync(t => t.ProjectId == projectId && t.ParentTaskId == null && t.Status == TaskStatus.Completed, ct);
@@ -80,13 +80,13 @@ public class ProjectService : IProjectService
     public async Task<ProjectDto> UpdateAsync(Guid userId, Guid projectId, string name, string? description, string? subject, DateTime? deadlineAt, CancellationToken ct = default)
     {
         var p = await _context.Projects.FirstOrDefaultAsync(x => x.Id == projectId && x.ArchivedAt == null, ct)
-            ?? throw new NotFoundException("Project not found");
+            ?? throw new NotFoundException("Không tìm thấy dự án này.");
         await RequireLeaderAsync(userId, p.GroupId, ct);
         p.Name = name.Trim();
         p.Description = description;
         p.Subject = subject;
         p.DeadlineAt = deadlineAt;
-        _context.ActivityLogs.Add(Log(userId, p.GroupId, projectId, "Project", projectId, "Update", $"Updated project '{p.Name}'"));
+        _context.ActivityLogs.Add(Log(userId, p.GroupId, projectId, "Project", projectId, "Update", $"Cập nhật dự án '{p.Name}'"));
         await _context.SaveChangesAsync(ct);
         var total = await _context.Tasks.CountAsync(t => t.ProjectId == projectId && t.ParentTaskId == null, ct);
         var done = await _context.Tasks.CountAsync(t => t.ProjectId == projectId && t.ParentTaskId == null && t.Status == TaskStatus.Completed, ct);
@@ -97,11 +97,11 @@ public class ProjectService : IProjectService
     public async Task ArchiveAsync(Guid userId, Guid projectId, CancellationToken ct = default)
     {
         var p = await _context.Projects.FirstOrDefaultAsync(x => x.Id == projectId && x.ArchivedAt == null, ct)
-            ?? throw new NotFoundException("Project not found");
+            ?? throw new NotFoundException("Không tìm thấy dự án này.");
         await RequireLeaderAsync(userId, p.GroupId, ct);
         p.ArchivedAt = DateTime.UtcNow;
         p.Status = ProjectStatus.Archived;
-        _context.ActivityLogs.Add(Log(userId, p.GroupId, projectId, "Project", projectId, "Archive", $"Archived project '{p.Name}'"));
+        _context.ActivityLogs.Add(Log(userId, p.GroupId, projectId, "Project", projectId, "Archive", $"Lưu trữ dự án '{p.Name}'"));
         await _context.SaveChangesAsync(ct);
     }
 

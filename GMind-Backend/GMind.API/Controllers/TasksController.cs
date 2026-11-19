@@ -95,9 +95,9 @@ public class TasksController : ControllerBase
 
 public class TaskRequest
 {
-    [Required, MaxLength(200)]
+    [Required(ErrorMessage = "Vui lòng nhập tiêu đề công việc."), MaxLength(200, ErrorMessage = "Tiêu đề tối đa 200 ký tự.")]
     public string Title { get; set; } = string.Empty;
-    [MaxLength(2000)]
+    [MaxLength(2000, ErrorMessage = "Mô tả tối đa 2000 ký tự.")]
     public string? Description { get; set; }
     public Guid? AssigneeUserId { get; set; }
     public Guid? ParentTaskId { get; set; }
@@ -114,27 +114,27 @@ public class AssignRequest
 
 public class StatusRequest
 {
-    [Required]
+    [Required(ErrorMessage = "Vui lòng chọn trạng thái.")]
     public GMind.Domain.Enums.TaskStatus Status { get; set; }
 
-    [MaxLength(2000)]
+    [MaxLength(2000, ErrorMessage = "Nhận xét tối đa 2000 ký tự.")]
     public string? Comment { get; set; }
 }
 
 public class CommentRequest
 {
-    [Required, MaxLength(2000)]
+    [Required(ErrorMessage = "Vui lòng nhập nội dung bình luận."), MaxLength(2000, ErrorMessage = "Bình luận tối đa 2000 ký tự.")]
     public string Body { get; set; } = string.Empty;
 }
 
 public class LinkRequest
 {
-    [Required, MaxLength(2000), Url]
+    [Required(ErrorMessage = "Vui lòng nhập liên kết."), MaxLength(2000, ErrorMessage = "Liên kết tối đa 2000 ký tự."), Url(ErrorMessage = "Liên kết không hợp lệ.")]
     public string Url { get; set; } = string.Empty;
 
-    [MaxLength(500)]
+    [MaxLength(500, ErrorMessage = "Tên hiển thị tối đa 500 ký tự.")]
     public string? DisplayName { get; set; }
 
-    [MaxLength(50)]
+    [MaxLength(50, ErrorMessage = "Loại liên kết tối đa 50 ký tự.")]
     public string? Type { get; set; }
 }

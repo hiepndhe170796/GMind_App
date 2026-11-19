@@ -42,7 +42,7 @@ public class AuthService : IAuthService
         var normalizedEmail = email.Trim().ToLowerInvariant();
 
         if (await _context.Users.AnyAsync(u => u.Email == normalizedEmail, ct))
-            throw new ConflictException("Email is already registered");
+            throw new ConflictException("Email này đã được đăng ký. Hãy đăng nhập hoặc dùng email khác.");
 
         var user = new User
         {
@@ -65,7 +65,7 @@ public class AuthService : IAuthService
 
         // Intentionally vague to avoid leaking which accounts exist
         if (user is null || !_passwordHasher.VerifyPassword(password, user.PasswordHash))
-            throw new UnauthorizedException("Invalid email or password");
+            throw new UnauthorizedException("Email hoặc mật khẩu không đúng.");
 
         return await IssueTokensAsync(user, ct);
     }
@@ -77,7 +77,7 @@ public class AuthService : IAuthService
             u => u.RefreshToken == tokenHash && u.RefreshTokenExpiryTime > DateTime.UtcNow && u.IsActive, ct);
 
         if (user is null)
-            throw new UnauthorizedException("Invalid or expired refresh token");
+            throw new UnauthorizedException("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
 
         // Rotate refresh token
         return await IssueTokensAsync(user, ct);
@@ -108,7 +108,7 @@ public class AuthService : IAuthService
     public async Task ForgotPasswordAsync(string email, CancellationToken ct = default)
     {
         if (_passwordResetDelivery is not { IsAvailable: true })
-            throw new BadRequestException("Password recovery is not configured");
+            throw new BadRequestException("Tính năng khôi phục mật khẩu chưa được cấu hình.");
 
         var normalizedEmail = email.Trim().ToLowerInvariant();
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail && u.IsActive, ct);
@@ -133,7 +133,7 @@ public class AuthService : IAuthService
             u => u.PasswordResetToken == tokenHash && u.PasswordResetTokenExpiry > DateTime.UtcNow && u.IsActive, ct);
 
         if (user is null)
-            throw new BadRequestException("Invalid or expired reset token");
+            throw new BadRequestException("Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.");
 
         user.PasswordHash = _passwordHasher.HashPassword(newPassword);
         user.AuthVersion = checked(user.AuthVersion + 1);
@@ -148,14 +148,14 @@ public class AuthService : IAuthService
     public async Task<UserDto> GetProfileAsync(Guid userId, CancellationToken ct = default)
     {
         var user = await _context.Users.FindAsync(new object[] { userId }, ct)
-            ?? throw new NotFoundException("User not found");
+            ?? throw new NotFoundException("Không tìm thấy người dùng này.");
         return ToDto(user);
     }
 
     public async Task<UserDto> UpdateProfileAsync(Guid userId, string displayName, string? avatarUrl, CancellationToken ct = default)
     {
         var user = await _context.Users.FindAsync(new object[] { userId }, ct)
-            ?? throw new NotFoundException("User not found");
+            ?? throw new NotFoundException("Không tìm thấy người dùng này.");
 
         user.DisplayName = displayName.Trim();
         user.AvatarUrl = avatarUrl?.Trim();
@@ -167,10 +167,10 @@ public class AuthService : IAuthService
     public async Task ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct = default)
     {
         var user = await _context.Users.FindAsync(new object[] { userId }, ct)
-            ?? throw new NotFoundException("User not found");
+            ?? throw new NotFoundException("Không tìm thấy người dùng này.");
 
         if (!_passwordHasher.VerifyPassword(currentPassword, user.PasswordHash))
-            throw new BadRequestException("Current password is incorrect");
+            throw new BadRequestException("Mật khẩu hiện tại không đúng.");
 
         user.PasswordHash = _passwordHasher.HashPassword(newPassword);
         user.UpdatedAt = DateTime.UtcNow;
@@ -199,7 +199,7 @@ public class AuthService : IAuthService
         }
         catch (DbUpdateConcurrencyException)
         {
-            throw new UnauthorizedException("Session changed. Sign in again.");
+            throw new UnauthorizedException("Phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.");
         }
 
         return new AuthResult(accessToken, refreshToken, DateTime.UtcNow.AddMinutes(expiryMinutes), ToDto(user));

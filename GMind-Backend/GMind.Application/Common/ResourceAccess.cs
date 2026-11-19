@@ -20,12 +20,12 @@ public sealed class ResourceAccess(IApplicationDbContext context) : IResourceAcc
     public async Task<GroupMember> RequireMemberAsync(Guid userId, Guid groupId, CancellationToken ct = default)
         => await context.GroupMembers.Include(m => m.Group)
             .FirstOrDefaultAsync(m => m.UserId == userId && m.GroupId == groupId && m.IsActive && m.User.IsActive && !m.Group.IsArchived, ct)
-            ?? throw new ForbiddenException("Not an active member of this group");
+            ?? throw new ForbiddenException("Bạn không còn là thành viên của nhóm này.");
 
     public async Task<GroupMember> RequireLeaderAsync(Guid userId, Guid groupId, CancellationToken ct = default)
     {
         var member = await RequireMemberAsync(userId, groupId, ct);
-        if (member.Role != Role.Leader) throw new ForbiddenException("Leader role required");
+        if (member.Role != Role.Leader) throw new ForbiddenException("Bạn cần quyền Trưởng nhóm để thực hiện thao tác này.");
         return member;
     }
 
@@ -33,10 +33,10 @@ public sealed class ResourceAccess(IApplicationDbContext context) : IResourceAcc
     {
         var task = await context.Tasks.Include(t => t.Project)
             .FirstOrDefaultAsync(t => t.Id == taskId && t.Project.ArchivedAt == null, ct)
-            ?? throw new NotFoundException("Task not found");
+            ?? throw new NotFoundException("Không tìm thấy công việc này.");
         var member = await RequireMemberAsync(userId, task.Project.GroupId, ct);
         if (member.Role != Role.Leader && task.AssigneeUserId != userId)
-            throw new ForbiddenException("Only the leader or assignee can access task details");
+            throw new ForbiddenException("Chỉ Trưởng nhóm hoặc người phụ trách mới xem được chi tiết công việc này.");
         return task;
     }
 

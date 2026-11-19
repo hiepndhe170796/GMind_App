@@ -70,7 +70,7 @@ public class NotificationService : INotificationService
     public async Task MarkReadAsync(Guid userId, Guid notificationId, CancellationToken ct = default)
     {
         var n = await VisibleTo(userId).FirstOrDefaultAsync(x => x.Id == notificationId, ct)
-            ?? throw new NotFoundException("Notification not found");
+            ?? throw new NotFoundException("Không tìm thấy thông báo này.");
         n.ReadAt ??= DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
     }

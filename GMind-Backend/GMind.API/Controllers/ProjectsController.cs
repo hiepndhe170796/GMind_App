@@ -41,11 +41,11 @@ public class ProjectsController : ControllerBase
 
 public class ProjectRequest
 {
-    [Required, MaxLength(200)]
+    [Required(ErrorMessage = "Vui lòng nhập tên dự án."), MaxLength(200, ErrorMessage = "Tên dự án tối đa 200 ký tự.")]
     public string Name { get; set; } = string.Empty;
-    [MaxLength(2000)]
+    [MaxLength(2000, ErrorMessage = "Mô tả dự án tối đa 2000 ký tự.")]
     public string? Description { get; set; }
-    [MaxLength(100)]
+    [MaxLength(100, ErrorMessage = "Môn học tối đa 100 ký tự.")]
     public string? Subject { get; set; }
     public DateTime? DeadlineAt { get; set; }
 }

@@ -79,9 +79,9 @@ public class GroupsController : ControllerBase
 
 public class CreateGroupRequest
 {
-    [Required, MaxLength(200)]
+    [Required(ErrorMessage = "Vui lòng nhập tên nhóm."), MaxLength(200, ErrorMessage = "Tên nhóm tối đa 200 ký tự.")]
     public string Name { get; set; } = string.Empty;
-    [MaxLength(1000)]
+    [MaxLength(1000, ErrorMessage = "Mô tả nhóm tối đa 1000 ký tự.")]
     public string? Description { get; set; }
 }
 
@@ -93,13 +93,13 @@ public class CreateInviteRequest
 
 public class JoinRequest
 {
-    [Required]
+    [Required(ErrorMessage = "Vui lòng nhập mã mời.")]
     public string Code { get; set; } = string.Empty;
 }
 
 public class ChangeRoleRequest
 {
-    [Required]
-    [EnumDataType(typeof(Role))]
+    [Required(ErrorMessage = "Vui lòng chọn vai trò.")]
+    [EnumDataType(typeof(Role), ErrorMessage = "Vai trò không hợp lệ.")]
     public Role Role { get; set; }
 }

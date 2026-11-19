@@ -43,19 +43,19 @@ public class MarketplaceController : ControllerBase
 
 public class MarketplaceRequestModel
 {
-    [Required]
-    [EnumDataType(typeof(MarketplaceRequestType))]
+    [Required(ErrorMessage = "Vui lòng chọn loại yêu cầu.")]
+    [EnumDataType(typeof(MarketplaceRequestType), ErrorMessage = "Loại yêu cầu không hợp lệ.")]
     public MarketplaceRequestType RequestType { get; set; }
-    [Required]
+    [Required(ErrorMessage = "Vui lòng chọn công việc.")]
     public Guid TaskId { get; set; }
     public Guid? TargetUserId { get; set; }
     public Guid? RelatedTaskId { get; set; }
-    [Required, MaxLength(1000)]
+    [Required(ErrorMessage = "Vui lòng nhập lý do."), MaxLength(1000, ErrorMessage = "Lý do tối đa 1000 ký tự.")]
     public string Reason { get; set; } = string.Empty;
 }
 
 public class ReviewRequestModel
 {
-    [MaxLength(1000)]
+    [MaxLength(1000, ErrorMessage = "Nhận xét tối đa 1000 ký tự.")]
     public string Comment { get; set; } = string.Empty;
 }

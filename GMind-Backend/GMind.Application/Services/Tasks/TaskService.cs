@@ -36,14 +36,14 @@ public class TaskService : ITaskService
     public async Task<TaskDetailDto> CreateAsync(Guid userId, Guid projectId, string title, string? description, Guid? assigneeUserId, Priority priority, DateTime? deadlineAt, decimal? estimateHours, int? points, Guid? parentTaskId, CancellationToken ct = default)
     {
         var project = await _context.Projects.FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct)
-            ?? throw new NotFoundException("Project not found");
+            ?? throw new NotFoundException("Không tìm thấy dự án này.");
         var membership = await _access.RequireLeaderAsync(userId, project.GroupId, ct);
         ValidateMetadata(title, description, priority, estimateHours, points);
 
         // Members may only create tasks assigned to themselves; Leader can assign to anyone.
         var isLeader = membership.Role == Role.Leader;
         if (!isLeader && assigneeUserId != null && assigneeUserId != userId)
-            throw new ForbiddenException("Only the leader can assign tasks to others");
+            throw new ForbiddenException("Chỉ Trưởng nhóm mới có thể giao việc cho người khác.");
 
         if (assigneeUserId != null)
             await _access.RequireMemberAsync(assigneeUserId.Value, project.GroupId, ct);
@@ -51,9 +51,9 @@ public class TaskService : ITaskService
         if (parentTaskId != null)
         {
             var parent = await _context.Tasks.FirstOrDefaultAsync(t => t.Id == parentTaskId && t.ProjectId == projectId, ct)
-                ?? throw new BadRequestException("Parent task not found in this project");
+                ?? throw new BadRequestException("Không tìm thấy công việc cha trong dự án này.");
             if (parent.ParentTaskId != null)
-                throw new BadRequestException("Subtasks may only be one level deep");
+                throw new BadRequestException("Công việc con chỉ được tối đa một cấp.");
         }
 
         var task = new TaskEntity
@@ -85,7 +85,7 @@ public class TaskService : ITaskService
     public async Task<List<TaskSummaryDto>> ListByProjectAsync(Guid userId, Guid projectId, CancellationToken ct = default)
     {
         var project = await _context.Projects.FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct)
-            ?? throw new NotFoundException("Project not found");
+            ?? throw new NotFoundException("Không tìm thấy dự án này.");
         var membership = await _access.RequireMemberAsync(userId, project.GroupId, ct);
         var anotherLeader = membership.Role == Role.Leader
             && await _context.GroupMembers.AnyAsync(m => m.GroupId == project.GroupId
@@ -107,7 +107,7 @@ public class TaskService : ITaskService
     {
         var scope = await _context.Tasks.Where(t => t.Id == taskId && t.Project.ArchivedAt == null)
             .Select(t => new { t.Project.GroupId, t.AssigneeUserId }).FirstOrDefaultAsync(ct)
-            ?? throw new NotFoundException("Task not found");
+            ?? throw new NotFoundException("Không tìm thấy công việc này.");
         var membership = await _access.RequireMemberAsync(userId, scope.GroupId, ct);
         if (membership.Role == Role.Leader || scope.AssigneeUserId == userId)
             return await GetDetailDtoAsync(taskId, ct);
@@ -125,9 +125,9 @@ public class TaskService : ITaskService
 
         // Editable by leader, creator, or assignee
         if (membership.Role != Role.Leader && task.CreatedByUserId != userId && task.AssigneeUserId != userId)
-            throw new ForbiddenException("You cannot edit this task");
+            throw new ForbiddenException("Bạn không có quyền sửa công việc này.");
         if (task.Status == TaskStatus.Completed)
-            throw new BadRequestException("Completed tasks cannot be edited");
+            throw new BadRequestException("Không thể sửa công việc đã hoàn thành.");
 
         var oldDeadline = task.DeadlineAt;
         task.Title = title.Trim();
@@ -157,9 +157,9 @@ public class TaskService : ITaskService
         var task = await LoadAsync(taskId, ct);
         var membership = await _access.RequireLeaderAsync(userId, task.Project.GroupId, ct);
         if (membership.Role != Role.Leader && task.CreatedByUserId != userId)
-            throw new ForbiddenException("Only the leader or task creator can assign this task");
+            throw new ForbiddenException("Chỉ Trưởng nhóm hoặc người tạo mới có thể giao công việc này.");
         if (task.Status == TaskStatus.Completed)
-            throw new BadRequestException("Cannot reassign a completed task");
+            throw new BadRequestException("Không thể giao lại công việc đã hoàn thành.");
 
         if (assigneeUserId != null)
             await _access.RequireMemberAsync(assigneeUserId.Value, task.Project.GroupId, ct);
@@ -184,12 +184,12 @@ public class TaskService : ITaskService
         var isLeader = membership.Role == Role.Leader;
         var isAssignee = task.AssigneeUserId == userId;
 
-        if (!Enum.IsDefined(newStatus)) throw new BadRequestException("Invalid task status");
+        if (!Enum.IsDefined(newStatus)) throw new BadRequestException("Trạng thái công việc không hợp lệ.");
         if (newStatus is TaskStatus.Completed or TaskStatus.ChangesRequested)
         {
-            if (!isLeader) throw new ForbiddenException("Leader role required");
+            if (!isLeader) throw new ForbiddenException("Bạn cần quyền Trưởng nhóm để thực hiện thao tác này.");
         }
-        else if (!isAssignee) throw new ForbiddenException("Only the assignee can update task status");
+        else if (!isAssignee) throw new ForbiddenException("Chỉ người phụ trách mới có thể cập nhật trạng thái công việc này.");
 
         // Submit -> Review -> Approve -> Completed per BA workflow
         var allowed = (task.Status, newStatus, isLeader, isAssignee) switch
@@ -204,7 +204,7 @@ public class TaskService : ITaskService
         };
 
         if (!allowed)
-            throw new BadRequestException($"Cannot transition task from {task.Status} to {newStatus} with your role");
+            throw new BadRequestException($"Không thể chuyển công việc từ {Labels.TaskStatus(task.Status)} sang {Labels.TaskStatus(newStatus)} với vai trò của bạn.");
 
         // Leader decisions create a review record with optional comment
         if (newStatus is TaskStatus.Completed or TaskStatus.ChangesRequested)
@@ -212,7 +212,7 @@ public class TaskService : ITaskService
             if (isAssignee && !await _access.CanReviewOwnAsync(task.Project.GroupId, userId, task.AssigneeUserId ?? userId, ct))
                 throw new ForbiddenException("Cần một Trưởng nhóm khác duyệt công việc của bạn");
             if (newStatus == TaskStatus.ChangesRequested && string.IsNullOrWhiteSpace(reviewComment))
-                throw new BadRequestException("Review comment is required when requesting changes");
+                throw new BadRequestException("Vui lòng nhập nhận xét khi yêu cầu chỉnh sửa.");
 
             var version = await _context.TaskReviews.CountAsync(r => r.TaskId == taskId, ct) + 1;
             _context.TaskReviews.Add(new TaskReview
@@ -266,9 +266,9 @@ public class TaskService : ITaskService
         var task = await LoadAsync(taskId, ct);
         var membership = await _access.RequireLeaderAsync(userId, task.Project.GroupId, ct);
         if (membership.Role != Role.Leader && task.CreatedByUserId != userId)
-            throw new ForbiddenException("Only the leader or task creator can delete this task");
+            throw new ForbiddenException("Chỉ Trưởng nhóm hoặc người tạo mới có thể xóa công việc này.");
         if (task.Status == TaskStatus.Completed)
-            throw new BadRequestException("Completed tasks cannot be deleted");
+            throw new BadRequestException("Không thể xóa công việc đã hoàn thành.");
 
         _context.ActivityLogs.Add(Log(userId, task.Project.GroupId, task.ProjectId, "Task", task.Id, "Delete", $"Xóa công việc '{task.Title}'"));
         _context.Tasks.Remove(task);
@@ -277,7 +277,7 @@ public class TaskService : ITaskService
 
     private async Task<TaskEntity> LoadAsync(Guid taskId, CancellationToken ct)
         => await _context.Tasks.Include(t => t.Project).FirstOrDefaultAsync(t => t.Id == taskId && t.Project.ArchivedAt == null, ct)
-            ?? throw new NotFoundException("Task not found");
+            ?? throw new NotFoundException("Không tìm thấy công việc này.");
 
     private async Task<TaskDetailDto> GetDetailDtoAsync(Guid taskId, CancellationToken ct)
         => await _context.Tasks.Where(t => t.Id == taskId)
@@ -290,10 +290,10 @@ public class TaskService : ITaskService
     private static void ValidateMetadata(string title, string? description, Priority priority, decimal? estimateHours, int? points)
     {
         if (string.IsNullOrWhiteSpace(title) || title.Length > 200 || description?.Length > 2000)
-            throw new BadRequestException("Invalid task title or description");
-        if (!Enum.IsDefined(priority)) throw new BadRequestException("Invalid task priority");
-        if (estimateHours is < 0 or > 999.99m) throw new BadRequestException("Estimate hours must be between 0 and 999.99");
-        if (points is <= 0) throw new BadRequestException("Points must be a positive integer");
+            throw new BadRequestException("Tiêu đề hoặc mô tả công việc không hợp lệ.");
+        if (!Enum.IsDefined(priority)) throw new BadRequestException("Mức độ ưu tiên không hợp lệ.");
+        if (estimateHours is < 0 or > 999.99m) throw new BadRequestException("Thời lượng ước tính phải từ 0 đến 999.99 giờ.");
+        if (points is <= 0) throw new BadRequestException("Điểm phải là số nguyên dương.");
     }
 
     private static ActivityLog Log(Guid actor, Guid groupId, Guid projectId, string entityType, Guid? entityId, string action, string summary)

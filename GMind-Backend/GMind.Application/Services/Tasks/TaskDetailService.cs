@@ -37,7 +37,7 @@ public class TaskDetailService : ITaskDetailService
     public async Task<CommentDto> AddCommentAsync(Guid userId, Guid taskId, string body, CancellationToken ct = default)
     {
         await _access.RequireTaskDetailsAsync(userId, taskId, ct);
-        if (string.IsNullOrWhiteSpace(body) || body.Length > 2000) throw new BadRequestException("Comment body is required");
+        if (string.IsNullOrWhiteSpace(body) || body.Length > 2000) throw new BadRequestException("Vui lòng nhập nội dung bình luận.");
 
         var comment = new TaskComment
         {
@@ -57,10 +57,10 @@ public class TaskDetailService : ITaskDetailService
     {
         var c = await _context.TaskComments.Include(x => x.Task).ThenInclude(t => t.Project)
             .FirstOrDefaultAsync(x => x.Id == commentId && x.DeletedAt == null, ct)
-            ?? throw new NotFoundException("Comment not found");
+            ?? throw new NotFoundException("Không tìm thấy bình luận này.");
         await _access.RequireTaskDetailsAsync(userId, c.TaskId, ct);
-        if (c.AuthorUserId != userId) throw new ForbiddenException("Only the author can edit a comment");
-        if (string.IsNullOrWhiteSpace(body) || body.Length > 2000) throw new BadRequestException("Comment body is required");
+        if (c.AuthorUserId != userId) throw new ForbiddenException("Chỉ tác giả mới có thể sửa bình luận này.");
+        if (string.IsNullOrWhiteSpace(body) || body.Length > 2000) throw new BadRequestException("Vui lòng nhập nội dung bình luận.");
         c.Body = body.Trim();
         c.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
@@ -72,11 +72,11 @@ public class TaskDetailService : ITaskDetailService
     {
         var c = await _context.TaskComments.Include(x => x.Task).ThenInclude(t => t.Project)
             .FirstOrDefaultAsync(x => x.Id == commentId && x.DeletedAt == null, ct)
-            ?? throw new NotFoundException("Comment not found");
+            ?? throw new NotFoundException("Không tìm thấy bình luận này.");
         await _access.RequireTaskDetailsAsync(userId, c.TaskId, ct);
         var membership = await _access.RequireMemberAsync(userId, c.Task.Project.GroupId, ct);
         if (c.AuthorUserId != userId && membership.Role != Role.Leader)
-            throw new ForbiddenException("Only the author or a leader can delete a comment");
+            throw new ForbiddenException("Chỉ tác giả hoặc Trưởng nhóm mới có thể xóa bình luận này.");
         c.DeletedAt = DateTime.UtcNow; // soft delete
         await _context.SaveChangesAsync(ct);
     }
@@ -95,7 +95,7 @@ public class TaskDetailService : ITaskDetailService
     {
         var task = await _access.RequireTaskDetailsAsync(userId, taskId, ct);
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != "http" && uri.Scheme != "https"))
-            throw new BadRequestException("Only absolute http(s) URLs are allowed");
+            throw new BadRequestException("Chỉ chấp nhận liên kết http(s) đầy đủ.");
 
         var link = new TaskLink
         {
@@ -116,18 +116,18 @@ public class TaskDetailService : ITaskDetailService
     {
         var l = await _context.TaskLinks.Include(x => x.Project)
             .FirstOrDefaultAsync(x => x.Id == linkId, ct)
-            ?? throw new NotFoundException("Link not found");
+            ?? throw new NotFoundException("Không tìm thấy liên kết này.");
         if (l.TaskId != null)
         {
             await _access.RequireTaskDetailsAsync(userId, l.TaskId.Value, ct);
         }
         else if (l.Project.ArchivedAt != null)
         {
-            throw new NotFoundException("Link not found");
+            throw new NotFoundException("Không tìm thấy liên kết này.");
         }
         var membership = await _access.RequireMemberAsync(userId, l.Project.GroupId, ct);
         if (l.CreatedByUserId != userId && membership.Role != Role.Leader)
-            throw new ForbiddenException("Only the creator or a leader can delete a link");
+            throw new ForbiddenException("Chỉ người tạo hoặc Trưởng nhóm mới có thể xóa liên kết này.");
         _context.TaskLinks.Remove(l);
         await _context.SaveChangesAsync(ct);
     }

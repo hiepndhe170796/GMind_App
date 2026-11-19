@@ -64,7 +64,7 @@ public class GroupService : IGroupService
 
         _context.Groups.Add(group);
         _context.GroupMembers.Add(membership);
-        _context.ActivityLogs.Add(Log(userId, group.Id, null, "Group", group.Id, "Create", $"Created group '{group.Name}'"));
+        _context.ActivityLogs.Add(Log(userId, group.Id, null, "Group", group.Id, "Create", $"Tạo nhóm '{group.Name}'"));
         await _context.SaveChangesAsync(ct);
 
         return new GroupDto(group.Id, group.Name, group.Description, 1, "Leader", group.CreatedAt);
@@ -110,7 +110,7 @@ public class GroupService : IGroupService
         var before = group.Name;
         group.Name = name.Trim();
         group.Description = description;
-        _context.ActivityLogs.Add(Log(userId, groupId, null, "Group", groupId, "Update", $"Renamed '{before}' -> '{group.Name}'"));
+        _context.ActivityLogs.Add(Log(userId, groupId, null, "Group", groupId, "Update", $"Cập nhật nhóm '{group.Name}'"));
         await _context.SaveChangesAsync(ct);
         var count = await _context.GroupMembers.CountAsync(m => m.GroupId == groupId && m.IsActive, ct);
         return new GroupDto(group.Id, group.Name, group.Description, count, "Leader", group.CreatedAt);
@@ -138,7 +138,7 @@ public class GroupService : IGroupService
     public async Task RevokeInviteAsync(Guid userId, Guid inviteId, CancellationToken ct = default)
     {
         var invite = await _context.GroupInvites.FirstOrDefaultAsync(i => i.Id == inviteId, ct)
-            ?? throw new NotFoundException("Invite not found");
+            ?? throw new NotFoundException("Không tìm thấy mã mời này.");
         await RequireLeaderAsync(userId, invite.GroupId, ct);
         invite.RevokedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
@@ -150,17 +150,17 @@ public class GroupService : IGroupService
         var invite = await _context.GroupInvites
             .Include(i => i.Group)
             .FirstOrDefaultAsync(i => i.TokenHash == hash, ct)
-            ?? throw new NotFoundException("Invalid invite code");
+            ?? throw new NotFoundException("Mã mời không hợp lệ.");
 
         if (invite.RevokedAt != null || (invite.ExpiresAt != null && invite.ExpiresAt < DateTime.UtcNow)
             || (invite.MaxUses != null && invite.UsedCount >= invite.MaxUses))
-            throw new BadRequestException("Invite is expired, revoked, or out of uses");
-        if (invite.Group.IsArchived) throw new BadRequestException("Group is archived");
+            throw new BadRequestException("Mã mời đã hết hạn, bị thu hồi hoặc hết lượt sử dụng.");
+        if (invite.Group.IsArchived) throw new BadRequestException("Nhóm này đã được lưu trữ.");
 
         var existing = await _context.GroupMembers
             .FirstOrDefaultAsync(m => m.GroupId == invite.GroupId && m.UserId == userId, ct);
         if (existing is { IsActive: true })
-            throw new ConflictException("Already a member of this group");
+            throw new ConflictException("Bạn đã là thành viên của nhóm này.");
         if (existing != null)
         {
             // Reactivate the former membership rather than inserting a duplicate.
@@ -177,7 +177,7 @@ public class GroupService : IGroupService
         }
         var joinedName = await _context.Users.Where(u => u.Id == userId).Select(u => u.DisplayName).FirstAsync(ct);
         invite.UsedCount++;
-        _context.ActivityLogs.Add(Log(userId, invite.GroupId, null, "GroupMember", userId, "Join", $"{joinedName} đã tham gia nhóm '{invite.Group.Name}'"));
+        _context.ActivityLogs.Add(Log(userId, invite.GroupId, null, "GroupMember", userId, "Join", $"Tham gia nhóm '{invite.Group.Name}'"));
         await _context.SaveChangesAsync(ct);
 
         var leaders = await _context.GroupMembers
@@ -215,17 +215,17 @@ public class GroupService : IGroupService
         await RequireLeaderAsync(userId, groupId, ct);
         var target = await _context.GroupMembers.Include(m => m.Group)
             .FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == memberUserId && m.IsActive, ct)
-            ?? throw new NotFoundException("Member not found");
+            ?? throw new NotFoundException("Không tìm thấy thành viên này trong nhóm.");
         if (target.Role == Role.Leader)
         {
             var leaderCount = await _context.GroupMembers.CountAsync(m => m.GroupId == groupId && m.Role == Role.Leader && m.IsActive, ct);
-            if (leaderCount <= 1) throw new BadRequestException("Cannot remove the only leader");
+            if (leaderCount <= 1) throw new BadRequestException("Không thể xóa Trưởng nhóm duy nhất của nhóm.");
         }
         target.IsActive = false;
         var memberName = await _context.Users.Where(u => u.Id == memberUserId).Select(u => u.DisplayName).FirstAsync(ct);
         var count = await DeactivateMemberAsync(target, groupId, ct);
         _context.ActivityLogs.Add(Log(userId, groupId, null, "GroupMember", memberUserId, "Remove",
-            $"{memberName} bị xóa khỏi nhóm{(count > 0 ? $"; {count} công việc chuyển về Chưa giao" : "")}"));
+            $"Xóa {memberName} khỏi nhóm{(count > 0 ? $"; {count} công việc chuyển về Chưa giao" : "")}"));
         await _context.SaveChangesAsync(ct);
 
         await _notifications.NotifyAsync(memberUserId, groupId, NotificationType.MemberRemoved,
@@ -269,17 +269,19 @@ public class GroupService : IGroupService
     public async Task ChangeMemberRoleAsync(Guid userId, Guid groupId, Guid memberUserId, Role newRole, CancellationToken ct = default)
     {
         await RequireLeaderAsync(userId, groupId, ct);
-        if (!Enum.IsDefined(newRole)) throw new BadRequestException("Invalid member role");
+        if (!Enum.IsDefined(newRole)) throw new BadRequestException("Vai trò thành viên không hợp lệ.");
         var target = await _context.GroupMembers.FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == memberUserId && m.IsActive, ct)
-            ?? throw new NotFoundException("Member not found");
+            ?? throw new NotFoundException("Không tìm thấy thành viên này trong nhóm.");
         if (target.Role == Role.Leader && newRole == Role.Member)
         {
             var leaderCount = await _context.GroupMembers.CountAsync(m => m.GroupId == groupId && m.Role == Role.Leader && m.IsActive, ct);
-            if (leaderCount <= 1) throw new BadRequestException("Cannot demote the only leader");
+            if (leaderCount <= 1) throw new BadRequestException("Không thể hạ vai trò Trưởng nhóm duy nhất của nhóm.");
         }
         var before = target.Role;
         target.Role = newRole;
-        _context.ActivityLogs.Add(Log(userId, groupId, null, "GroupMember", memberUserId, "ChangeRole", $"{target.User.DisplayName} đổi vai trò {before} → {newRole}"));
+        var memberName = await _context.Users.Where(u => u.Id == memberUserId).Select(u => u.DisplayName).FirstAsync(ct);
+        _context.ActivityLogs.Add(Log(userId, groupId, null, "GroupMember", memberUserId, "ChangeRole",
+            $"Đổi vai trò của {memberName}: {Labels.Role(before)} → {Labels.Role(newRole)}"));
         await _context.SaveChangesAsync(ct);
     }
 
@@ -289,13 +291,13 @@ public class GroupService : IGroupService
         if (membership.Role == Role.Leader)
         {
             var leaderCount = await _context.GroupMembers.CountAsync(m => m.GroupId == groupId && m.Role == Role.Leader && m.IsActive, ct);
-            if (leaderCount <= 1) throw new BadRequestException("The only leader must transfer leadership before leaving");
+            if (leaderCount <= 1) throw new BadRequestException("Bạn là Trưởng nhóm duy nhất. Hãy chỉ định Trưởng nhóm khác trước khi rời nhóm.");
         }
         membership.IsActive = false;
         var memberName = await _context.Users.Where(u => u.Id == userId).Select(u => u.DisplayName).FirstAsync(ct);
         var count = await DeactivateMemberAsync(membership, groupId, ct);
         _context.ActivityLogs.Add(Log(userId, groupId, null, "GroupMember", userId, "Leave",
-            $"{memberName} rời nhóm{(count > 0 ? $"; {count} công việc chuyển về Chưa giao" : "")}"));
+            $"Rời nhóm{(count > 0 ? $"; {count} công việc chuyển về Chưa giao" : "")}"));
         await _context.SaveChangesAsync(ct);
         await NotifyLeadersAsync(userId, groupId,
             $"{memberName} đã rời nhóm{(count > 0 ? $"; {count} công việc chuyển về Chưa giao" : "")}", ct);

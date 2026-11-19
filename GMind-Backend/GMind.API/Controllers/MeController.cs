@@ -45,11 +45,11 @@ public class MeController : ControllerBase
 
 public class UpdateProfileRequest : IValidatableObject
 {
-    [Required]
-    [MaxLength(100)]
+    [Required(ErrorMessage = "Vui lòng nhập tên hiển thị.")]
+    [MaxLength(100, ErrorMessage = "Tên hiển thị tối đa 100 ký tự.")]
     public string DisplayName { get; set; } = string.Empty;
 
-    [MaxLength(500)]
+    [MaxLength(500, ErrorMessage = "Đường dẫn ảnh đại diện tối đa 500 ký tự.")]
     public string? AvatarUrl { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext _)
@@ -59,20 +59,20 @@ public class UpdateProfileRequest : IValidatableObject
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
             || string.IsNullOrWhiteSpace(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo)
             || AvatarUrl.Any(char.IsControl))
-            yield return new ValidationResult("Avatar URL must be a valid http(s) URL", new[] { nameof(AvatarUrl) });
+            yield return new ValidationResult("Đường dẫn ảnh đại diện phải là liên kết http(s) hợp lệ.", new[] { nameof(AvatarUrl) });
     }
 }
 
 public class ChangePasswordRequest
 {
-    [Required]
+    [Required(ErrorMessage = "Vui lòng nhập mật khẩu hiện tại.")]
     public string CurrentPassword { get; set; } = string.Empty;
 
-    [Required]
-    [MinLength(8)]
+    [Required(ErrorMessage = "Vui lòng nhập mật khẩu mới.")]
+    [MinLength(8, ErrorMessage = "Mật khẩu phải có ít nhất 8 ký tự.")]
     public string NewPassword { get; set; } = string.Empty;
 
-    [Required]
-    [Compare(nameof(NewPassword))]
+    [Required(ErrorMessage = "Vui lòng xác nhận mật khẩu.")]
+    [Compare(nameof(NewPassword), ErrorMessage = "Mật khẩu xác nhận không khớp.")]
     public string ConfirmPassword { get; set; } = string.Empty;
 }

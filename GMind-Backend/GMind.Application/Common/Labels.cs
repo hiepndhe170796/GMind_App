@@ -26,4 +26,10 @@ public static class Labels
         Domain.Enums.MarketplaceRequestType.Swap => "Hoán đổi",
         _ => t.ToString(),
     };
+    public static string Role(Domain.Enums.Role r) => r switch
+    {
+        Domain.Enums.Role.Leader => "Trưởng nhóm",
+        Domain.Enums.Role.Member => "Thành viên",
+        _ => r.ToString(),
+    };
 }
