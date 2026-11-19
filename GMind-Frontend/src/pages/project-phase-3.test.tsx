@@ -162,3 +162,18 @@ describe('Round2 regressions', () => {
     expect((create.mock.calls[0][1].deadlineAt as string)).toBe(new Date('2026-11-09T23:59:00+07:00').toISOString());
   });
 });
+
+describe('M0 canReview', () => {
+  it('Leader on submitted task with canReview=false sees note and no review link', async () => {
+    setup('Leader', [task('a', { status: 'Submitted', canReview: false, assigneeUserId: 'u-l', assigneeName: 'Leader' })]);
+    renderAt();
+    await screen.findByText('Cần Trưởng nhóm khác duyệt');
+    expect(screen.queryByRole('link', { name: 'Xem và duyệt' })).toBeNull();
+  });
+  it('canReview=true shows Xem và duyệt link to the task', async () => {
+    setup('Leader', [task('a', { status: 'Submitted', canReview: true })]);
+    renderAt();
+    const link = await screen.findByRole('link', { name: 'Xem và duyệt' });
+    expect(link.getAttribute('href')).toBe('/tasks/a');
+  });
+});

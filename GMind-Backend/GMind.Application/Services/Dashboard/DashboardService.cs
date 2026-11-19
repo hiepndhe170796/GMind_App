@@ -13,8 +13,8 @@ public interface IDashboardService
 }
 
 public record MyTaskDto(Guid Id, Guid ProjectId, string ProjectName, string Title, string Status, string Priority, DateTime? DeadlineAt);
-public record MemberProgressDto(Guid UserId, string DisplayName, int Total, int InProgress, int Submitted, int Completed);
-public record GroupProgressDto(Guid GroupId, int TotalTasks, int CompletedTasks, int PercentComplete, List<MemberProgressDto> Members);
+public record MemberProgressDto(Guid UserId, string DisplayName, int Total, int InProgress, int Submitted, int Completed, int ChangesRequested, int Overdue, bool IsActiveMember);
+public record GroupProgressDto(Guid GroupId, int TotalTasks, int CompletedTasks, int PercentComplete, int UnassignedTasks, List<MemberProgressDto> Members);
 
 public class DashboardService : IDashboardService
 {
@@ -43,22 +43,32 @@ public class DashboardService : IDashboardService
     {
         await _access.RequireLeaderAsync(userId, groupId, ct);
 
-        var memberProgress = await _context.Tasks
-            .Where(t => t.Project.GroupId == groupId && t.AssigneeUserId != null && t.ParentTaskId == null && t.Project.ArchivedAt == null)
-            .GroupBy(t => new { t.AssigneeUserId, t.Assignee!.DisplayName })
+        var now = DateTime.UtcNow;
+        var tasks = await _context.Tasks
+            .Where(t => t.Project.GroupId == groupId && t.ParentTaskId == null && t.Project.ArchivedAt == null)
+            .Select(t => new { t.AssigneeUserId, Assignee = t.Assignee!.DisplayName, t.Status, t.DeadlineAt })
+            .ToListAsync(ct);
+        var activeIds = await _context.GroupMembers
+            .Where(m => m.GroupId == groupId && m.IsActive)
+            .Select(m => m.UserId).ToHashSetAsync(ct);
+        var memberProgress = tasks
+            .Where(t => t.AssigneeUserId != null)
+            .GroupBy(t => new { t.AssigneeUserId, t.Assignee })
             .Select(g => new MemberProgressDto(
                 g.Key.AssigneeUserId!.Value,
-                g.Key.DisplayName,
+                g.Key.Assignee,
                 g.Count(),
                 g.Count(t => t.Status == TaskStatus.InProgress),
-                g.Count(t => t.Status == TaskStatus.Submitted || t.Status == TaskStatus.ChangesRequested),
-                g.Count(t => t.Status == TaskStatus.Completed)))
-            .ToListAsync(ct);
-
-        var total = memberProgress.Sum(m => m.Total);
-        var done = memberProgress.Sum(m => m.Completed);
+                g.Count(t => t.Status == TaskStatus.Submitted),
+                g.Count(t => t.Status == TaskStatus.Completed),
+                g.Count(t => t.Status == TaskStatus.ChangesRequested),
+                g.Count(t => t.DeadlineAt != null && t.DeadlineAt < now && t.Status != TaskStatus.Completed),
+                activeIds.Contains(g.Key.AssigneeUserId!.Value)))
+            .ToList();
+        var total = tasks.Count;
+        var done = tasks.Count(t => t.Status == TaskStatus.Completed);
         var pct = total == 0 ? 0 : (int)Math.Round(done * 100.0 / total);
-
-        return new GroupProgressDto(groupId, total, done, pct, memberProgress);
+        var unassigned = tasks.Count(t => t.AssigneeUserId == null);
+        return new GroupProgressDto(groupId, total, done, pct, unassigned, memberProgress);
     }
 }

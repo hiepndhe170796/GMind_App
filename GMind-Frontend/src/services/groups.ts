@@ -1,7 +1,7 @@
 import api from './api';
 
 export interface GroupDto { id: string; name: string; description?: string; memberCount: number; myRole: string; createdAt: string }
-export interface GroupMemberDto { userId: string; displayName: string; avatarUrl?: string | null; role: string; joinedAt: string }
+export interface GroupMemberDto { userId: string; displayName: string; avatarUrl?: string | null; role: string; joinedAt: string; openTaskCount?: number | null }
 export interface GroupDetailDto extends GroupDto { members: GroupMemberDto[] }
 
 export const groupsService = {

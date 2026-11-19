@@ -28,7 +28,7 @@ const detail = (role = 'Leader', leaders = 1): GroupDetailDto => ({
   ],
 });
 const ws = (role = 'Leader', leaders = 1) => ({
-  group: detail(role, leaders), projects: [], progress: role === 'Leader' ? { groupId: 'g1', totalTasks: 0, completedTasks: 0, percentComplete: 0, members: [] } : null,
+  group: detail(role, leaders), projects: [], progress: role === 'Leader' ? { groupId: 'g1', totalTasks: 0, completedTasks: 0, percentComplete: 0, unassignedTasks: 0, members: [] } : null,
   activity: role === 'Leader' ? [{ id: 'a1', actorName: 'X', action: 'Create', entityType: 'Task', summary: 'ACT', createdAt: '2026-01-01T00:00:00Z' }] : [],
 });
 const renderAt = (_el: ReactNode, entry: string) => render(
@@ -221,5 +221,25 @@ describe('Round2 regressions', () => {
     fireEvent.submit(screen.getByLabelText('Tên dự án').closest('form')!);
     expect(await screen.findByText('proj fail')).toBeTruthy();
     expect((screen.getByLabelText('Tên dự án') as HTMLInputElement).value).toBe('DraftP');
+  });
+});
+
+describe('M0 group progress', () => {
+  it('Leader sees unassigned count, departed marker and split status counts', async () => {
+    vi.mocked(loadGroupWorkspace).mockResolvedValue({
+      group: detail('Leader'), projects: [], activity: [],
+      progress: {
+        groupId: 'g1', totalTasks: 5, completedTasks: 1, percentComplete: 20, unassignedTasks: 2,
+        members: [
+          { userId: 'u-gone', displayName: 'Departed Member', total: 3, inProgress: 0, submitted: 0, completed: 1, changesRequested: 1, overdue: 1, isActiveMember: false },
+          { userId: 'u-m', displayName: 'Member One', total: 2, inProgress: 1, submitted: 1, completed: 0, changesRequested: 0, overdue: 0, isActiveMember: true },
+        ],
+      },
+    });
+    renderAt(<GroupDetail />, '/groups/g1');
+    await screen.findByText('2 công việc chưa giao');
+    expect(screen.getByText(/đã rời nhóm/)).toBeTruthy();
+    const counts = screen.getByText(/1 cần sửa/);
+    expect(counts.textContent).toContain('1 cần sửa · 1 quá hạn');
   });
 });

@@ -17,7 +17,7 @@ vi.mock('../services/auth', () => ({
 }));
 
 const req = (id: string, over: Partial<MarketplaceDto> = {}): MarketplaceDto => ({
-  id, requestType: 'NeedHelp', status: 'Pending', taskTitle: 'Task A', taskId: 't-a',
+  id, requestType: 'NeedHelp', status: 'Pending', canReview: true, taskTitle: 'Task A', taskId: 't-a',
   requestedByName: 'Member', reason: 'help me', createdAt: '2026-01-01T00:00:00Z',
   requestedByUserId: 'u-m', ...over,
 });
@@ -191,4 +191,21 @@ it('reject POST success then GET500 upserts Rejected row and hides Pending actio
   await waitFor(() => expect(screen.queryByRole('button', { name: 'Duyệt' })).toBeNull());
   expect(await screen.findByText(/Nhận xét: no/)).toBeTruthy(); // upserted Rejected DTO
   expect(await screen.findByRole('button', { name: 'Tải lại' })).toBeTruthy();
+});
+
+describe('M0 canReview + Cancelled', () => {
+  it('Leader-owned pending request with canReview=false shows note, hides Duyệt/Từ chối', async () => {
+    setup('Leader', [req('r1', { canReview: false })]);
+    renderAt();
+    await screen.findByText('Cần Trưởng nhóm khác duyệt');
+    expect(screen.queryByRole('button', { name: 'Duyệt' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Từ chối' })).toBeNull();
+  });
+  it('Cancelled request keeps Đã hủy badge; status filter offers Đã hủy', async () => {
+    setup('Member', [req('r1', { status: 'Cancelled', canReview: false })]);
+    renderAt();
+    expect((await screen.findAllByText('Đã hủy')).length).toBeGreaterThan(0);
+    const sel = screen.getByLabelText('Lọc trạng thái') as HTMLSelectElement;
+    expect([...sel.options].some(o => o.value === 'Cancelled' && o.text === 'Đã hủy')).toBe(true);
+  });
 });

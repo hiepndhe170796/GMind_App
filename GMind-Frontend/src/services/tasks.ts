@@ -3,7 +3,7 @@ import api from './api';
 export interface TaskSummaryDto {
   id: string; projectId: string; parentTaskId?: string | null; title: string;
   assigneeUserId?: string | null; assigneeName?: string | null; status: string; priority: string;
-  deadlineAt?: string | null; canViewDetails: boolean;
+  deadlineAt?: string | null; canViewDetails: boolean; canReview?: boolean;
 }
 export interface TaskDetailDto extends TaskSummaryDto {
   canViewDetails: true; description?: string | null; estimateHours?: number | null; points?: number | null;

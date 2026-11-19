@@ -266,7 +266,7 @@ function MarketplaceWorkspace({ groupId, userId }: { groupId: string; userId: st
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <Badge variant="neutral">{TYPE_LABEL[r.requestType] ?? r.requestType}</Badge>
-                                <Badge variant={r.status === 'Rejected' || r.status === 'Cancelled' ? 'danger' : r.status === 'Approved' ? 'success' : 'warning'}>{STATUS_VN[r.status] ?? r.status}</Badge>
+                                <Badge variant={r.status === 'Rejected' ? 'danger' : r.status === 'Cancelled' ? 'neutral' : r.status === 'Approved' ? 'success' : 'warning'}>{STATUS_VN[r.status] ?? r.status}</Badge>
                               </div>
                               <p className="mt-2 min-w-0 font-medium text-slate-900 [overflow-wrap:anywhere]">
                                 <Link to={`/tasks/${r.taskId}`} state={taskLinkOf()} className="text-primary-700 hover:underline">{r.taskTitle}</Link>
@@ -280,12 +280,15 @@ function MarketplaceWorkspace({ groupId, userId }: { groupId: string; userId: st
                               </p>
                             </div>
                             <div className="flex shrink-0 flex-wrap gap-2">
-                              {r.status === 'Pending' && isLeader && (
+                              {r.status === 'Pending' && r.canReview && (
                                 <>
                                   <Button size="sm" className="workspace-primary min-h-9" disabled={busy} onClick={() => setDialog({ kind: 'approve', req: r })}>Duyệt</Button>
                                   <Button size="sm" variant="secondary" className="min-h-9 text-danger-700" disabled={busy}
                                     onClick={() => { setDialog({ kind: 'reject', req: r }); setRejectNote(''); setRejectError(''); }}>Từ chối</Button>
                                 </>
+                              )}
+                              {r.status === 'Pending' && isLeader && !r.canReview && (
+                                <span className="text-sm text-slate-600">Cần Trưởng nhóm khác duyệt</span>
                               )}
                               {r.status === 'Pending' && r.requestedByUserId === userId && (
                                 <Button size="sm" variant="secondary" className="min-h-9" disabled={busy}

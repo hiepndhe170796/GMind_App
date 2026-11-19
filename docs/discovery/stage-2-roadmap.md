@@ -23,7 +23,7 @@ Dependency mới chỉ dùng bản phát hành ≥7 ngày.
 
 | M | Mục tiêu | Ưu tiên | Trạng thái |
 |---|---|---|---|
-| M0 | Toàn vẹn dữ liệu, phân quyền, bảo mật | P0/P1 | Đang làm |
+| M0 | Toàn vẹn dữ liệu, phân quyền, bảo mật | P0/P1 | Xong |
 | M1 | Design system, app shell, auth, lớp dữ liệu dùng chung | P1/P2 | Chờ |
 | M2 | Task & Project hoàn chỉnh (quản lý của Leader, tiến độ, bàn giao, subtask, comment/link, kanban kéo-thả) | P1 | Chờ |
 | M3 | Dashboard theo vai trò, Leader cockpit, cảnh báo rủi ro, cài đặt nhóm, điểm đóng góp | P1 | Chờ |
@@ -69,4 +69,7 @@ Dependency mới chỉ dùng bản phát hành ≥7 ngày.
 
 ## Nhật ký tiến độ
 
-- 2026-11-09 — Stage 1 hoàn tất; quyết định Q1–Q11 ghi nhận; bắt đầu M0.
+- 2026-11-09 — Stage 1 hoàn tất; quyết định Q1–Q11 ghi nhận; bắt đầu M0 (nhánh `feat/stage2-m0-integrity`, commit docs `c981b72`).
+- 2026-11-09 — `DESIGN.md` (design system M1: xanh + tím, Be Vietnam Pro, quy tắc trạng thái/ưu tiên, component, signature) được viết; chưa áp dụng vào code.
+- 2026-11-09 — M0 review vòng 1: backend dựng được, phát hiện 6 lỗi (giờ VN trong thông báo đổi hạn, trạng thái dự án chưa áp dụng mọi đường, OpenTaskCount/IsActiveMember/CanReview chưa điền, text còn enum/GUID, kiểm tra envelope 429); đang sửa cùng reminder worker, frontend và test.
+- 2026-11-09 — M0 hoàn tất: dotnet test 108/108 (gồm IntegrityM0Tests 19 test mới), vitest 282/282 (22 file), npm run lint 0 cảnh báo, npm run build pass. Smoke API thật trên :5194: register/join/invite/project/task gán Member → Member rời → assignee=null + thông báo Leader "1 công việc chuyển về Chưa giao" → mời mới + rejoin 200 (1 dòng member active) → 11 login sai: 6×401 rồi 429 envelope {success:false,message:"Bạn thao tác quá nhiều lần..."}. Ảnh 404 (Edge, đăng nhập + khách, 1440 & 390) tại %TEMP%\gm-m0\notfound-*.png, không console error; ảnh đăng nhập chụp lại qua luồng login UI thật (assert: URL giữ /khong-ton-tai, heading + link Về Tổng quan + MainLayout nav). Detector impeccable: 0 phát hiện trên 4 file đã sửa.

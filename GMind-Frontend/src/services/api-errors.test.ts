@@ -89,4 +89,15 @@ describe('normalizeApiError', () => {
     expect(serialized).not.toContain('abc123');
     expect(serialized).not.toContain('stack');
   });
+
+  it('surfaces the 429 rate-limit envelope message and status', () => {
+    const error = axiosErrorWithResponse(429, {
+      success: false, data: null,
+      message: 'Bạn thao tác quá nhiều lần. Vui lòng thử lại sau ít phút.',
+      errors: null,
+    });
+    const result = normalizeApiError(error);
+    expect(result.status).toBe(429);
+    expect(result.message).toBe('Bạn thao tác quá nhiều lần. Vui lòng thử lại sau ít phút.');
+  });
 });

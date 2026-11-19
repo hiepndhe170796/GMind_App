@@ -297,11 +297,12 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
                   <Card className="p-4 sm:p-6">
                     <h3 className="font-semibold text-slate-900">Tiến độ thành viên</h3>
                     <p className="mt-1 text-sm text-slate-600">Tỷ lệ công việc hoàn thành: {progress.completedTasks}/{progress.totalTasks} ({Math.round(progress.percentComplete)}%)</p>
+                    {progress.unassignedTasks > 0 && <p className="mt-1 text-sm text-warning-700">{progress.unassignedTasks} công việc chưa giao</p>}
                     <ul className="mt-3 divide-y divide-slate-100">
                       {progress.members.map(m => (
                         <li key={m.userId} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2 text-sm min-w-0">
-                          <span className="font-medium [overflow-wrap:anywhere]">{m.displayName}</span>
-                          <span className="text-slate-600">{m.total} tổng · {m.inProgress} đang làm · {m.submitted} chờ duyệt · {m.completed} xong</span>
+                          <span className="font-medium [overflow-wrap:anywhere]">{m.displayName}{!m.isActiveMember && <span className="font-normal text-slate-600"> (đã rời nhóm)</span>}</span>
+                          <span className="text-slate-600">{m.total} tổng · {m.inProgress} đang làm · {m.submitted} chờ duyệt · {m.changesRequested} cần sửa · {m.overdue} quá hạn · {m.completed} xong</span>
                         </li>
                       ))}
                     </ul>
@@ -375,7 +376,8 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
 
             <ConfirmationDialog open={!!dialog} busy={busy} onClose={() => { if (!busy) setDialog(null); }}
               title={dialog?.kind === 'leave' ? 'Rời nhóm' : dialog?.kind === 'remove' ? 'Xóa thành viên' : 'Đổi vai trò'}>
-              {dialog?.kind === 'leave' && <p>Bạn sẽ rời nhóm "{group.name}". Công việc được giao cho bạn <b>không</b> được tự động giao lại.</p>}
+              {dialog?.kind === 'leave' && <p>Bạn sẽ rời nhóm "{group.name}". Công việc được giao cho bạn <b>không</b> được tự động giao lại.{(() => { const n = group.members.find(x => x.userId === authService.currentUser()?.id)?.openTaskCount; return n ? ` ${n} công việc chưa hoàn thành sẽ chuyển về Chưa giao.` : ''; })()}</p>}
+              {dialog?.kind === 'remove' && (() => { const n = group.members.find(x => x.userId === dialog.memberId)?.openTaskCount; return n ? <p className="text-sm text-slate-600">{n} công việc chưa hoàn thành sẽ chuyển về Chưa giao.</p> : null; })()}
               {dialog?.kind === 'remove' && <p>Xóa {dialog.memberName} khỏi nhóm? Công việc đã giao cho họ <b>không</b> được tự động giao lại.</p>}
               {dialog?.kind === 'role' && <p>{dialog.toRole === ROLE_NUM.Member ? `Hạ ${dialog.memberName} xuống Thành viên?` : `Nâng ${dialog.memberName} lên Trưởng nhóm?`}</p>}
               {actionErrors.member && <p role="alert" className="mt-3 text-sm text-danger-700 [overflow-wrap:anywhere]">{actionErrors.member}</p>}

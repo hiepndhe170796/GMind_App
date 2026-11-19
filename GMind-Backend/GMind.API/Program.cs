@@ -34,6 +34,39 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+// Per-client-IP fixed-window limits on auth endpoints; config-overridable via RateLimiting:*.
+var rl = builder.Configuration.GetSection("RateLimiting");
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+    options.OnRejected = async (ctx, _) =>
+    {
+        ctx.HttpContext.Response.StatusCode = 429;
+        await ctx.HttpContext.Response.WriteAsJsonAsync(new GMind.API.Models.ApiResponse<object>
+        {
+            Success = false,
+            Message = "Bạn thao tác quá nhiều lần. Vui lòng thử lại sau ít phút.",
+            Errors = null
+        });
+    };
+    options.AddPolicy("auth-login", httpContext => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rl.GetValue<int?>("LoginPermitLimit") ?? 10,
+            Window = TimeSpan.FromMinutes(rl.GetValue<double?>("LoginWindowMinutes") ?? 1),
+            QueueLimit = 0,
+        }));
+    options.AddPolicy("auth-recovery", httpContext => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rl.GetValue<int?>("RecoveryPermitLimit") ?? 5,
+            Window = TimeSpan.FromMinutes(rl.GetValue<double?>("RecoveryWindowMinutes") ?? 15),
+            QueueLimit = 0,
+        }));
+});
+
 builder.Services.AddHealthChecks().AddCheck<DatabaseReadinessCheck>("database", tags: ["ready"]);
 
 builder.Services.AddCors(options =>
@@ -64,6 +97,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("Frontend");
 if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

@@ -72,12 +72,12 @@ public class TaskService : ITaskService
         };
 
         _context.Tasks.Add(task);
-        _context.ActivityLogs.Add(Log(userId, project.GroupId, projectId, "Task", task.Id, "Create", $"Created task '{task.Title}'"));
+        _context.ActivityLogs.Add(Log(userId, project.GroupId, projectId, "Task", task.Id, "Create", $"Tạo công việc '{task.Title}'"));
         await _context.SaveChangesAsync(ct);
 
         if (assigneeUserId != null && assigneeUserId != userId)
             await _notifications.NotifyAsync(assigneeUserId.Value, project.GroupId, NotificationType.TaskAssigned,
-                "Task mới được giao", $"Bạn được giao task '{task.Title}'", "Task", task.Id, ct);
+                "Task mới được giao", $"Bạn được giao công việc '{task.Title}'", "Task", task.Id, ct);
 
         return await GetDetailDtoAsync(task.Id, ct);
     }
@@ -87,6 +87,9 @@ public class TaskService : ITaskService
         var project = await _context.Projects.FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct)
             ?? throw new NotFoundException("Project not found");
         var membership = await _access.RequireMemberAsync(userId, project.GroupId, ct);
+        var anotherLeader = membership.Role == Role.Leader
+            && await _context.GroupMembers.AnyAsync(m => m.GroupId == project.GroupId
+                && m.Role == Role.Leader && m.IsActive && m.UserId != userId, ct);
 
         return await _context.Tasks
             .Where(t => t.ProjectId == projectId)
@@ -94,7 +97,9 @@ public class TaskService : ITaskService
             .Select(t => new TaskSummaryDto(t.Id, t.ProjectId, t.ParentTaskId, t.Title,
                 t.AssigneeUserId, t.Assignee != null ? t.Assignee.DisplayName : null,
                 t.Status.ToString(), t.Priority.ToString(), t.DeadlineAt,
-                membership.Role == Role.Leader || t.AssigneeUserId == userId))
+                membership.Role == Role.Leader || t.AssigneeUserId == userId,
+                membership.Role == Role.Leader && t.Status == TaskStatus.Submitted
+                    && !(t.AssigneeUserId == userId && anotherLeader)))
             .ToListAsync(ct);
     }
 
@@ -124,6 +129,7 @@ public class TaskService : ITaskService
         if (task.Status == TaskStatus.Completed)
             throw new BadRequestException("Completed tasks cannot be edited");
 
+        var oldDeadline = task.DeadlineAt;
         task.Title = title.Trim();
         task.Description = description;
         task.Priority = priority;
@@ -132,8 +138,17 @@ public class TaskService : ITaskService
         task.Points = points;
         task.UpdatedAt = DateTime.UtcNow;
 
-        _context.ActivityLogs.Add(Log(userId, task.Project.GroupId, task.ProjectId, "Task", task.Id, "Update", $"Updated task '{task.Title}'"));
+        _context.ActivityLogs.Add(Log(userId, task.Project.GroupId, task.ProjectId, "Task", task.Id, "Update",
+            $"Cập nhật công việc '{task.Title}'{(oldDeadline != deadlineAt ? $" — hạn {(oldDeadline != null ? VnTime.FormatDate(oldDeadline.Value) : "—")} → {(deadlineAt != null ? VnTime.FormatDate(deadlineAt.Value) : "—")}" : "")}"));
         await _context.SaveChangesAsync(ct);
+        if (oldDeadline != deadlineAt && task.AssigneeUserId != null && task.AssigneeUserId != userId)
+        {
+            var vn = deadlineAt != null ? VnTime.Format(deadlineAt.Value) : null;
+            await _notifications.NotifyAsync(task.AssigneeUserId.Value, task.Project.GroupId, NotificationType.TaskUpdated,
+                "Hạn công việc đã thay đổi",
+                deadlineAt == null ? $"Hạn công việc '{task.Title}' đã bỏ" : $"Hạn công việc '{task.Title}': {vn}",
+                "Task", task.Id, ct);
+        }
         return await GetDetailDtoAsync(taskId, ct);
     }
 
@@ -151,12 +166,13 @@ public class TaskService : ITaskService
 
         task.AssigneeUserId = assigneeUserId;
         task.UpdatedAt = DateTime.UtcNow;
-        _context.ActivityLogs.Add(Log(userId, task.Project.GroupId, task.ProjectId, "Task", task.Id, "Assign", $"Assigned task '{task.Title}' to {assigneeUserId}"));
+        var assigneeName = assigneeUserId == null ? "bỏ giao" : await _context.Users.Where(u => u.Id == assigneeUserId).Select(u => u.DisplayName).FirstAsync(ct);
+        _context.ActivityLogs.Add(Log(userId, task.Project.GroupId, task.ProjectId, "Task", task.Id, "Assign", $"Giao công việc '{task.Title}' cho {assigneeName}"));
         await _context.SaveChangesAsync(ct);
 
         if (assigneeUserId != null && assigneeUserId != userId)
             await _notifications.NotifyAsync(assigneeUserId.Value, task.Project.GroupId, NotificationType.TaskAssigned,
-                "Task mới được giao", $"Bạn được giao task '{task.Title}'", "Task", task.Id, ct);
+                "Task mới được giao", $"Bạn được giao công việc '{task.Title}'", "Task", task.Id, ct);
 
         return await GetDetailDtoAsync(taskId, ct);
     }
@@ -193,6 +209,8 @@ public class TaskService : ITaskService
         // Leader decisions create a review record with optional comment
         if (newStatus is TaskStatus.Completed or TaskStatus.ChangesRequested)
         {
+            if (isAssignee && !await _access.CanReviewOwnAsync(task.Project.GroupId, userId, task.AssigneeUserId ?? userId, ct))
+                throw new ForbiddenException("Cần một Trưởng nhóm khác duyệt công việc của bạn");
             if (newStatus == TaskStatus.ChangesRequested && string.IsNullOrWhiteSpace(reviewComment))
                 throw new BadRequestException("Review comment is required when requesting changes");
 
@@ -213,7 +231,10 @@ public class TaskService : ITaskService
         if (newStatus == TaskStatus.Submitted) task.SubmittedAt = DateTime.UtcNow;
         if (newStatus == TaskStatus.Completed) { task.CompletedAt = DateTime.UtcNow; task.ProgressPercent = 100; }
 
-        _context.ActivityLogs.Add(Log(userId, task.Project.GroupId, task.ProjectId, "Task", task.Id, "StatusChange", $"Task '{task.Title}' -> {newStatus}"));
+        var selfNote = isAssignee && isLeader && (newStatus is TaskStatus.Completed or TaskStatus.ChangesRequested)
+            ? " (tự duyệt)" : "";
+        _context.ActivityLogs.Add(Log(userId, task.Project.GroupId, task.ProjectId, "Task", task.Id, "StatusChange",
+            $"Công việc '{task.Title}' chuyển sang {GMind.Application.Common.Labels.TaskStatus(newStatus)}{selfNote}"));
         await _context.SaveChangesAsync(ct);
 
         // Notifications per BA workflow
@@ -249,7 +270,7 @@ public class TaskService : ITaskService
         if (task.Status == TaskStatus.Completed)
             throw new BadRequestException("Completed tasks cannot be deleted");
 
-        _context.ActivityLogs.Add(Log(userId, task.Project.GroupId, task.ProjectId, "Task", task.Id, "Delete", $"Deleted task '{task.Title}'"));
+        _context.ActivityLogs.Add(Log(userId, task.Project.GroupId, task.ProjectId, "Task", task.Id, "Delete", $"Xóa công việc '{task.Title}'"));
         _context.Tasks.Remove(task);
         await _context.SaveChangesAsync(ct);
     }

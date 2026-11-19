@@ -225,8 +225,10 @@ function ProjectWorkspace({ id, userId }: { id: string; userId: string }) {
         <Button size="sm" className="workspace-primary min-h-9" disabled={busy} isLoading={pending === `status-${t.id}`} onClick={() => changeStatus(t, TaskStatus.InProgress)}>Bắt đầu</Button>)}
       {t.status === 'InProgress' && t.assigneeUserId === userId && (
         <Button size="sm" className="workspace-primary min-h-9" disabled={busy} isLoading={pending === `status-${t.id}`} onClick={() => changeStatus(t, TaskStatus.Submitted)}>Nộp để duyệt</Button>)}
-      {t.status === 'Submitted' && isLeader && (
+      {t.status === 'Submitted' && t.canReview && (
         <Link to={`/tasks/${t.id}`} state={navState} className="inline-flex min-h-9 items-center rounded-lg bg-primary-600 px-3 text-sm font-medium text-white hover:bg-primary-700">Xem và duyệt</Link>)}
+      {t.status === 'Submitted' && isLeader && !t.canReview && (
+        <span className="inline-flex min-h-9 items-center text-sm text-slate-600">Cần Trưởng nhóm khác duyệt</span>)}
       {t.status === 'ChangesRequested' && t.assigneeUserId === userId && (
         <Button size="sm" variant="secondary" className="min-h-9" disabled={busy} isLoading={pending === `status-${t.id}`} onClick={() => changeStatus(t, TaskStatus.InProgress)}>Làm lại</Button>)}
     </span>

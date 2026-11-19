@@ -22,7 +22,7 @@ public interface IMarketplaceService
 
 public record MarketplaceDto(Guid Id, string RequestType, string Status, string TaskTitle, Guid TaskId,
     string RequestedByName, string? TargetName, string Reason, string? ReviewComment, DateTime CreatedAt, DateTime? ReviewedAt,
-    Guid RequestedByUserId, Guid? TargetUserId, Guid? RelatedTaskId, string? RelatedTaskTitle);
+    Guid RequestedByUserId, Guid? TargetUserId, Guid? RelatedTaskId, string? RelatedTaskTitle, bool CanReview = false);
 
 public class MarketplaceService : IMarketplaceService
 {
@@ -98,7 +98,7 @@ public class MarketplaceService : IMarketplaceService
 
         _context.MarketplaceRequests.Add(request);
         _context.ActivityLogs.Add(Log(userId, groupId, task.ProjectId, "MarketplaceRequest", request.Id, "Create",
-            $"{type} request for task '{task.Title}'"));
+            $"{GMind.Application.Common.Labels.MarketplaceType(request.RequestType)} cho công việc '{task.Title}'"));
         await _context.SaveChangesAsync(ct);
 
         var leaders = await _context.GroupMembers
@@ -107,7 +107,7 @@ public class MarketplaceService : IMarketplaceService
         var requesterName = await _context.Users.Where(u => u.Id == userId).Select(u => u.DisplayName).FirstAsync(ct);
         foreach (var leaderId in leaders)
             await _notifications.NotifyAsync(leaderId, groupId, NotificationType.MarketplaceRequestCreated,
-                $"Yêu cầu {type}", $"{requesterName} tạo yêu cầu {type} cho task '{task.Title}'",
+                $"Yêu cầu {GMind.Application.Common.Labels.MarketplaceType(request.RequestType)}", $"{requesterName} tạo yêu cầu {GMind.Application.Common.Labels.MarketplaceType(request.RequestType)} cho công việc '{task.Title}'",
                 "MarketplaceRequest", request.Id, ct);
 
         return ToDto(request, task.Title, requesterName, targetName, other?.Title);
@@ -115,7 +115,10 @@ public class MarketplaceService : IMarketplaceService
 
     public async Task<List<MarketplaceDto>> ListAsync(Guid userId, Guid groupId, string? statusFilter, CancellationToken ct = default)
     {
-        await RequireMemberAsync(userId, groupId, ct);
+        var membership = await RequireMemberAsync(userId, groupId, ct);
+        var anotherLeader = membership.Role == Role.Leader
+            && await _context.GroupMembers.AnyAsync(m => m.GroupId == groupId
+                && m.Role == Role.Leader && m.IsActive && m.UserId != userId, ct);
         var q = _context.MarketplaceRequests
             .Where(r => r.GroupId == groupId)
             .AsQueryable();
@@ -132,7 +135,9 @@ public class MarketplaceService : IMarketplaceService
                 r.RequestedBy.DisplayName, r.TargetUser != null ? r.TargetUser.DisplayName : null,
                 r.Reason, r.ReviewComment, r.CreatedAt, r.ReviewedAt,
                 r.RequestedByUserId, r.TargetUserId, r.RelatedTaskId,
-                r.RelatedTask != null ? r.RelatedTask.Title : null))
+                r.RelatedTask != null ? r.RelatedTask.Title : null,
+                membership.Role == Role.Leader && r.Status == MarketplaceRequestStatus.Pending
+                    && !(r.RequestedByUserId == userId && anotherLeader)))
             .ToListAsync(ct);
     }
 
@@ -171,19 +176,19 @@ public class MarketplaceService : IMarketplaceService
                 task.AssigneeUserId = req.TargetUserId;
                 task.UpdatedAt = DateTime.UtcNow;
                 _context.ActivityLogs.Add(Log(leaderId, req.GroupId, req.ProjectId, "Task", task.Id, "Transfer",
-                    $"Task '{task.Title}' transferred to {req.TargetUserId}"));
+                    $"Công việc '{task.Title}' chuyển cho {req.TargetUser?.DisplayName}"));
                 break;
 
             case MarketplaceRequestType.Swap:
                 (task.AssigneeUserId, other!.AssigneeUserId) = (other.AssigneeUserId, task.AssigneeUserId);
                 task.UpdatedAt = other.UpdatedAt = DateTime.UtcNow;
                 _context.ActivityLogs.Add(Log(leaderId, req.GroupId, req.ProjectId, "Task", task.Id, "Swap",
-                    $"Swapped '{task.Title}' <-> '{other!.Title}'"));
+                    $"Hoán đổi '{task.Title}' ↔ '{other!.Title}'"));
                 break;
 
             case MarketplaceRequestType.NeedHelp:
                 _context.ActivityLogs.Add(Log(leaderId, req.GroupId, req.ProjectId, "Task", task.Id, "NeedHelp",
-                    $"Help approved for '{task.Title}'"));
+                    $"Hỗ trợ được duyệt cho công việc '{task.Title}'"));
                 break;
         }
 
@@ -194,7 +199,7 @@ public class MarketplaceService : IMarketplaceService
         await _context.SaveChangesAsync(ct);
 
         await _notifications.NotifyAsync(req.RequestedByUserId, req.GroupId, NotificationType.MarketplaceRequestApproved,
-            "Yêu cầu được duyệt", $"Yêu cầu {req.RequestType} cho task '{task.Title}' đã được duyệt",
+            "Yêu cầu được duyệt", $"Yêu cầu {GMind.Application.Common.Labels.MarketplaceType(req.RequestType)} cho công việc '{task.Title}' đã được duyệt",
             "MarketplaceRequest", req.Id, ct);
         if (req.TargetUserId != null)
             await _notifications.NotifyAsync(req.TargetUserId.Value, req.GroupId, NotificationType.TaskAssigned,
@@ -220,7 +225,7 @@ public class MarketplaceService : IMarketplaceService
         await _context.SaveChangesAsync(ct);
 
         await _notifications.NotifyAsync(req.RequestedByUserId, req.GroupId, NotificationType.MarketplaceRequestRejected,
-            "Yêu cầu bị từ chối", $"Yêu cầu {req.RequestType} bị từ chối: {comment}",
+            "Yêu cầu bị từ chối", $"Yêu cầu {GMind.Application.Common.Labels.MarketplaceType(req.RequestType)} bị từ chối: {comment}",
             "MarketplaceRequest", req.Id, ct);
 
         return ToDto(req, req.Task?.Title ?? "", req.RequestedBy.DisplayName, req.TargetUser?.DisplayName);
@@ -233,7 +238,15 @@ public class MarketplaceService : IMarketplaceService
         if (req.RequestedByUserId != userId) throw new ForbiddenException("Only the requester can cancel");
         if (req.Status != MarketplaceRequestStatus.Pending)
             throw new BadRequestException("Request is not pending");
-        _context.MarketplaceRequests.Remove(req);
+        req.Status = MarketplaceRequestStatus.Cancelled;
+        req.ReviewedAt = DateTime.UtcNow;
+        var userName = await _context.Users.Where(u => u.Id == userId).Select(u => u.DisplayName).FirstAsync(ct);
+        _context.ActivityLogs.Add(new ActivityLog
+        {
+            Id = Guid.NewGuid(), ActorUserId = userId, GroupId = req.GroupId,
+            EntityType = "MarketplaceRequest", EntityId = req.Id, Action = "Cancel",
+            Summary = $"{userName} đã hủy yêu cầu {GMind.Application.Common.Labels.MarketplaceType(req.RequestType)}",
+        });
         await _context.SaveChangesAsync(ct);
     }
 
@@ -250,10 +263,11 @@ public class MarketplaceService : IMarketplaceService
     private Task RequireLeaderAsync(Guid userId, Guid groupId, CancellationToken ct)
         => _access.RequireLeaderAsync(userId, groupId, ct);
 
-    private static MarketplaceDto ToDto(MarketplaceRequest r, string taskTitle, string requesterName, string? targetName, string? relatedTaskTitle = null)
+    private static MarketplaceDto ToDto(MarketplaceRequest r, string taskTitle, string requesterName, string? targetName, string? relatedTaskTitle = null, bool canReview = false)
         => new(r.Id, r.RequestType.ToString(), r.Status.ToString(), taskTitle, r.TaskId ?? Guid.Empty,
             requesterName, targetName, r.Reason, r.ReviewComment, r.CreatedAt, r.ReviewedAt,
-            r.RequestedByUserId, r.TargetUserId, r.RelatedTaskId, relatedTaskTitle ?? r.RelatedTask?.Title);
+            r.RequestedByUserId, r.TargetUserId, r.RelatedTaskId, relatedTaskTitle ?? r.RelatedTask?.Title,
+            CanReview: canReview);
 
     private static ActivityLog Log(Guid actor, Guid groupId, Guid? projectId, string entityType, Guid? entityId, string action, string summary)
         => new() { Id = Guid.NewGuid(), ActorUserId = actor, GroupId = groupId, ProjectId = projectId, EntityType = entityType, EntityId = entityId, Action = action, Summary = summary };

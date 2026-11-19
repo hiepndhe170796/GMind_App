@@ -5,6 +5,7 @@ export interface MarketplaceDto {
   requestedByName: string; targetName?: string; reason: string;
   reviewComment?: string; createdAt: string; reviewedAt?: string;
   requestedByUserId: string; targetUserId?: string; relatedTaskId?: string; relatedTaskTitle?: string;
+  canReview?: boolean;
 }
 
 // MarketplaceRequestType: NeedHelp=1, Transfer=2, Swap=3

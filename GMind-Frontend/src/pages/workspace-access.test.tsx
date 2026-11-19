@@ -56,8 +56,8 @@ const group = (id: string, name: string, myRole: string): GroupDetailDto => ({
   id, name, memberCount: 2, myRole, createdAt: '2026-01-01T00:00:00Z', members: [],
 });
 const leaderProgress: GroupProgress = {
-  groupId: 'g1', totalTasks: 2, completedTasks: 1, percentComplete: 50,
-  members: [{ userId: 'u-b', displayName: 'User B', total: 2, inProgress: 1, submitted: 0, completed: 1 }],
+  groupId: 'g1', totalTasks: 2, completedTasks: 1, percentComplete: 50, unassignedTasks: 0,
+  members: [{ userId: 'u-b', displayName: 'User B', total: 2, inProgress: 1, submitted: 0, completed: 1, changesRequested: 0, overdue: 0, isActiveMember: true }],
 };
 const privateActivity: ActivityDto[] = [
   { id: 'a1', actorName: 'Leader A', action: 'Create', entityType: 'Task', summary: 'PRIVATE_ACTIVITY', createdAt: '2026-01-01T00:00:00Z' },
@@ -285,7 +285,7 @@ describe('TaskDetail mutations', () => {
   });
 
   it('pending return locks both review buttons; double click still one POST', async () => {
-    vi.mocked(loadTaskWorkspace).mockResolvedValue(ws({ status: 'Submitted', assigneeUserId: 'u-x' }, 'Leader'));
+    vi.mocked(loadTaskWorkspace).mockResolvedValue(ws({ status: 'Submitted', canReview: true, assigneeUserId: 'u-x' }, 'Leader'));
     const req = deferred<TaskDetailDto>();
     const change = vi.spyOn(tasksService, 'changeStatus').mockReturnValue(req.promise);
     renderTaskRoutes('/tasks/t1');
@@ -303,7 +303,7 @@ describe('TaskDetail mutations', () => {
   });
 
   it('status 500 keeps review draft; retry posts once and clears old error', async () => {
-    vi.mocked(loadTaskWorkspace).mockResolvedValue(ws({ status: 'Submitted', assigneeUserId: 'u-x' }, 'Leader'));
+    vi.mocked(loadTaskWorkspace).mockResolvedValue(ws({ status: 'Submitted', canReview: true, assigneeUserId: 'u-x' }, 'Leader'));
     const change = vi.spyOn(tasksService, 'changeStatus')
       .mockRejectedValueOnce({ status: 500, message: 'server err' })
       .mockResolvedValue({ ...detailTask, status: 'ChangesRequested' });

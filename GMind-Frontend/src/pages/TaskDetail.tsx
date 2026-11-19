@@ -260,7 +260,10 @@ function TaskWorkspace({ id, userId }: { id: string; userId: string }) {
             {statusBtn(TaskStatus.Submitted, 'Nộp để duyệt', 'w-full')}
           </>
         )}
-        {dt.status === 'Submitted' && isLeader && (
+        {dt.status === 'Submitted' && isLeader && !dt.canReview && (
+          <p className="text-sm text-slate-500">Cần Trưởng nhóm khác duyệt</p>
+        )}
+        {dt.status === 'Submitted' && dt.canReview && (
           <>
             <label htmlFor="review-note" className="block text-sm font-medium text-slate-700">Nhận xét duyệt</label>
             <textarea id="review-note" ref={reviewRef} rows={3} maxLength={2000} value={reviewNote}

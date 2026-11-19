@@ -12,6 +12,7 @@ public interface IResourceAccess
     Task<GroupMember> RequireMemberAsync(Guid userId, Guid groupId, CancellationToken ct = default);
     Task<GroupMember> RequireLeaderAsync(Guid userId, Guid groupId, CancellationToken ct = default);
     Task<TaskEntity> RequireTaskDetailsAsync(Guid userId, Guid taskId, CancellationToken ct = default);
+    Task<bool> CanReviewOwnAsync(Guid groupId, Guid reviewerId, Guid ownerId, CancellationToken ct = default);
 }
 
 public sealed class ResourceAccess(IApplicationDbContext context) : IResourceAccess
@@ -37,5 +38,13 @@ public sealed class ResourceAccess(IApplicationDbContext context) : IResourceAcc
         if (member.Role != Role.Leader && task.AssigneeUserId != userId)
             throw new ForbiddenException("Only the leader or assignee can access task details");
         return task;
+    }
+
+    // A Leader may not review their own work when another active Leader exists in the group.
+    public async Task<bool> CanReviewOwnAsync(Guid groupId, Guid reviewerId, Guid ownerId, CancellationToken ct = default)
+    {
+        if (reviewerId != ownerId) return true;
+        return !await context.GroupMembers
+            .AnyAsync(m => m.GroupId == groupId && m.Role == Role.Leader && m.IsActive && m.UserId != reviewerId, ct);
     }
 }

@@ -28,7 +28,7 @@ public interface IGroupService
 
 public record GroupDto(Guid Id, string Name, string? Description, int MemberCount, string MyRole, DateTime CreatedAt);
 public record GroupDetailDto(Guid Id, string Name, string? Description, int MemberCount, string MyRole, DateTime CreatedAt, List<MemberDto> Members);
-public record MemberDto(Guid UserId, string DisplayName, string? AvatarUrl, string Role, DateTime JoinedAt);
+public record MemberDto(Guid UserId, string DisplayName, string? AvatarUrl, string Role, DateTime JoinedAt, int? OpenTaskCount);
 public record InviteDto(Guid Id, string Code, string InviteLink, DateTime? ExpiresAt, int? MaxUses, int UsedCount);
 public record ActivityDto(Guid Id, string ActorName, string Action, string EntityType, string Summary, DateTime CreatedAt, Guid? ProjectId);
 
@@ -85,10 +85,20 @@ public class GroupService : IGroupService
     {
         var membership = await RequireMembershipAsync(userId, groupId, ct);
         var group = membership.Group;
-        var members = await _context.GroupMembers
-            .Where(m => m.GroupId == groupId && m.IsActive)
-            .Select(m => new MemberDto(m.UserId, m.User.DisplayName, m.User.AvatarUrl, m.Role.ToString(), m.JoinedAt))
+        var isLeader = membership.Role == Role.Leader;
+        var openTasks = await _context.Tasks
+            .Where(t => t.Project.GroupId == groupId && t.Project.ArchivedAt == null
+                && t.AssigneeUserId != null && t.Status != Domain.Enums.TaskStatus.Completed)
+            .Select(t => t.AssigneeUserId!.Value)
             .ToListAsync(ct);
+        var openCounts = openTasks.GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
+        var rows = await _context.GroupMembers
+            .Where(m => m.GroupId == groupId && m.IsActive)
+            .Select(m => new { m.UserId, m.User.DisplayName, m.User.AvatarUrl, m.Role, m.JoinedAt })
+            .ToListAsync(ct);
+        var members = rows.Select(m => new MemberDto(m.UserId, m.DisplayName, m.AvatarUrl, m.Role.ToString(), m.JoinedAt,
+                isLeader || m.UserId == userId ? (openCounts.ContainsKey(m.UserId) ? openCounts[m.UserId] : 0) : null))
+            .ToList();
 
         return new GroupDetailDto(group.Id, group.Name, group.Description, members.Count, membership.Role.ToString(), group.CreatedAt, members);
     }
@@ -114,7 +124,7 @@ public class GroupService : IGroupService
         {
             Id = Guid.NewGuid(),
             GroupId = groupId,
-            Code = code,
+            Code = null, // plaintext codes are never persisted for new invites
             TokenHash = HashToken(code),
             CreatedByUserId = userId,
             ExpiresAt = expiresAt,
@@ -147,21 +157,32 @@ public class GroupService : IGroupService
             throw new BadRequestException("Invite is expired, revoked, or out of uses");
         if (invite.Group.IsArchived) throw new BadRequestException("Group is archived");
 
-        if (await _context.GroupMembers.AnyAsync(m => m.GroupId == invite.GroupId && m.UserId == userId && m.IsActive, ct))
+        var existing = await _context.GroupMembers
+            .FirstOrDefaultAsync(m => m.GroupId == invite.GroupId && m.UserId == userId, ct);
+        if (existing is { IsActive: true })
             throw new ConflictException("Already a member of this group");
-
-        _context.GroupMembers.Add(new GroupMember
+        if (existing != null)
         {
-            Id = Guid.NewGuid(), GroupId = invite.GroupId, UserId = userId, Role = Role.Member
-        });
+            // Reactivate the former membership rather than inserting a duplicate.
+            existing.IsActive = true;
+            existing.Role = Role.Member;
+            existing.JoinedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            _context.GroupMembers.Add(new GroupMember
+            {
+                Id = Guid.NewGuid(), GroupId = invite.GroupId, UserId = userId, Role = Role.Member
+            });
+        }
+        var joinedName = await _context.Users.Where(u => u.Id == userId).Select(u => u.DisplayName).FirstAsync(ct);
         invite.UsedCount++;
-        _context.ActivityLogs.Add(Log(userId, invite.GroupId, null, "GroupMember", userId, "Join", $"{userId} joined group {invite.GroupId}"));
+        _context.ActivityLogs.Add(Log(userId, invite.GroupId, null, "GroupMember", userId, "Join", $"{joinedName} đã tham gia nhóm '{invite.Group.Name}'"));
         await _context.SaveChangesAsync(ct);
 
         var leaders = await _context.GroupMembers
             .Where(m => m.GroupId == invite.GroupId && m.Role == Role.Leader && m.IsActive)
             .Select(m => m.UserId).ToListAsync(ct);
-        var joinedName = await _context.Users.Where(u => u.Id == userId).Select(u => u.DisplayName).FirstAsync(ct);
         foreach (var leaderId in leaders)
             await _notifications.NotifyAsync(leaderId, invite.GroupId, NotificationType.MemberJoined,
                 "Thành viên mới", $"{joinedName} đã tham gia nhóm '{invite.Group.Name}'", "Group", invite.GroupId, ct);
@@ -172,11 +193,21 @@ public class GroupService : IGroupService
 
     public async Task<List<MemberDto>> GetMembersAsync(Guid userId, Guid groupId, CancellationToken ct = default)
     {
-        await RequireMembershipAsync(userId, groupId, ct);
-        return await _context.GroupMembers
-            .Where(m => m.GroupId == groupId && m.IsActive)
-            .Select(m => new MemberDto(m.UserId, m.User.DisplayName, m.User.AvatarUrl, m.Role.ToString(), m.JoinedAt))
+        var membership = await RequireMembershipAsync(userId, groupId, ct);
+        var isLeader = membership.Role == Role.Leader;
+        var openTasks = await _context.Tasks
+            .Where(t => t.Project.GroupId == groupId && t.Project.ArchivedAt == null
+                && t.AssigneeUserId != null && t.Status != Domain.Enums.TaskStatus.Completed)
+            .Select(t => t.AssigneeUserId!.Value)
             .ToListAsync(ct);
+        var openCounts = openTasks.GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
+        var rows = await _context.GroupMembers
+            .Where(m => m.GroupId == groupId && m.IsActive)
+            .Select(m => new { m.UserId, m.User.DisplayName, m.User.AvatarUrl, m.Role, m.JoinedAt })
+            .ToListAsync(ct);
+        return rows.Select(m => new MemberDto(m.UserId, m.DisplayName, m.AvatarUrl, m.Role.ToString(), m.JoinedAt,
+                isLeader || m.UserId == userId ? (openCounts.ContainsKey(m.UserId) ? openCounts[m.UserId] : 0) : null))
+            .ToList();
     }
 
     public async Task RemoveMemberAsync(Guid userId, Guid groupId, Guid memberUserId, CancellationToken ct = default)
@@ -191,11 +222,48 @@ public class GroupService : IGroupService
             if (leaderCount <= 1) throw new BadRequestException("Cannot remove the only leader");
         }
         target.IsActive = false;
-        _context.ActivityLogs.Add(Log(userId, groupId, null, "GroupMember", memberUserId, "Remove", $"Removed member {memberUserId}"));
+        var memberName = await _context.Users.Where(u => u.Id == memberUserId).Select(u => u.DisplayName).FirstAsync(ct);
+        var count = await DeactivateMemberAsync(target, groupId, ct);
+        _context.ActivityLogs.Add(Log(userId, groupId, null, "GroupMember", memberUserId, "Remove",
+            $"{memberName} bị xóa khỏi nhóm{(count > 0 ? $"; {count} công việc chuyển về Chưa giao" : "")}"));
         await _context.SaveChangesAsync(ct);
 
         await _notifications.NotifyAsync(memberUserId, groupId, NotificationType.MemberRemoved,
             "Bạn đã bị xóa khỏi nhóm", $"Bạn không còn là thành viên của nhóm '{target.Group.Name}'", "Group", groupId, ct);
+        await NotifyLeadersAsync(userId, groupId,
+            $"{memberName} đã bị xóa khỏi nhóm{(count > 0 ? $"; {count} công việc chuyển về Chưa giao" : "")}", ct);
+    }
+
+    private async Task<int> DeactivateMemberAsync(GroupMember member, Guid groupId, CancellationToken ct)
+    {
+        var openTasks = await _context.Tasks
+            .Where(t => t.AssigneeUserId == member.UserId && t.Status != Domain.Enums.TaskStatus.Completed
+                && t.Project.GroupId == groupId && t.Project.ArchivedAt == null)
+            .ToListAsync(ct);
+        foreach (var t in openTasks) { t.AssigneeUserId = null; t.UpdatedAt = DateTime.UtcNow; }
+
+        var pending = await _context.MarketplaceRequests
+            .Where(r => r.GroupId == groupId && r.Status == MarketplaceRequestStatus.Pending
+                && (r.RequestedByUserId == member.UserId || r.TargetUserId == member.UserId))
+            .ToListAsync(ct);
+        foreach (var r in pending)
+        {
+            r.Status = MarketplaceRequestStatus.Cancelled;
+            r.ReviewedAt = DateTime.UtcNow;
+            r.ReviewComment = "Tự động hủy vì thành viên đã rời nhóm";
+        }
+        return openTasks.Count;
+    }
+
+    private async Task NotifyLeadersAsync(Guid actorId, Guid groupId, string message, CancellationToken ct)
+    {
+        var leaders = await _context.GroupMembers
+            .Where(m => m.GroupId == groupId && m.Role == Role.Leader && m.IsActive && m.UserId != actorId)
+            .Select(m => m.UserId).ToListAsync(ct);
+        var groupName = await _context.Groups.Where(g => g.Id == groupId).Select(g => g.Name).FirstAsync(ct);
+        foreach (var leaderId in leaders)
+            await _notifications.NotifyAsync(leaderId, groupId, NotificationType.MemberRemoved,
+                "Thành viên rời nhóm", $"{message} — nhóm '{groupName}'", "Group", groupId, ct);
     }
 
     public async Task ChangeMemberRoleAsync(Guid userId, Guid groupId, Guid memberUserId, Role newRole, CancellationToken ct = default)
@@ -211,7 +279,7 @@ public class GroupService : IGroupService
         }
         var before = target.Role;
         target.Role = newRole;
-        _context.ActivityLogs.Add(Log(userId, groupId, null, "GroupMember", memberUserId, "ChangeRole", $"Role {before} -> {newRole}"));
+        _context.ActivityLogs.Add(Log(userId, groupId, null, "GroupMember", memberUserId, "ChangeRole", $"{target.User.DisplayName} đổi vai trò {before} → {newRole}"));
         await _context.SaveChangesAsync(ct);
     }
 
@@ -224,8 +292,13 @@ public class GroupService : IGroupService
             if (leaderCount <= 1) throw new BadRequestException("The only leader must transfer leadership before leaving");
         }
         membership.IsActive = false;
-        _context.ActivityLogs.Add(Log(userId, groupId, null, "GroupMember", userId, "Leave", $"{userId} left group"));
+        var memberName = await _context.Users.Where(u => u.Id == userId).Select(u => u.DisplayName).FirstAsync(ct);
+        var count = await DeactivateMemberAsync(membership, groupId, ct);
+        _context.ActivityLogs.Add(Log(userId, groupId, null, "GroupMember", userId, "Leave",
+            $"{memberName} rời nhóm{(count > 0 ? $"; {count} công việc chuyển về Chưa giao" : "")}"));
         await _context.SaveChangesAsync(ct);
+        await NotifyLeadersAsync(userId, groupId,
+            $"{memberName} đã rời nhóm{(count > 0 ? $"; {count} công việc chuyển về Chưa giao" : "")}", ct);
     }
 
     public async Task<List<ActivityDto>> GetActivityAsync(Guid userId, Guid groupId, int take, CancellationToken ct = default)

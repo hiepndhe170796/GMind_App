@@ -47,7 +47,7 @@ public class ProjectService : IProjectService
         _context.Projects.Add(project);
         _context.ActivityLogs.Add(Log(userId, groupId, project.Id, "Project", project.Id, "Create", $"Created project '{project.Name}'"));
         await _context.SaveChangesAsync(ct);
-        return ToDto(project, 0, 0);
+        return ToDto(project, 0, 0, 0);
     }
 
     public async Task<List<ProjectDto>> ListByGroupAsync(Guid userId, Guid groupId, CancellationToken ct = default)
@@ -56,7 +56,10 @@ public class ProjectService : IProjectService
         return await _context.Projects
             .Where(p => p.GroupId == groupId && p.ArchivedAt == null)
             .Select(p => new ProjectDto(p.Id, p.GroupId, p.Name, p.Description, p.Subject,
-                p.DeadlineAt, p.Status.ToString(),
+                p.DeadlineAt, DeriveStatus(p.ArchivedAt != null,
+                    p.Tasks.Count(t => t.ParentTaskId == null),
+                    p.Tasks.Count(t => t.ParentTaskId == null && t.Status == TaskStatus.Completed),
+                    p.Tasks.Count(t => t.ParentTaskId == null && t.Status != TaskStatus.ToDo)),
                 p.Tasks.Count(t => t.ParentTaskId == null),
                 p.Tasks.Count(t => t.ParentTaskId == null && t.Status == TaskStatus.Completed),
                 p.CreatedAt))
@@ -70,7 +73,8 @@ public class ProjectService : IProjectService
         await RequireMemberAsync(userId, p.GroupId, ct);
         var total = await _context.Tasks.CountAsync(t => t.ProjectId == projectId && t.ParentTaskId == null, ct);
         var done = await _context.Tasks.CountAsync(t => t.ProjectId == projectId && t.ParentTaskId == null && t.Status == TaskStatus.Completed, ct);
-        return ToDto(p, total, done);
+        var started = await _context.Tasks.CountAsync(t => t.ProjectId == p.Id && t.ParentTaskId == null && t.Status != TaskStatus.ToDo, ct);
+        return ToDto(p, total, done, started);
     }
 
     public async Task<ProjectDto> UpdateAsync(Guid userId, Guid projectId, string name, string? description, string? subject, DateTime? deadlineAt, CancellationToken ct = default)
@@ -86,7 +90,8 @@ public class ProjectService : IProjectService
         await _context.SaveChangesAsync(ct);
         var total = await _context.Tasks.CountAsync(t => t.ProjectId == projectId && t.ParentTaskId == null, ct);
         var done = await _context.Tasks.CountAsync(t => t.ProjectId == projectId && t.ParentTaskId == null && t.Status == TaskStatus.Completed, ct);
-        return ToDto(p, total, done);
+        var started = await _context.Tasks.CountAsync(t => t.ProjectId == p.Id && t.ParentTaskId == null && t.Status != TaskStatus.ToDo, ct);
+        return ToDto(p, total, done, started);
     }
 
     public async Task ArchiveAsync(Guid userId, Guid projectId, CancellationToken ct = default)
@@ -106,8 +111,11 @@ public class ProjectService : IProjectService
     private async Task RequireLeaderAsync(Guid userId, Guid groupId, CancellationToken ct)
         => await _access.RequireLeaderAsync(userId, groupId, ct);
 
-    private static ProjectDto ToDto(Project p, int total, int done)
-        => new(p.Id, p.GroupId, p.Name, p.Description, p.Subject, p.DeadlineAt, p.Status.ToString(), total, done, p.CreatedAt);
+    private static string DeriveStatus(bool archived, int total, int done, int started)
+        => archived ? "Archived" : total == 0 ? "NotStarted" : total == done ? "Completed" : started > 0 ? "InProgress" : "NotStarted";
+
+    private static ProjectDto ToDto(Project p, int total, int done, int started)
+        => new(p.Id, p.GroupId, p.Name, p.Description, p.Subject, p.DeadlineAt, DeriveStatus(p.ArchivedAt != null, total, done, started), total, done, p.CreatedAt);
 
     private static ActivityLog Log(Guid actor, Guid groupId, Guid? projectId, string entityType, Guid? entityId, string action, string summary)
         => new() { Id = Guid.NewGuid(), ActorUserId = actor, GroupId = groupId, ProjectId = projectId, EntityType = entityType, EntityId = entityId, Action = action, Summary = summary };

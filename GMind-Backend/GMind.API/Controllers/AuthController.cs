@@ -2,6 +2,7 @@ using GMind.API.Common;
 using GMind.API.Models.Auth;
 using GMind.Application.Services.Auth;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GMind.API.Controllers;
@@ -18,6 +19,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>Đăng ký tài khoản mới.</summary>
+    [EnableRateLimiting("auth-login")]
     [HttpPost("register")]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -29,6 +31,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>Đăng nhập, trả về access token + refresh token.</summary>
+    [EnableRateLimiting("auth-login")]
     [HttpPost("login")]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -61,6 +64,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>Yêu cầu đặt lại mật khẩu (gửi token reset).</summary>
+    [EnableRateLimiting("auth-recovery")]
     [HttpPost("forgot-password")]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -71,6 +75,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>Đặt lại mật khẩu bằng token.</summary>
+    [EnableRateLimiting("auth-recovery")]
     [HttpPost("reset-password")]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
