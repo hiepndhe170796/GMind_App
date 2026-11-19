@@ -233,10 +233,10 @@ export default function Dashboard() {
 
   return (
     <MainLayout>
-      <div className="dashboard-surface space-y-6">
+      <div className="space-y-6">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-2xl font-bold text-slate-900 break-words">Chào {user?.displayName || 'bạn'},</h2>
+            <h2 className="text-title font-semibold text-ink break-words">Chào {user?.displayName || 'bạn'},</h2>
             <p className="mt-2 text-base text-slate-600">Theo dõi những công việc đang mở được giao cho bạn.</p>
           </div>
           <div className="flex flex-wrap gap-2">

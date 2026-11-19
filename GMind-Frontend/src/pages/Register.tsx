@@ -82,7 +82,7 @@ export default function Register() {
           </div>
         </fieldset>
         {error && <p role="alert" className="text-sm text-danger-700">{error}</p>}
-        <Button type="submit" className="auth-submit w-full" isLoading={loading}>{registered ? 'Thử đăng nhập lại' : 'Tạo tài khoản'}</Button>
+        <Button type="submit" size="lg" className="w-full" isLoading={loading}>{registered ? 'Thử đăng nhập lại' : 'Tạo tài khoản'}</Button>
       </form>
     </RegisterLayout>
   );

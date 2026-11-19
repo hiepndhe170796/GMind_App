@@ -1,5 +1,6 @@
 import type { InputHTMLAttributes } from 'react';
 import { forwardRef, useId } from 'react';
+import Icon from './Icon';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -20,7 +21,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label htmlFor={inputId} className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor={inputId} className="mb-1.5 block text-small font-semibold text-ink-secondary">
             {label}
           </label>
         )}
@@ -30,13 +31,15 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           id={inputId}
           aria-invalid={error ? true : invalid}
           aria-describedby={descriptions}
-          className={`w-full px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed ${error ? 'border-danger-500 focus:ring-danger-500' : ''} ${className}`}
+          className={`w-full px-3.5 bg-white text-ink ${className}`}
         />
         {hint && (
-          <p id={hintId} className="mt-2 text-sm text-slate-600">{hint}</p>
+          <p id={hintId} className="mt-1.5 text-small text-ink-muted">{hint}</p>
         )}
         {error && (
-          <p id={errorId} role="alert" className="mt-2 text-sm text-danger-700">{error}</p>
+          <p id={errorId} role="alert" className="mt-1.5 flex items-start gap-1.5 text-small text-danger-700">
+            <Icon name="alert" size={15} className="mt-0.5 shrink-0" />{error}
+          </p>
         )}
       </div>
     );

@@ -89,7 +89,7 @@ function PasswordForm({ sessionId }: { sessionId: string }) {
         <Button type="button" variant="secondary" disabled={busy} onClick={() => {
           setFields(EMPTY); setErrors({}); setError(''); setReset(v => v + 1);
         }}>Hủy</Button>
-        <Button type="submit" className="account-primary" isLoading={busy}>Đổi mật khẩu</Button>
+        <Button type="submit" isLoading={busy}>Đổi mật khẩu</Button>
       </div>
     </form>
   );

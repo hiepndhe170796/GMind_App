@@ -1,10 +1,5 @@
 /* Phase 4 redesign — continuous plane calendar workspace (R2) */
 .calendar-surface { @apply text-slate-700; }
-.calendar-surface input[type="search"], .calendar-surface input[type="month"], .calendar-surface select { @apply min-h-11 border-slate-500 text-base caret-primary-700; }
-.calendar-surface input::placeholder { @apply text-slate-500; }
-.calendar-surface input:focus, .calendar-surface select:focus { @apply border-primary-600 ring-primary-600; }
-.calendar-surface :focus-visible { @apply outline-primary-700; }
-.calendar-surface ::selection { @apply bg-primary-100 text-primary-900; }
 .calendar-surface .cal-count { @apply tabular-nums; }
 
 /* Compact controls keep the calendar, rather than form chrome, in view. */
@@ -40,7 +35,6 @@
 .calendar-surface .gcal-cell[data-outside] { @apply bg-slate-50/70; }
 .calendar-surface .gcal-cell[data-outside] .gcal-date-pill { @apply text-slate-500; }
 .calendar-surface .gcal-cell[data-weekend] { @apply bg-slate-50/40; }
-.calendar-surface .gcal-cell[data-selected] { @apply bg-primary-50; box-shadow: inset 0 0 0 1px theme('colors.primary.500'); }
 
 /* full-cell background button (interactive only via foreground) */
 .calendar-surface .gcal-day-btn { @apply absolute inset-0 w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-600; }
@@ -48,7 +42,6 @@
   @apply absolute left-1 top-1 flex h-7 w-7 items-center justify-center rounded-full text-sm tabular-nums text-slate-700;
 }
 .calendar-surface .gcal-cell[data-today] .gcal-date-pill { @apply bg-primary-600 font-bold text-white; }
-.calendar-surface .gcal-cell[data-selected]:not([data-today]) .gcal-date-pill { @apply text-primary-700 ring-2 ring-primary-500; }
 
 /* foreground events: above bg button, pointer-events on links only */
 .calendar-surface .gcal-events { @apply absolute inset-x-0 bottom-0 top-[32px] hidden flex-col gap-0.5 px-0.5 pb-0.5 pointer-events-none; }

@@ -7,7 +7,6 @@ import Icon from '../components/ui/Icon';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import ResponsiveFilters from '../components/ui/ResponsiveFilters';
-import '../components/tasks/tasks.css';
 import { dashboardService, type MyTaskDto } from '../services/dashboard';
 import { authService } from '../services/auth';
 import { formatDate, formatDateTime, STATUS_LABEL, PRIORITY_LABEL } from '../utils/presentation';
@@ -104,10 +103,10 @@ export default function MyTasks() {
 
   return (
     <MainLayout>
-      <div className="task-surface space-y-6">
+      <div className="space-y-6">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-2xl font-bold text-slate-900">Việc của tôi</h2>
+            <h2 className="text-title font-semibold text-ink">Việc của tôi</h2>
             <p className="mt-2 text-base text-slate-600">Những công việc đang mở được giao cho bạn.</p>
           </div>
           <Button variant="secondary" className="min-h-11" onClick={() => setAttempt(a => a + 1)} disabled={state.loading}>Làm mới</Button>

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout';
-import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import { authService } from '../services/auth';
@@ -32,10 +31,10 @@ export default function ForgotPassword() {
 
   return (
     <AuthLayout>
-      <Card className="p-6 sm:p-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Quên mật khẩu</h1>
-          <p className="mt-2 text-base text-slate-600">Nhập email đã dùng để đăng ký GMind.</p>
+      <>
+        <div className="mb-8">
+          <h1 className="text-display font-bold text-ink">Quên mật khẩu</h1>
+          <p className="mt-2 text-body text-ink-secondary">Nhập email đã dùng để đăng ký GMind.</p>
         </div>
         {sent ? (
           <div>
@@ -57,13 +56,13 @@ export default function ForgotPassword() {
               onChange={e => { setEmail(e.target.value); if (fieldErrors.email) setFieldErrors({}); if (error) setError(''); }}
               error={fieldErrors.email} />
             {error && <p role="alert" className="text-sm text-danger-700">{error}</p>}
-            <Button type="submit" className="auth-submit w-full" isLoading={loading}>Gửi hướng dẫn đặt lại</Button>
+            <Button type="submit" size="lg" className="w-full" isLoading={loading}>Gửi hướng dẫn đặt lại</Button>
           </form>
         )}
-        <div className="mt-6 border-t border-slate-200 pt-5 text-center text-sm text-slate-600">
+        <div className="mt-8 border-t border-line pt-6 text-center text-small text-ink-secondary">
           <Link to="/login" className="text-primary-700 font-medium hover:underline">Về đăng nhập</Link>
         </div>
-      </Card>
+      </>
     </AuthLayout>
   );
 }

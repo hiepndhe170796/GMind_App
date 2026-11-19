@@ -70,7 +70,7 @@ export default function Login() {
           </div>
         </fieldset>
         {error && <p role="alert" className="text-sm text-danger-700">{error}</p>}
-        <Button type="submit" className="auth-submit w-full" isLoading={loading}>Đăng nhập</Button>
+        <Button type="submit" size="lg" className="w-full" isLoading={loading}>Đăng nhập</Button>
       </form>
     </LoginLayout>
   );

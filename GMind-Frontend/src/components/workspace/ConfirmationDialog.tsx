@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 export default function ConfirmationDialog({ open, title, children, onClose, busy }: {
   open: boolean; title: string; children: ReactNode; onClose: () => void; busy?: boolean;
@@ -42,12 +43,13 @@ function DialogShell({ title, children, busyRef, onCloseRef }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <dialog ref={ref} aria-labelledby={titleId} className="bg-white">
+  return createPortal(
+    <dialog ref={ref} aria-labelledby={titleId} className="app-surface w-[26rem] max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] rounded-3xl border border-line bg-white p-0 shadow-overlay backdrop:bg-ink/40 motion-safe:animate-dialog-in">
       <div className="p-5 sm:p-6 overflow-y-auto max-h-[calc(100dvh-2rem)]">
-        <h3 id={titleId} className="text-lg font-semibold text-slate-900">{title}</h3>
-        <div className="mt-3 text-sm text-slate-700">{children}</div>
+        <h3 id={titleId} className="text-section font-semibold text-ink">{title}</h3>
+        <div className="mt-3 text-body text-ink-secondary">{children}</div>
       </div>
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }

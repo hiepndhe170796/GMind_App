@@ -6,7 +6,6 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Icon from '../components/ui/Icon';
-import '../components/workspace/workspace.css';
 import { Breadcrumb, Skeleton, ErrorState } from '../components/workspace/WorkspaceUI';
 import { errMsg, status, initials } from '../components/workspace/utils';
 import ConfirmationDialog from '../components/workspace/ConfirmationDialog';
@@ -222,9 +221,9 @@ function ProjectWorkspace({ id, userId }: { id: string; userId: string }) {
   const actions = (t: TaskSummaryDto) => (
     <span className="flex gap-2 flex-wrap">
       {t.status === 'ToDo' && t.assigneeUserId === userId && (
-        <Button size="sm" className="workspace-primary min-h-9" disabled={busy} isLoading={pending === `status-${t.id}`} onClick={() => changeStatus(t, TaskStatus.InProgress)}>Bắt đầu</Button>)}
+        <Button size="sm" className="min-h-9" disabled={busy} isLoading={pending === `status-${t.id}`} onClick={() => changeStatus(t, TaskStatus.InProgress)}>Bắt đầu</Button>)}
       {t.status === 'InProgress' && t.assigneeUserId === userId && (
-        <Button size="sm" className="workspace-primary min-h-9" disabled={busy} isLoading={pending === `status-${t.id}`} onClick={() => changeStatus(t, TaskStatus.Submitted)}>Nộp để duyệt</Button>)}
+        <Button size="sm" className="min-h-9" disabled={busy} isLoading={pending === `status-${t.id}`} onClick={() => changeStatus(t, TaskStatus.Submitted)}>Nộp để duyệt</Button>)}
       {t.status === 'Submitted' && t.canReview && (
         <Link to={`/tasks/${t.id}`} state={navState} className="inline-flex min-h-9 items-center rounded-lg bg-primary-600 px-3 text-sm font-medium text-white hover:bg-primary-700">Xem và duyệt</Link>)}
       {t.status === 'Submitted' && isLeader && !t.canReview && (
@@ -248,7 +247,7 @@ function ProjectWorkspace({ id, userId }: { id: string; userId: string }) {
   const projectOverdue = project?.deadlineAt && project.status !== 'Completed' && timestamp(project.deadlineAt).getTime() < now;
 
   return (
-    <div className="workspace-surface space-y-6">
+    <div className="space-y-6">
       {loading ? <Skeleton label="Đang tải dự án…" />
         : fatalError || !project ? <ErrorState message={fatalError || 'Không tìm thấy dự án.'} onRetry={() => void reload(false)} backTo="/groups" backLabel="Về nhóm của tôi" />
         : (
@@ -256,7 +255,7 @@ function ProjectWorkspace({ id, userId }: { id: string; userId: string }) {
             <Breadcrumb items={[{ label: 'Nhóm của tôi', to: '/groups' }, { label: ws!.groupName, to: `/groups/${project.groupId}` }, { label: project.name }]} />
             <header className="flex flex-wrap items-start justify-between gap-3 min-w-0">
               <div className="min-w-0">
-                <h2 className="text-2xl font-bold text-slate-900 [overflow-wrap:anywhere]">{project.name}</h2>
+                <h2 className="text-title font-semibold text-ink [overflow-wrap:anywhere]">{project.name}</h2>
                 {project.subject && <p className="mt-0.5 text-sm text-slate-600">Môn: {project.subject}</p>}
                 {project.description && <p className="mt-1 max-w-[65ch] text-base text-slate-600 [overflow-wrap:anywhere]">{project.description}</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
@@ -268,7 +267,7 @@ function ProjectWorkspace({ id, userId }: { id: string; userId: string }) {
               {isLeader && (
                 <div className="flex flex-wrap gap-2">
                   <Button variant="secondary" className="min-h-11" disabled={busy} onClick={() => { setEditForm({ name: project.name, description: project.description ?? '', subject: project.subject ?? '', deadline: project.deadlineAt ? dayKey(project.deadlineAt) : '' }); setEditError(''); setEditOpen(v => !v); }}>Sửa dự án</Button>
-                  <Button variant="secondary" className="min-h-11 text-danger-700" disabled={busy} onClick={() => setConfirm('archive')}>Lưu trữ</Button>
+                  <Button variant="danger" className="min-h-11" disabled={busy} onClick={() => setConfirm('archive')}>Lưu trữ</Button>
                 </div>
               )}
             </header>
@@ -289,7 +288,7 @@ function ProjectWorkspace({ id, userId }: { id: string; userId: string }) {
                   <Input id="pe-subject" label="Môn học" maxLength={100} value={editForm.subject} disabled={busy} onChange={e => setEditForm(x => ({ ...x, subject: e.target.value }))} />
                   <Input id="pe-deadline" label="Hạn" type="date" value={editForm.deadline} disabled={busy} onChange={e => setEditForm(x => ({ ...x, deadline: e.target.value }))} />
                   <Input id="pe-desc" label="Mô tả" maxLength={2000} value={editForm.description} disabled={busy} onChange={e => setEditForm(x => ({ ...x, description: e.target.value }))} />
-                  <Button type="submit" className="workspace-primary min-h-11 sm:w-auto" disabled={busy} isLoading={pending === 'edit'}>Lưu</Button>
+                  <Button type="submit" className="min-h-11 sm:w-auto" disabled={busy} isLoading={pending === 'edit'}>Lưu</Button>
                 </form>
               </Card>
             )}
@@ -331,7 +330,7 @@ function ProjectWorkspace({ id, userId }: { id: string; userId: string }) {
                 <button className="min-h-9 text-primary-700 font-medium hover:underline" onClick={() => { setQ(''); updateFilters({ q: null, status: null, assignee: null, priority: null }); }}>Xóa lọc</button>
               )}
               {isLeader && !formOpen && (
-                <Button className="workspace-primary min-h-11 gap-1" disabled={busy} onClick={() => setFormOpen(true)}>
+                <Button className="min-h-11 gap-1" disabled={busy} onClick={() => setFormOpen(true)}>
                   <Icon name="plus" size={15} />Thêm công việc</Button>
               )}
             </div>
@@ -364,7 +363,7 @@ function ProjectWorkspace({ id, userId }: { id: string; userId: string }) {
                   {formError && !(formError.includes('Tên') || formError.includes('tên')) && (
                     <p role="alert" className="sm:col-span-2 text-sm text-danger-700 [overflow-wrap:anywhere]">{formError}</p>)}
                   <div className="flex gap-2 sm:col-span-2">
-                    <Button type="submit" className="workspace-primary min-h-11" disabled={busy} isLoading={pending === 'create'}>Thêm công việc</Button>
+                    <Button type="submit" className="min-h-11" disabled={busy} isLoading={pending === 'create'}>Thêm công việc</Button>
                     <Button type="button" variant="secondary" className="min-h-11" disabled={busy} onClick={() => setFormOpen(false)}>Hủy</Button>
                   </div>
                 </form>
@@ -466,7 +465,7 @@ function ProjectWorkspace({ id, userId }: { id: string; userId: string }) {
             <ConfirmationDialog open={confirm === 'archive'} busy={busy} onClose={() => { if (!busy) setConfirm(null); }} title="Lưu trữ dự án">
               <p>Lưu trữ dự án "{project.name}"? Dự án sẽ không còn nhận công việc mới.</p>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button variant="secondary" className="min-h-11 text-danger-700" disabled={busy} isLoading={pending === 'archive'} onClick={archive}>Lưu trữ</Button>
+                <Button variant="danger" className="min-h-11" disabled={busy} isLoading={pending === 'archive'} onClick={archive}>Lưu trữ</Button>
                 <Button variant="secondary" className="min-h-11" disabled={busy} onClick={() => setConfirm(null)}>Hủy</Button>
               </div>
             </ConfirmationDialog>

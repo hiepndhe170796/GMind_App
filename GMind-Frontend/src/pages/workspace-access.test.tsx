@@ -266,7 +266,7 @@ describe('TaskDetail mutations', () => {
     task: { ...detailTask, ...over } as TaskDetailDto,
     comments: [], links: [], reviews: [], myRole,
   });
-  const header = () => document.querySelector('.task-surface header')!;
+  const header = () => document.querySelector('header')!;
 
   it.each([
     ['ToDo', 'InProgress', 2, 'Bắt đầu làm', 'Đang làm'],

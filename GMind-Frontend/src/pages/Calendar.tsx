@@ -173,7 +173,7 @@ function CalendarWorkspace() {
   return (
     <div className="calendar-surface space-y-4">
       <header className="gcal-page-header">
-        <h2 className="text-2xl font-bold text-slate-900">Lịch công việc</h2>
+        <h2 className="text-title font-semibold text-ink">Lịch công việc</h2>
         <Button variant="secondary" className="min-h-11 whitespace-nowrap" disabled={busy} isLoading={refreshing}
           onClick={() => { if (!refreshingRef.current) void reload(true); }}>Làm mới</Button>
         <p className="gcal-page-description">Hạn công việc được giao cho bạn. Giờ Việt Nam (UTC+7).</p>
@@ -250,7 +250,7 @@ function CalendarWorkspace() {
               <div className={`gcal-section grid grid-cols-1 ${showMonthAgenda ? 'xl:grid-cols-[minmax(0,1fr)_280px]' : ''}`}>
                 <div className="min-w-0">
                   {model.open.length === 0 && model.undated.length === 0 ? (
-                    <div className="p-6"><EmptyState title="Chưa có công việc nào" body="Khi được giao công việc có hạn, nó sẽ xuất hiện ở đây."
+                    <div className="p-6"><EmptyState illustration="calendar" title="Chưa có công việc nào" body="Khi được giao công việc có hạn, nó sẽ xuất hiện ở đây."
                       action={<Link to="/my-tasks" className="min-h-11 inline-flex items-center text-primary-700 font-medium hover:underline">Về Việc của tôi</Link>} /></div>
                   ) : filters.view === 'month' ? (
                     <CalendarMonth month={filters.month} selected={selectedDay} today={today} byDate={model.byDate}

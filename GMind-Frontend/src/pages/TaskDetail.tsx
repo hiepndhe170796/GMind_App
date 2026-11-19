@@ -6,7 +6,6 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Icon from '../components/ui/Icon';
-import '../components/tasks/tasks.css';
 import { tasksService, TaskStatus, hasTaskDetails, type TaskDetailDto, type CommentDto, type LinkDto } from '../services/tasks';
 import { loadTaskWorkspace } from '../services/workspace';
 import { authService } from '../services/auth';
@@ -240,7 +239,7 @@ function TaskWorkspace({ id, userId }: { id: string; userId: string }) {
   const time = task ? deadlineTime(task.deadlineAt) : null;
   const isOverdue = time !== null && time < now && task?.status !== 'Completed';
   const statusBtn = (target: number, label: string, extra = '') => (
-    <Button key={target} className={`task-primary min-h-11 ${extra}`} disabled={busy}
+    <Button key={target} className={`min-h-11 ${extra}`} disabled={busy}
       isLoading={pendingStatus === target && pending === 'status'} onClick={() => postStatus(target)}>{label}</Button>
   );
 
@@ -274,10 +273,10 @@ function TaskWorkspace({ id, userId }: { id: string; userId: string }) {
             <p id="review-note-hint" className="text-xs text-slate-600">Bắt buộc khi trả về sửa; tối đa 2.000 ký tự.</p>
             {actionErrors.review && <p id="review-note-error" role="alert" className="text-sm text-danger-700 [overflow-wrap:anywhere]">{actionErrors.review}</p>}
             <div className="flex gap-2 flex-wrap">
-              <Button className="task-primary min-h-11" disabled={busy}
+              <Button className="min-h-11" disabled={busy}
                 isLoading={pendingStatus === TaskStatus.Completed && pending === 'status'}
                 onClick={() => submitReview(TaskStatus.Completed)}>Duyệt hoàn thành</Button>
-              <Button variant="secondary" className="min-h-11 text-danger-700" disabled={busy}
+              <Button variant="danger" className="min-h-11" disabled={busy}
                 isLoading={pendingStatus === TaskStatus.ChangesRequested && pending === 'status'}
                 onClick={() => submitReview(TaskStatus.ChangesRequested)}>Trả về sửa</Button>
             </div>
@@ -345,7 +344,7 @@ function TaskWorkspace({ id, userId }: { id: string; userId: string }) {
   ) : null;
 
   return (
-    <div className="task-surface space-y-6">
+    <div className="space-y-6">
       <nav aria-label="Điều hướng công việc" className="flex flex-wrap items-center justify-between gap-2">
         <Link to={backTo.to} className="inline-flex min-h-9 items-center gap-1 text-sm text-primary-700 font-medium hover:underline">
           <Icon name="chevron-left" size={16} />{backTo.label}
@@ -375,7 +374,7 @@ function TaskWorkspace({ id, userId }: { id: string; userId: string }) {
 
       {!loading && (fatalError || !task) && (
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Không thể tải công việc</h2>
+          <h2 className="text-title font-semibold text-ink">Không thể tải công việc</h2>
           <p role="alert" className="text-sm text-danger-700 [overflow-wrap:anywhere]">{fatalError || 'Không tìm thấy công việc.'}</p>
           <Button variant="secondary" className="mt-3" onClick={() => void reload(false)}>Thử lại</Button>
         </div>
@@ -384,7 +383,7 @@ function TaskWorkspace({ id, userId }: { id: string; userId: string }) {
       {!loading && task && (
         <>
           <header className="min-w-0">
-            <h2 className="text-2xl font-bold text-slate-900 [overflow-wrap:anywhere]">{task.title}</h2>
+            <h2 className="text-title font-semibold text-ink [overflow-wrap:anywhere]">{task.title}</h2>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <Badge value={task.status} className={task.status === 'ChangesRequested' ? '!text-danger-700' : ''}>{STATUS_LABEL[task.status] ?? task.status}</Badge>
               <Badge value={task.priority} className={task.priority === 'Urgent' ? '!text-danger-700' : ''}>{PRIORITY_LABEL[task.priority] ?? task.priority}</Badge>
@@ -466,7 +465,7 @@ function TaskWorkspace({ id, userId }: { id: string; userId: string }) {
                       onKeyDown={onCommentKey} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-base focus:outline-none focus:ring-2" />
                     <p id="task-comment-hint" className="mt-1 text-xs text-slate-600">Tối đa 2.000 ký tự. Ctrl + Enter để gửi.</p>
                     {actionErrors.comment && <p id="task-comment-error" role="alert" className="mt-1 text-sm text-danger-700 [overflow-wrap:anywhere]">{actionErrors.comment}</p>}
-                    <Button type="submit" className="task-primary mt-3 min-h-11" disabled={busy} isLoading={pending === 'comment'}>Gửi</Button>
+                    <Button type="submit" className="mt-3 min-h-11" disabled={busy} isLoading={pending === 'comment'}>Gửi</Button>
                   </form>
                   {workspace!.comments.length === 0 ? (
                     <p className="mt-4 text-sm text-slate-600">Chưa có bình luận. Hãy trao đổi về công việc tại đây.</p>

@@ -4,7 +4,6 @@ import MainLayout from '../layouts/MainLayout';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
-import '../components/workspace/workspace.css';
 import { Breadcrumb, Skeleton, ErrorState, EmptyState } from '../components/workspace/WorkspaceUI';
 import { errMsg, status } from '../components/workspace/utils';
 import ConfirmationDialog from '../components/workspace/ConfirmationDialog';
@@ -190,7 +189,7 @@ function MarketplaceWorkspace({ groupId, userId }: { groupId: string; userId: st
   const taskLinkOf = () => ({ navigationSection: '/groups' });
 
   return (
-    <div className="workspace-surface space-y-6">
+    <div className="space-y-6">
       {loading ? <Skeleton label="Đang tải marketplace…" />
         : fatalError || !group ? <ErrorState message={fatalError || 'Không tải được marketplace.'} onRetry={() => void reload(false)} backTo="/groups" backLabel="Về nhóm của tôi" />
         : (
@@ -198,10 +197,10 @@ function MarketplaceWorkspace({ groupId, userId }: { groupId: string; userId: st
             <Breadcrumb items={[{ label: 'Nhóm của tôi', to: '/groups' }, { label: group.name, to: `/groups/${groupId}` }, { label: 'Marketplace' }]} />
             <header className="flex flex-wrap items-end justify-between gap-4">
               <div className="min-w-0">
-                <h2 className="text-2xl font-bold text-slate-900">Marketplace</h2>
+                <h2 className="text-title font-semibold text-ink">Marketplace</h2>
                 <p className="mt-2 text-base text-slate-600">Yêu cầu hỗ trợ, chuyển giao hoặc đổi công việc — chỉ có hiệu lực sau khi Leader duyệt.</p>
               </div>
-              <Button className="workspace-primary min-h-11" disabled={busy || !!tasksError} onClick={() => setFormOpen(v => !v)}>
+              <Button className="min-h-11" disabled={busy || !!tasksError} onClick={() => setFormOpen(v => !v)}>
                 {formOpen ? 'Đóng biểu mẫu' : 'Tạo yêu cầu'}
               </Button>
             </header>
@@ -256,7 +255,7 @@ function MarketplaceWorkspace({ groupId, userId }: { groupId: string; userId: st
                   {filtered.length ? `${filtered.length} yêu cầu` : '0 yêu cầu phù hợp'} · hiển thị tối đa 100 yêu cầu gần nhất
                 </p>
                 {pageItems.length === 0 ? (
-                  <Card className="p-4 sm:p-6"><EmptyState title="Không có yêu cầu nào" body={requests.length === 0 ? 'Chưa có yêu cầu nào trong nhóm.' : 'Thử đổi bộ lọc.'} /></Card>
+                  <Card className="p-4 sm:p-6"><EmptyState illustration="handoff" title="Không có yêu cầu nào" body={requests.length === 0 ? 'Chưa có yêu cầu nào trong nhóm.' : 'Thử đổi bộ lọc.'} /></Card>
                 ) : (
                   <ul className="space-y-3">
                     {pageItems.map(r => (
@@ -282,8 +281,8 @@ function MarketplaceWorkspace({ groupId, userId }: { groupId: string; userId: st
                             <div className="flex shrink-0 flex-wrap gap-2">
                               {r.status === 'Pending' && r.canReview && (
                                 <>
-                                  <Button size="sm" className="workspace-primary min-h-9" disabled={busy} onClick={() => setDialog({ kind: 'approve', req: r })}>Duyệt</Button>
-                                  <Button size="sm" variant="secondary" className="min-h-9 text-danger-700" disabled={busy}
+                                  <Button size="sm" className="min-h-9" disabled={busy} onClick={() => setDialog({ kind: 'approve', req: r })}>Duyệt</Button>
+                                  <Button size="sm" variant="danger" className="min-h-9" disabled={busy}
                                     onClick={() => { setDialog({ kind: 'reject', req: r }); setRejectNote(''); setRejectError(''); }}>Từ chối</Button>
                                 </>
                               )}
@@ -365,7 +364,7 @@ function MarketplaceWorkspace({ groupId, userId }: { groupId: string; userId: st
                         <p className="mt-1 text-xs text-slate-600">Bắt buộc, tối đa 1.000 ký tự.</p>
                       </div>
                       {formError && <p role="alert" className="text-sm text-danger-700 [overflow-wrap:anywhere]">{formError}</p>}
-                      <Button type="submit" className="workspace-primary min-h-11 w-full" disabled={busy || !!tasksError || myTasks.length === 0} isLoading={pending === 'create'}>Gửi yêu cầu</Button>
+                      <Button type="submit" className="min-h-11 w-full" disabled={busy || !!tasksError || myTasks.length === 0} isLoading={pending === 'create'}>Gửi yêu cầu</Button>
                     </form>
                   </Card>
                 </aside>
@@ -385,7 +384,7 @@ function MarketplaceWorkspace({ groupId, userId }: { groupId: string; userId: st
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-base focus:outline-none focus:ring-2" />
                   {rejectError && <p id="reject-note-error" role="alert" className="mt-1 text-sm text-danger-700">{rejectError}</p>}
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <Button variant="secondary" className="min-h-11 text-danger-700" disabled={busy} isLoading={pending?.startsWith('r-')} onClick={confirmReject}>Từ chối</Button>
+                    <Button variant="danger" className="min-h-11" disabled={busy} isLoading={pending?.startsWith('r-')} onClick={confirmReject}>Từ chối</Button>
                     <Button variant="secondary" className="min-h-11" disabled={busy} onClick={() => setDialog(null)}>Đóng</Button>
                   </div>
                 </>
@@ -399,7 +398,7 @@ function MarketplaceWorkspace({ groupId, userId }: { groupId: string; userId: st
                       : <p>Duyệt đổi "{dialog.req.taskTitle}" của {dialog.req.requestedByName} với "{dialog.req.relatedTaskTitle}" của {dialog.req.targetName}?</p>}
                   {actionError && <p role="alert" className="mt-3 text-sm text-danger-700 [overflow-wrap:anywhere]">{actionError}</p>}
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <Button className="workspace-primary min-h-11" disabled={busy} isLoading={pending?.startsWith('a-')} onClick={approve}>Duyệt</Button>
+                    <Button className="min-h-11" disabled={busy} isLoading={pending?.startsWith('a-')} onClick={approve}>Duyệt</Button>
                     <Button variant="secondary" className="min-h-11" disabled={busy} onClick={() => setDialog(null)}>Đóng</Button>
                   </div>
                 </>
@@ -409,7 +408,7 @@ function MarketplaceWorkspace({ groupId, userId }: { groupId: string; userId: st
                   <p>Hủy yêu cầu "{dialog.req.taskTitle}"? Hệ thống sẽ xóa yêu cầu đang chờ này.</p>
                   {actionError && <p role="alert" className="mt-3 text-sm text-danger-700 [overflow-wrap:anywhere]">{actionError}</p>}
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <Button variant="secondary" className="min-h-11 text-danger-700" disabled={busy} isLoading={pending?.startsWith('c-')} onClick={confirmCancel}>Hủy yêu cầu</Button>
+                    <Button variant="danger" className="min-h-11" disabled={busy} isLoading={pending?.startsWith('c-')} onClick={confirmCancel}>Hủy yêu cầu</Button>
                     <Button variant="secondary" className="min-h-11" disabled={busy} onClick={() => setDialog(null)}>Đóng</Button>
                   </div>
                 </>

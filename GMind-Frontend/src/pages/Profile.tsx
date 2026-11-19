@@ -80,7 +80,7 @@ function ProfileForm({ session }: { session: SessionRecord }) {
           <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
             <Button type="button" variant="secondary" disabled={!dirty || busy}
               onClick={() => { setName(me.displayName); setUrl(me.avatarUrl ?? ''); setErrors({}); setError(''); setOk(''); }}>Hủy</Button>
-            <Button type="submit" className="account-primary" disabled={!dirty} isLoading={busy}>Lưu thay đổi</Button>
+            <Button type="submit" disabled={!dirty} isLoading={busy}>Lưu thay đổi</Button>
           </div>
         </form>
     </>

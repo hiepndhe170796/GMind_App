@@ -26,7 +26,7 @@ const locBox: { loc: ReturnType<typeof useLocation> | null } = { loc: null };
 const Probe = () => { const l = useLocation(); useEffect(() => { locBox.loc = l; }, [l]); return null; };
 const loc = () => locBox.loc!;
 const TaskProbe = () => { const n = useNavigate(); return <button onClick={() => n(-1)}>TASK_BACK</button>; };
-const listSection = () => within(document.querySelector('.task-surface ul')!);
+const listSection = () => within(document.querySelector('.space-y-6 ul')!);
 
 const renderTasks = (entry = '/my-tasks') => render(
   <MemoryRouter initialEntries={[entry]}>

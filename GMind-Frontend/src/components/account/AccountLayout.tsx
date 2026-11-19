@@ -1,15 +1,14 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
-import './account.css';
 
 export default function AccountLayout({ page, children }: { page: 'profile' | 'settings'; children: ReactNode }) {
   const profile = page === 'profile';
   return (
     <MainLayout>
-      <div className="account-surface mx-auto w-full max-w-4xl">
+      <div className="mx-auto w-full max-w-4xl">
         <header className="mb-5">
-          <h2 className="text-2xl font-bold text-slate-900">{profile ? 'Hồ sơ' : 'Cài đặt'}</h2>
+          <h2 className="text-title font-semibold text-ink">{profile ? 'Hồ sơ' : 'Cài đặt'}</h2>
           <p className="mt-1 text-sm text-slate-600">{profile ? 'Thông tin giúp mọi người nhận ra bạn trong GMind.' : 'Quản lý mật khẩu và bảo vệ tài khoản của bạn.'}</p>
         </header>
         <nav aria-label="Tài khoản" className="mb-5 flex gap-2 border-b border-slate-200">

@@ -7,13 +7,10 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 
 const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ className = '', variant = 'default', children, ...props }, ref) => {
-    const variantStyles = {
-      default: 'bg-white border border-[#e7ecf4]',
-      outlined: 'bg-white border border-[#e7ecf4]',
-      elevated: 'bg-white border border-[#e7ecf4] shadow-card',
-    };
+    const hasPadding = /(^|\s)([a-z0-9]+:)?p[xytrbl]?-(\d|\[)/.test(className);
+    const elevated = variant === 'elevated' ? ' shadow-raised' : '';
     return (
-      <div ref={ref} className={`rounded-2xl p-6 ${variantStyles[variant]} ${className}`} {...props}>
+      <div ref={ref} className={`rounded-2xl bg-white border border-line${elevated}${hasPadding ? '' : ' p-4 sm:p-5'} ${className}`} {...props}>
         {children}
       </div>
     );

@@ -1,32 +1,40 @@
 import type { ButtonHTMLAttributes } from 'react';
 import { forwardRef } from 'react';
 
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'accent' | 'danger';
+export type ButtonSize = 'sm' | 'md' | 'lg';
+
+const variantStyles: Record<ButtonVariant, string> = {
+  primary: 'bg-primary-600 text-white hover:bg-primary-700',
+  secondary: 'bg-white text-ink border border-line-strong hover:bg-surface-subtle',
+  ghost: 'text-primary-700 hover:bg-primary-50',
+  accent: 'bg-accent-600 text-white hover:bg-accent-700',
+  danger: 'bg-white text-danger-700 border border-danger-100 hover:bg-danger-50',
+};
+const sizeStyles: Record<ButtonSize, string> = {
+  sm: 'min-h-9 px-3 text-sm',
+  md: 'min-h-11 px-4 text-sm',
+  lg: 'min-h-12 px-6 text-base',
+};
+const baseStyles = 'inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-[color,background-color,border-color,transform] duration-150 ease-out active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-y-0';
+
+// eslint-disable-next-line react/only-export-components -- shared by Button and Link-as-button call sites
+export function buttonClasses({ variant = 'primary', size = 'md', className = '' }: { variant?: ButtonVariant; size?: ButtonSize; className?: string } = {}): string {
+  return `${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`;
+}
+
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   isLoading?: boolean;
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className = '', variant = 'primary', size = 'md', isLoading = false, disabled, children, ...props }, ref) => {
-    const baseStyles = 'inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
-    const variantStyles = {
-      primary: 'bg-primary-500 text-white hover:bg-primary-600',
-      secondary: 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50',
-      success: 'bg-success-50 text-success-700 border border-success-100 hover:bg-success-100',
-      warning: 'bg-warning-50 text-warning-700 border border-warning-100 hover:bg-warning-100',
-      danger: 'bg-danger-50 text-danger-600 border border-danger-100 hover:bg-danger-100',
-      ghost: 'bg-transparent text-slate-600 hover:bg-slate-100',
-    };
-    const sizeStyles = {
-      sm: 'px-3 py-1.5 text-sm',
-      md: 'px-4 py-2.5 text-sm',
-      lg: 'px-6 py-3 text-base',
-    };
     return (
       <button
         ref={ref}
-        className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+        className={buttonClasses({ variant, size, className })}
         disabled={disabled || isLoading}
         {...props}
       >

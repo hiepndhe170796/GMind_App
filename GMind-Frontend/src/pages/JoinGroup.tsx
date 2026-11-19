@@ -4,7 +4,6 @@ import MainLayout from '../layouts/MainLayout';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Card from '../components/ui/Card';
-import '../components/workspace/workspace.css';
 import { Breadcrumb } from '../components/workspace/WorkspaceUI';
 import { errMsg } from '../components/workspace/utils';
 import { groupsService } from '../services/groups';
@@ -67,10 +66,10 @@ export default function JoinGroup() {
 
   return (
     <MainLayout>
-      <div className="workspace-surface space-y-6">
+      <div className="space-y-6">
         <Breadcrumb items={[{ label: 'Nhóm của tôi', to: '/groups' }, { label: 'Tạo hoặc tham gia' }]} />
         <header>
-          <h2 className="text-2xl font-bold text-slate-900">Tạo hoặc tham gia nhóm</h2>
+          <h2 className="text-title font-semibold text-ink">Tạo hoặc tham gia nhóm</h2>
           <p className="mt-2 text-base text-slate-600">Tạo nhóm mới để làm Trưởng nhóm, hoặc nhập mã mời để tham gia với vai trò Thành viên.</p>
         </header>
         <div className="grid gap-6 lg:grid-cols-2">
@@ -88,7 +87,7 @@ export default function JoinGroup() {
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-base focus:outline-none focus:ring-2" />
                 {errors.description && <p id="create-desc-error" role="alert" className="mt-1 text-sm text-danger-700">{errors.description}</p>}
               </div>
-              <Button type="submit" className="workspace-primary min-h-11" disabled={busy} isLoading={pending === 'create'}>Tạo nhóm</Button>
+              <Button type="submit" className="min-h-11" disabled={busy} isLoading={pending === 'create'}>Tạo nhóm</Button>
             </form>
           </Card>
           <Card className="p-4 sm:p-6">

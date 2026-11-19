@@ -3,9 +3,8 @@ import { Link } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import Button from '../components/ui/Button';
+import Button, { buttonClasses } from '../components/ui/Button';
 import Icon from '../components/ui/Icon';
-import '../components/workspace/workspace.css';
 import { Skeleton, ErrorState, EmptyState } from '../components/workspace/WorkspaceUI';
 import { errMsg } from '../components/workspace/utils';
 import { groupsService, type GroupDto } from '../services/groups';
@@ -47,13 +46,13 @@ export default function Groups() {
 
   return (
     <MainLayout>
-      <div className="workspace-surface space-y-6">
+      <div className="space-y-6">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-2xl font-bold text-slate-900">Nhóm của tôi</h2>
+            <h2 className="text-title font-semibold text-ink">Nhóm của tôi</h2>
             <p className="mt-2 text-base text-slate-600">Các nhóm bạn đang tham gia và vai trò của bạn.</p>
           </div>
-          <Link to="/join-group" className="workspace-primary inline-flex min-h-11 items-center gap-1.5 rounded-xl px-4 font-medium hover:opacity-95">
+          <Link to="/join-group" className={buttonClasses({ className: 'gap-1.5' })}>
             <Icon name="plus" size={16} />Tạo / tham gia nhóm
           </Link>
         </header>
@@ -62,7 +61,7 @@ export default function Groups() {
           <Card className="p-4 sm:p-6"><ErrorState message={error} onRetry={() => setAttempt(a => a + 1)} /></Card>
         ) : groups.length === 0 ? (
           <Card className="p-4 sm:p-6">
-            <EmptyState title="Bạn chưa thuộc nhóm nào"
+            <EmptyState illustration="groups" title="Bạn chưa thuộc nhóm nào"
               body="Tạo nhóm mới để làm Leader, hoặc tham gia bằng mã mời để làm thành viên."
               action={<Link to="/join-group" className="min-h-11 inline-flex items-center text-primary-700 font-medium hover:underline">Tạo hoặc tham gia nhóm</Link>} />
           </Card>
@@ -94,7 +93,7 @@ export default function Groups() {
             </p>
             {filtered.length === 0 ? (
               <Card className="p-4 sm:p-6">
-                <EmptyState title="Không có nhóm khớp bộ lọc" body="Thử từ khóa hoặc vai trò khác."
+                <EmptyState illustration="search" title="Không có nhóm khớp bộ lọc" body="Thử từ khóa hoặc vai trò khác."
                   action={<button className="min-h-9 text-primary-700 font-medium hover:underline" onClick={() => { setQ(''); setSearch(''); setRole(''); }}>Xóa bộ lọc</button>} />
               </Card>
             ) : (

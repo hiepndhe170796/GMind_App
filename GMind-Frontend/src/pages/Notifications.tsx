@@ -9,7 +9,6 @@ import { useNotificationCount } from '../components/notifications/useNotificatio
 import { useNotificationInbox } from '../components/notifications/useNotificationInbox';
 import NotificationItem from '../components/notifications/NotificationItem';
 import { authService } from '../services/auth';
-import '../components/workspace/workspace.css';
 import '../components/notifications/notifications.css';
 
 function NotificationsWorkspace() {
@@ -53,10 +52,10 @@ function NotificationsWorkspace() {
   };
 
   return (
-    <div className="notifications-surface workspace-surface mx-auto w-full max-w-4xl">
+    <div className="mx-auto w-full max-w-4xl">
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Thông báo</h2>
+          <h2 className="text-title font-semibold text-ink">Thông báo</h2>
           <p className="mt-1 text-sm text-slate-600" data-unread-summary>
             {count.count === null ? 'Cập nhật từ nhóm và công việc của bạn.' : `${count.count} thông báo chưa đọc`}
             {count.error && count.count !== null && ' (chưa làm mới)'}
@@ -111,7 +110,7 @@ function NotificationsWorkspace() {
         {inbox.fatal && <div className="p-5"><ErrorState message={inbox.fatal} onRetry={() => void inbox.refresh()} /></div>}
         {inbox.items?.length === 0 && (
           <div className="px-5 py-3">
-            <EmptyState title={unreadOnly ? 'Không có thông báo chưa đọc' : 'Chưa có thông báo'}
+            <EmptyState illustration="inbox" title={unreadOnly ? 'Không có thông báo chưa đọc' : 'Chưa có thông báo'}
               body={unreadOnly ? 'Bạn có thể xem lại các thông báo đã đọc trong mục Tất cả.' : 'Những cập nhật về công việc và nhóm sẽ xuất hiện ở đây.'}
               action={unreadOnly ? <Button variant="secondary" onClick={() => setFilter(false)}>Xem tất cả</Button> : undefined} />
           </div>

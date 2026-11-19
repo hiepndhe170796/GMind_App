@@ -5,7 +5,6 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
-import '../components/workspace/workspace.css';
 import { Breadcrumb, Skeleton, ErrorState, EmptyState } from '../components/workspace/WorkspaceUI';
 import { errMsg, status, initials } from '../components/workspace/utils';
 import ConfirmationDialog from '../components/workspace/ConfirmationDialog';
@@ -195,7 +194,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
   const leaderCount = group?.members.filter(m => m.role === 'Leader').length ?? 0;
 
   return (
-    <div className="workspace-surface space-y-6">
+    <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Nhóm của tôi', to: '/groups' }, { label: group?.name ?? 'Nhóm' }]} />
       {loading ? <Skeleton label="Đang tải nhóm…" />
         : fatalError || !group ? <ErrorState message={fatalError || 'Không tìm thấy nhóm.'} onRetry={() => void reload(false)} backTo="/groups" backLabel="Về nhóm của tôi" />
@@ -203,7 +202,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
           <>
             <header className="flex flex-wrap items-start justify-between gap-3 min-w-0">
               <div className="min-w-0">
-                <h2 className="text-2xl font-bold text-slate-900 [overflow-wrap:anywhere]">{group.name}</h2>
+                <h2 className="text-title font-semibold text-ink [overflow-wrap:anywhere]">{group.name}</h2>
                 {group.description && <p className="mt-1 text-base text-slate-600 [overflow-wrap:anywhere] max-w-[65ch]">{group.description}</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <RoleBadge role={group.myRole} />
@@ -215,7 +214,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
                   <Link to={`/groups/${id}/marketplace`} className="min-h-11 inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50">Marketplace</Link>
                   {isLeader && <Button variant="secondary" className="min-h-11" disabled={busy}
                     onClick={() => { setEditName(group.name); setEditDesc(group.description ?? ''); setEditError(''); setEditOpen(v => !v); }}>Sửa nhóm</Button>}
-                  <Button variant="secondary" className="min-h-11 text-danger-700" disabled={busy || (isLeader && leaderCount <= 1)}
+                  <Button variant="danger" className="min-h-11" disabled={busy || (isLeader && leaderCount <= 1)}
                     onClick={() => setDialog({ kind: 'leave' })}>Rời nhóm</Button>
                 </div>
                 {isLeader && leaderCount <= 1 && <p className="text-xs text-slate-600 sm:text-right">Bạn là Trưởng nhóm duy nhất — không thể rời hoặc hạ vai trò chính mình.</p>}
@@ -239,7 +238,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
                   <Input id="edit-name" label="Tên nhóm" maxLength={200} value={editName} disabled={busy} error={editError}
                     onChange={e => { setEditName(e.target.value); setEditError(''); }} />
                   <Input id="edit-desc" label="Mô tả" maxLength={1000} value={editDesc} disabled={busy} onChange={e => setEditDesc(e.target.value)} />
-                  <Button type="submit" className="workspace-primary min-h-11" disabled={busy} isLoading={pending === 'edit'}>Lưu</Button>
+                  <Button type="submit" className="min-h-11" disabled={busy} isLoading={pending === 'edit'}>Lưu</Button>
                   {actionErrors.edit && <p role="alert" className="sm:col-span-3 text-sm text-danger-700 [overflow-wrap:anywhere]">{actionErrors.edit}</p>}
                 </form>
               </Card>
@@ -266,14 +265,14 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
                         onChange={e => { setProj(x => ({ ...x, description: e.target.value })); if (projErrors.description) setProjErrors(x => ({ ...x, description: undefined })); }} />
                       {actionErrors.project && <p role="alert" className="sm:col-span-2 text-sm text-danger-700 [overflow-wrap:anywhere]">{actionErrors.project}</p>}
                       <div className="flex gap-2 sm:col-span-2">
-                        <Button type="submit" className="workspace-primary min-h-11" disabled={busy} isLoading={pending === 'project'}>Tạo dự án</Button>
+                        <Button type="submit" className="min-h-11" disabled={busy} isLoading={pending === 'project'}>Tạo dự án</Button>
                         <Button type="button" variant="secondary" className="min-h-11" disabled={busy} onClick={() => setProjOpen(false)}>Hủy</Button>
                       </div>
                     </form>
                   </Card>
                 )}
                 {projects.length === 0 ? (
-                  <Card className="p-4 sm:p-6"><EmptyState title="Chưa có dự án" body={isLeader ? 'Tạo dự án đầu tiên cho nhóm.' : 'Trưởng nhóm sẽ tạo dự án cho nhóm.'} /></Card>
+                  <Card className="p-4 sm:p-6"><EmptyState illustration="tasks" title="Chưa có dự án" body={isLeader ? 'Tạo dự án đầu tiên cho nhóm.' : 'Trưởng nhóm sẽ tạo dự án cho nhóm.'} /></Card>
                 ) : (
                   <ul className="grid gap-4 md:grid-cols-2">
                     {projects.map(p => (
@@ -346,7 +345,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
                                 onClick={() => setDialog({ kind: 'role', memberId: m.userId, memberName: m.displayName, toRole: m.role === 'Leader' ? ROLE_NUM.Member : ROLE_NUM.Leader })}>
                                 {m.role === 'Leader' ? 'Hạ vai trò' : 'Làm trưởng nhóm'}
                               </Button>
-                              <Button size="sm" variant="secondary" className="min-h-11 text-danger-700" disabled={busy || soleLeader}
+                              <Button size="sm" variant="danger" className="min-h-11" disabled={busy || soleLeader}
                                 onClick={() => setDialog({ kind: 'remove', memberId: m.userId, memberName: m.displayName })}>Xóa</Button>
                             </span>
                           )}
@@ -362,7 +361,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <code className="rounded-lg bg-slate-100 px-3 py-1.5 font-mono text-base tracking-wider">{invite.code}</code>
                           <Button size="sm" variant="secondary" className="min-h-9" onClick={() => void copyCode()}>Sao chép mã</Button>
-                          <Button size="sm" variant="secondary" className="min-h-9 text-danger-700" disabled={busy} onClick={() => setInviteConfirm(true)}>Thu hồi</Button>
+                          <Button size="sm" variant="danger" className="min-h-9" disabled={busy} onClick={() => setInviteConfirm(true)}>Thu hồi</Button>
                         </div>
                       ) : (
                         <Button size="sm" variant="secondary" className="mt-2 min-h-11" disabled={busy} isLoading={pending === 'invite'} onClick={createInvite}>Tạo mã mời</Button>
@@ -382,7 +381,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
               {dialog?.kind === 'role' && <p>{dialog.toRole === ROLE_NUM.Member ? `Hạ ${dialog.memberName} xuống Thành viên?` : `Nâng ${dialog.memberName} lên Trưởng nhóm?`}</p>}
               {actionErrors.member && <p role="alert" className="mt-3 text-sm text-danger-700 [overflow-wrap:anywhere]">{actionErrors.member}</p>}
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button className="workspace-primary min-h-11" disabled={busy} isLoading={pending === 'member' || pending === 'leave'} onClick={confirmAction}>Xác nhận</Button>
+                <Button variant={dialog?.kind === 'role' ? 'primary' : 'danger'} className="min-h-11" disabled={busy} isLoading={pending === 'member' || pending === 'leave'} onClick={confirmAction}>Xác nhận</Button>
                 <Button variant="secondary" className="min-h-11" disabled={busy} onClick={() => setDialog(null)}>Hủy</Button>
               </div>
             </ConfirmationDialog>
@@ -391,7 +390,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
               <p>Thu hồi mã "{invite?.code}"? Người có mã cũ sẽ không tham gia được — cần tạo mã mới nếu đổi ý.</p>
               {actionErrors.invite && <p role="alert" className="mt-3 text-sm text-danger-700 [overflow-wrap:anywhere]">{actionErrors.invite}</p>}
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button variant="secondary" className="min-h-11 text-danger-700" disabled={busy} isLoading={pending === 'revoke'} onClick={confirmRevoke}>Thu hồi</Button>
+                <Button variant="danger" className="min-h-11" disabled={busy} isLoading={pending === 'revoke'} onClick={confirmRevoke}>Thu hồi</Button>
                 <Button variant="secondary" className="min-h-11" disabled={busy} onClick={() => setInviteConfirm(false)}>Hủy</Button>
               </div>
             </ConfirmationDialog>
