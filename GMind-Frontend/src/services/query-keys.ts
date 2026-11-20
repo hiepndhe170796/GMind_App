@@ -1,0 +1,36 @@
+/**
+ * Query-key factory. Every key starts with ['u', userId] so cached data can
+ * never leak across accounts on the same browser session.
+ */
+export const qk = {
+  task: (uid: string, id: string) => ['u', uid, 'task', id] as const,
+  taskSubtasks: (uid: string, id: string) => ['u', uid, 'task', id, 'subtasks'] as const,
+  taskComments: (uid: string, id: string) => ['u', uid, 'task', id, 'comments'] as const,
+  taskLinks: (uid: string, id: string) => ['u', uid, 'task', id, 'links'] as const,
+  taskReviews: (uid: string, id: string) => ['u', uid, 'task', id, 'reviews'] as const,
+  taskSubmissions: (uid: string, id: string) => ['u', uid, 'task', id, 'submissions'] as const,
+  project: (uid: string, projectId: string) => ['u', uid, 'project', projectId] as const,
+  projectTasks: (uid: string, projectId: string) => ['u', uid, 'project', projectId, 'tasks'] as const,
+  projectLinks: (uid: string, projectId: string) => ['u', uid, 'project', projectId, 'links'] as const,
+  myTasks: (uid: string) => ['u', uid, 'my-tasks'] as const,
+  myGroups: (uid: string) => ['u', uid, 'my-groups'] as const,
+  leaderQueue: (uid: string) => ['u', uid, 'leader-queue'] as const,
+  groupSettings: (uid: string, groupId: string) => ['u', uid, 'group', groupId, 'settings'] as const,
+  memberOverview: (uid: string, groupId: string, memberUserId: string) => ['u', uid, 'group', groupId, 'member', memberUserId] as const,
+  projectContributions: (uid: string, projectId: string) => ['u', uid, 'project', projectId, 'contributions'] as const,
+  group: (uid: string, groupId: string) => ['u', uid, 'group', groupId] as const,
+  groupWorkspace: (uid: string, groupId: string) => ['u', uid, 'group', groupId, 'workspace'] as const,
+  groupMembers: (uid: string, groupId: string) => ['u', uid, 'group', groupId, 'members'] as const,
+  groupInvites: (uid: string, groupId: string) => ['u', uid, 'group', groupId, 'invites'] as const,
+  archivedGroups: (uid: string) => ['u', uid, 'archived-groups'] as const,
+  archivedProjects: (uid: string, groupId: string) => ['u', uid, 'group', groupId, 'archived-projects'] as const,
+  activityLog: (uid: string, groupId: string, filters: Record<string, string>) =>
+    ['u', uid, 'group', groupId, 'activity-log', filters] as const,
+  activityFilters: (uid: string, groupId: string) => ['u', uid, 'group', groupId, 'activity-filters'] as const,
+  marketplace: (uid: string, groupId: string) => ['u', uid, 'group', groupId, 'marketplace'] as const,
+  marketplaceIncoming: (uid: string) => ['u', uid, 'marketplace-incoming'] as const,
+  swapCandidates: (uid: string, groupId: string, userId: string) =>
+    ['u', uid, 'group', groupId, 'swap-candidates', userId] as const,
+  taskHelpers: (uid: string, taskId: string) => ['u', uid, 'task', taskId, 'helpers'] as const,
+  helping: (uid: string) => ['u', uid, 'helping'] as const,
+};

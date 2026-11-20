@@ -5,16 +5,7 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import { authService } from '../services/auth';
 import { validateAuthFields, focusAuthError, authErrorMessage, type AuthFieldErrors } from '../utils/auth-form';
-
-function safeReturnPath(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return null;
-  if ([...value].some(c => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127)) return null;
-  const target = new URL(value, window.location.origin);
-  if (target.origin !== window.location.origin) return null;
-  if (['/login', '/register', '/forgot-password', '/reset-password'].includes(target.pathname)) return null;
-  return target.pathname + target.search + target.hash;
-}
+import { safeReturnPath } from '../utils/return-path';
 
 export default function Login() {
   const navigate = useNavigate();

@@ -1,321 +1,296 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MainLayout from '../layouts/MainLayout';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import Button from '../components/ui/Button';
+import Button, { buttonClasses } from '../components/ui/Button';
 import Input from '../components/ui/Input';
+import Icon from '../components/ui/Icon';
+import ActionMenu from '../components/ui/ActionMenu';
 import { Breadcrumb, Skeleton, ErrorState, EmptyState } from '../components/workspace/WorkspaceUI';
-import { errMsg, status, initials } from '../components/workspace/utils';
+import { errMsg, status } from '../components/workspace/utils';
 import ConfirmationDialog from '../components/workspace/ConfirmationDialog';
-import { groupsService, groupsManage, type InviteDto, type ActivityDto } from '../services/groups';
-import { projectsService } from '../services/projects';
+import { groupsService, groupsManage, type InviteListItemDto } from '../services/groups';
+import { projectsService, projectsManage } from '../services/projects';
 import { loadGroupWorkspace } from '../services/workspace';
-import { authService } from '../services/auth';
+import StatusBar from '../components/ui/StatusBar';
+import UserAvatar from '../components/account/UserAvatar';
+import GroupSettingsDialog from '../components/groups/GroupSettingsDialog';
+import { qk } from '../services/query-keys';
+import { useToast } from '../components/ui/Toast';
+import { useCurrentUserId } from '../hooks/use-current-user-id';
 import { formatDate, formatDateTime } from '../utils/presentation';
+import { deadlineState } from '../utils/task-time';
 
-type Workspace = Awaited<ReturnType<typeof loadGroupWorkspace>>;
-type ActionKind = 'invite' | 'revoke' | 'project' | 'edit' | 'member' | 'leave' | null;
-const PROJECT_STATUS: Record<string, string> = { NotStarted: 'Chưa bắt đầu', InProgress: 'Đang làm', Completed: 'Hoàn thành', Archived: 'Đã lưu trữ' };
 const ROLE_NUM = { Leader: 1, Member: 2 } as const;
+const PROJECT_STATUS: Record<string, string> = { NotStarted: 'Chưa bắt đầu', InProgress: 'Đang làm', Completed: 'Hoàn thành', Archived: 'Đã lưu trữ' };
+const INVITE_STATUS: Record<string, string> = { Active: 'Đang hoạt động', Expired: 'Hết hạn', Exhausted: 'Hết lượt', Revoked: 'Đã thu hồi' };
+
 const RoleBadge = ({ role }: { role: string }) =>
-  <Badge variant={role === 'Leader' ? 'primary' : 'neutral'}>{role === 'Leader' ? 'Trưởng nhóm' : 'Thành viên'}</Badge>;
+  <Badge variant={role === 'Leader' ? 'accent' : 'neutral'}>{role === 'Leader' ? 'Trưởng nhóm' : 'Thành viên'}</Badge>;
 
 export default function GroupDetail() {
   const { id } = useParams<{ id: string }>();
-  const me = authService.currentUser();
-  return <MainLayout><GroupWorkspace key={`${id ?? ''}:${me?.id ?? ''}`} id={id ?? ''} userId={me?.id ?? ''} /></MainLayout>;
+  const me = useCurrentUserId();
+  return <MainLayout><GroupWorkspace key={`${id ?? ''}:${me ?? ''}`} id={id ?? ''} userId={me} /></MainLayout>;
 }
 
-function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
+function GroupWorkspace({ id, userId }: { id: string; userId: string | null }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
+  const qc = useQueryClient();
   const routeNotice = (location.state as { notice?: string } | null)?.notice;
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [fatalError, setFatalError] = useState('');
-  const [refreshError, setRefreshError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [actionErrors, setActionErrors] = useState<Partial<Record<'invite' | 'project' | 'edit' | 'member', string>>>({});
-  const [invite, setInvite] = useState<InviteDto | null>(null);
-  const [inviteConfirm, setInviteConfirm] = useState(false);
-  const [pending, setPending] = useState<ActionKind>(null);
-  const [projOpen, setProjOpen] = useState(false);
-  const [proj, setProj] = useState({ name: '', description: '', subject: '', deadline: '' });
-  const [projErrors, setProjErrors] = useState<{ name?: string; description?: string; subject?: string }>({});
-  const [editOpen, setEditOpen] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editDesc, setEditDesc] = useState('');
-  const [editError, setEditError] = useState('');
-  const [dialog, setDialog] = useState<null | { kind: 'role' | 'remove' | 'leave'; memberId?: string; memberName?: string; toRole?: number }>(null);
-  const loadVersion = useRef(0);
-  const actionVersion = useRef(0);
-  const pendingRef = useRef(false);
-  const refreshingRef = useRef(false);
-  const projNameRef = useRef<HTMLInputElement>(null);
-  const busy = pending !== null || refreshing;
 
-  const clearPrivate = useCallback(() => {
-    setWorkspace(null); setInvite(null); setDialog(null); setInviteConfirm(false);
-    setProj({ name: '', description: '', subject: '', deadline: '' }); setProjErrors({}); setProjOpen(false);
-    setEditOpen(false); setEditName(''); setEditDesc(''); setEditError('');
-    setActionErrors({}); setSuccess(''); setRefreshError('');
-  }, []);
-  const invalidate = useCallback(() => {
-    loadVersion.current++; actionVersion.current++;
-    pendingRef.current = false; refreshingRef.current = false;
-  }, []);
-
-  const fetchWorkspace = useCallback(async (quiet = false) => {
-    const version = ++loadVersion.current;
-    try {
-      const data = await loadGroupWorkspace(id);
-      if (version !== loadVersion.current) return;
-      setWorkspace(data.group.myRole === 'Leader' ? data : { ...data, progress: null, activity: [] });
-      setFatalError('');
-    } catch (e: unknown) {
-      if (version !== loadVersion.current) return;
-      const s = status(e);
-      if (s === 403 || s === 404 || !quiet) {
-        if (s === 403 || s === 404) clearPrivate(); else setWorkspace(null);
-        setFatalError(errMsg(e, 'Không tải được nhóm'));
-      } else {
-        setRefreshError('Thao tác đã được lưu nhưng chưa tải lại được đầy đủ chi tiết. ' + errMsg(e, ''));
-      }
-    } finally {
-      if (version === loadVersion.current) { setLoading(false); setRefreshing(false); refreshingRef.current = false; }
-    }
-  }, [id, clearPrivate]);
-
-  const reload = useCallback((quiet = false) => {
-    if (!quiet) { setLoading(true); setWorkspace(null); setFatalError(''); setSuccess(''); }
-    setRefreshError('');
-    if (quiet) { refreshingRef.current = true; setRefreshing(true); }
-    return fetchWorkspace(quiet);
-  }, [fetchWorkspace]);
-
-  useEffect(() => {
-    if (!authService.isLoggedIn()) { navigate('/login'); return; }
-    let cancelled = false;
-    void Promise.resolve().then(() => { if (!cancelled) return fetchWorkspace(false); });
-    return () => { cancelled = true; invalidate(); };
-  }, [fetchWorkspace, invalidate, navigate]);
-
-  async function mutate<T>(kind: NonNullable<ActionKind>, request: () => Promise<T>, apply: (r: T) => void, notice: string,
-    errKey: keyof typeof actionErrors = 'member', reloadAfter = true) {
-    if (pendingRef.current || refreshingRef.current) return;
-    pendingRef.current = true;
-    const action = ++actionVersion.current;
-    const version = loadVersion.current;
-    setPending(kind); setSuccess(''); setRefreshError(''); setActionErrors(x => ({ ...x, [errKey]: undefined }));
-    try {
-      const result = await request();
-      if (action !== actionVersion.current || version !== loadVersion.current) return;
-      apply(result); setSuccess(notice);
-      if (reloadAfter) await reload(true);
-    } catch (e: unknown) {
-      if (action !== actionVersion.current || version !== loadVersion.current) return;
-      const s = status(e);
-      if (s === 403 || s === 404) {
-        loadVersion.current++;
-        clearPrivate(); setFatalError(errMsg(e, 'Không thực hiện được thao tác')); setLoading(false);
-      } else {
-        setActionErrors(x => ({ ...x, [errKey]: errMsg(e, 'Không thực hiện được thao tác') }));
-      }
-    } finally {
-      if (action === actionVersion.current) { pendingRef.current = false; setPending(null); }
-    }
-  }
-
-  const createInvite = () => mutate('invite', () => groupsService.createInvite(id),
-    (inv: InviteDto) => setInvite(inv), 'Đã tạo mã mời.', 'invite');
-  const confirmRevoke = () => invite && mutate('revoke', () => groupsManage.revokeInvite(invite.id),
-    () => { setInvite(null); setInviteConfirm(false); }, 'Đã thu hồi mã mời.', 'invite');
-  const copyCode = async () => {
-    if (!invite) return;
-    try { await navigator.clipboard.writeText(invite.code); setSuccess('Đã sao chép mã mời.'); }
-    catch { setActionErrors(x => ({ ...x, invite: 'Không sao chép được. Hãy chọn và chép mã thủ công.' })); }
-  };
-  const createProject = () => {
-    const errs: typeof projErrors = {};
-    const n = proj.name.trim(), d = proj.description.trim(), s = proj.subject.trim();
-    if (!n) errs.name = 'Nhập tên dự án.';
-    else if (n.length > 200) errs.name = 'Tên dự án tối đa 200 ký tự.';
-    if (d.length > 2000) errs.description = 'Mô tả tối đa 2.000 ký tự.';
-    if (s.length > 100) errs.subject = 'Môn học tối đa 100 ký tự.';
-    setProjErrors(errs);
-    if (errs.name || errs.description || errs.subject) { projNameRef.current?.focus(); return; }
-    void mutate('project',
-      () => projectsService.create(id, n, d || undefined, s || undefined,
-        proj.deadline && Number.isFinite(Date.parse(proj.deadline)) ? new Date(`${proj.deadline}T23:59:00+07:00`).toISOString() : undefined),
-      (p) => { setWorkspace(w => w ? { ...w, projects: [...w.projects, p] } : w); setProj({ name: '', description: '', subject: '', deadline: '' }); setProjOpen(false); },
-      'Đã tạo dự án.', 'project');
-  };
-  const saveEdit = () => {
-    const n = editName.trim();
-    if (!n) { setEditError('Nhập tên nhóm.'); return; }
-    void mutate('edit', () => groupsManage.update(id, n, editDesc.trim() || undefined),
-      (g) => { setWorkspace(w => w ? { ...w, group: { ...w.group, name: g.name, description: g.description } } : w); setEditOpen(false); },
-      'Đã cập nhật nhóm.', 'edit');
-  };
-  const confirmAction = () => {
-    if (!dialog) return;
-    if (dialog.kind === 'role' && dialog.memberId && dialog.toRole)
-      void mutate('member', () => groupsManage.changeRole(id, dialog.memberId!, dialog.toRole!),
-        () => {
-          setWorkspace(w => w ? {
-            ...w,
-            group: {
-              ...w.group,
-              members: w.group.members.map(m => m.userId === dialog.memberId
-                ? { ...m, role: dialog.toRole === ROLE_NUM.Leader ? 'Leader' : 'Member' }
-                : m),
-            },
-          } : w);
-          setDialog(null);
-        }, 'Đã đổi vai trò thành viên.', 'member');
-    if (dialog.kind === 'remove' && dialog.memberId)
-      void mutate('member', () => groupsManage.removeMember(id, dialog.memberId!),
-        () => {
-          setWorkspace(w => w ? { ...w, group: { ...w.group, members: w.group.members.filter(m => m.userId !== dialog.memberId) } } : w);
-          setDialog(null);
-        }, 'Đã xóa thành viên.', 'member');
-    if (dialog.kind === 'leave')
-      void mutate('leave', () => groupsManage.leave(id),
-        () => navigate('/groups'), 'Đã rời nhóm.', 'member', false);
-  };
-
-  const group = workspace?.group ?? null;
-  const projects = workspace?.projects ?? [];
-  const progress = workspace?.progress ?? null;
-  const activity = workspace?.activity ?? [];
+  const wsQ = useQuery({
+    queryKey: qk.groupWorkspace(userId ?? '', id),
+    queryFn: () => loadGroupWorkspace(id),
+    enabled: !!userId && !!id,
+    retry: (n, e) => status(e) !== 403 && status(e) !== 404 && n < 1,
+  });
+  const group = wsQ.data?.group;
   const isLeader = group?.myRole === 'Leader';
+
+  const invitesQ = useQuery({
+    queryKey: qk.groupInvites(userId ?? '', id),
+    queryFn: () => groupsService.listInvites(id),
+    enabled: !!userId && !!id && isLeader,
+    retry: (n, e) => status(e) !== 403 && status(e) !== 404 && n < 1,
+  });
+  const archivedQ = useQuery({
+    queryKey: qk.archivedProjects(userId ?? '', id),
+    queryFn: () => projectsManage.archived(id),
+    enabled: !!userId && !!id,
+    retry: (n, e) => status(e) !== 403 && status(e) !== 404 && n < 1,
+  });
+
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: qk.groupWorkspace(userId ?? '', id) });
+    void qc.invalidateQueries({ queryKey: qk.group(userId ?? '', id) });
+    void qc.invalidateQueries({ queryKey: qk.archivedProjects(userId ?? '', id) });
+    void qc.invalidateQueries({ queryKey: qk.groupInvites(userId ?? '', id) });
+    void qc.invalidateQueries({ queryKey: qk.myGroups(userId ?? '') });
+    void qc.invalidateQueries({ queryKey: qk.leaderQueue(userId ?? '') });
+  };
+
+  const [projOpen, setProjOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dialog, setDialog] = useState<null |
+    { kind: 'leave' } |
+    { kind: 'remove' | 'role'; memberId: string; memberName: string; toRole?: number } |
+    { kind: 'restoreProject'; projectId: string; name: string } |
+    { kind: 'revokeInvite'; invite: InviteListItemDto }>(null);
+  const [actionError, setActionError] = useState('');
+
+  const writeFailed = (e: unknown, fallback: string) => {
+    const s = status(e);
+    if (s === 403 || s === 404) {
+      setDialog(null);
+      toast.error(errMsg(e, 'Bạn không có quyền thực hiện thao tác này.'));
+      void wsQ.refetch();
+    } else {
+      setActionError(errMsg(e, fallback));
+    }
+  };
+
+  const leaveM = useMutation({
+    mutationFn: () => groupsManage.leave(id),
+    onSuccess: () => { toast.success('Đã rời nhóm.'); navigate('/groups'); },
+    onError: e => { setDialog(null); const s = status(e); if (s === 403 || s === 404) { toast.error(errMsg(e, 'Bạn không có quyền thực hiện thao tác này.')); void wsQ.refetch(); } else toast.error(errMsg(e, 'Không rời được nhóm.')); },
+  });
+  const removeM = useMutation({
+    mutationFn: (memberId: string) => groupsManage.removeMember(id, memberId),
+    onSuccess: () => { toast.success('Đã xóa thành viên.'); setDialog(null); invalidate(); },
+    onError: e => writeFailed(e, 'Không xóa được thành viên.'),
+  });
+  const roleM = useMutation({
+    mutationFn: ({ memberId, toRole }: { memberId: string; toRole: number }) => groupsManage.changeRole(id, memberId, toRole),
+    onSuccess: () => { toast.success('Đã đổi vai trò thành viên.'); setDialog(null); invalidate(); },
+    onError: e => writeFailed(e, 'Không đổi được vai trò.'),
+  });
+  const restoreProjectM = useMutation({
+    mutationFn: (projectId: string) => projectsManage.restore(projectId),
+    onSuccess: () => { toast.success('Đã khôi phục dự án.'); setDialog(null); invalidate(); },
+    onError: e => writeFailed(e, 'Không khôi phục được dự án.'),
+  });
+  const revokeM = useMutation({
+    mutationFn: (inviteId: string) => groupsManage.revokeInvite(inviteId),
+    onSuccess: () => { toast.success('Đã thu hồi mã mời.'); setDialog(null); void qc.invalidateQueries({ queryKey: qk.groupInvites(userId ?? '', id) }); },
+    onError: e => writeFailed(e, 'Không thu hồi được mã mời.'),
+  });
+
+  const projects = wsQ.data?.projects ?? [];
+  const progress = wsQ.data?.progress ?? null;
+  const activity = (wsQ.data?.activity ?? []).slice(0, 5);
+  const invites = invitesQ.data ?? [];
+  const archived = archivedQ.data ?? [];
+  const activeInvites = invites.filter(i => i.status === 'Active');
+  const deadInvites = invites.filter(i => i.status !== 'Active');
   const leaderCount = group?.members.filter(m => m.role === 'Leader').length ?? 0;
+  const busy = leaveM.isPending || removeM.isPending || roleM.isPending || restoreProjectM.isPending || revokeM.isPending;
+  const meMember = group?.members.find(m => m.userId === userId);
 
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Nhóm của tôi', to: '/groups' }, { label: group?.name ?? 'Nhóm' }]} />
-      {loading ? <Skeleton label="Đang tải nhóm…" />
-        : fatalError || !group ? <ErrorState message={fatalError || 'Không tìm thấy nhóm.'} onRetry={() => void reload(false)} backTo="/groups" backLabel="Về nhóm của tôi" />
-        : (
+      {wsQ.isPending ? <Skeleton label="Đang tải nhóm…" />
+        : wsQ.isError || !group ? (
+          <ErrorState
+            message={status(wsQ.error) === 403 ? 'Bạn không có quyền xem nhóm này.' : errMsg(wsQ.error, 'Không tải được nhóm.')}
+            onRetry={status(wsQ.error) === 403 || status(wsQ.error) === 404 ? undefined : () => void wsQ.refetch()}
+            backTo="/groups" backLabel="Về nhóm của tôi" />
+        ) : (
           <>
             <header className="flex flex-wrap items-start justify-between gap-3 min-w-0">
               <div className="min-w-0">
                 <h2 className="text-title font-semibold text-ink [overflow-wrap:anywhere]">{group.name}</h2>
-                {group.description && <p className="mt-1 text-base text-slate-600 [overflow-wrap:anywhere] max-w-[65ch]">{group.description}</p>}
-                <div className="mt-2 flex flex-wrap items-center gap-2">
+                {group.description && <p className="mt-1 max-w-[65ch] text-base text-ink-secondary [overflow-wrap:anywhere]">{group.description}</p>}
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
                   <RoleBadge role={group.myRole} />
-                  <span className="text-sm text-slate-600">{group.members.length} thành viên</span>
+                  <span>{group.members.length} thành viên</span>
+                  <span>Tạo ngày {formatDate(group.createdAt)}</span>
                 </div>
               </div>
-              <div className="flex flex-col items-start gap-1 sm:items-end">
-                <div className="flex flex-wrap gap-2 sm:justify-end">
-                  <Link to={`/groups/${id}/marketplace`} className="min-h-11 inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50">Marketplace</Link>
-                  {isLeader && <Button variant="secondary" className="min-h-11" disabled={busy}
-                    onClick={() => { setEditName(group.name); setEditDesc(group.description ?? ''); setEditError(''); setEditOpen(v => !v); }}>Sửa nhóm</Button>}
-                  <Button variant="danger" className="min-h-11" disabled={busy || (isLeader && leaderCount <= 1)}
-                    onClick={() => setDialog({ kind: 'leave' })}>Rời nhóm</Button>
-                </div>
-                {isLeader && leaderCount <= 1 && <p className="text-xs text-slate-600 sm:text-right">Bạn là Trưởng nhóm duy nhất — không thể rời hoặc hạ vai trò chính mình.</p>}
+              <div className="flex flex-wrap items-center gap-2">
+                {isLeader && (
+                  <Button className="min-h-11 gap-1.5" onClick={() => setProjOpen(true)}>
+                    <Icon name="plus" size={16} />Tạo dự án
+                  </Button>
+                )}
+                <Link to={`/groups/${id}/marketplace`} className={buttonClasses({ variant: 'secondary', className: 'min-h-11' })}>Marketplace</Link>
+                <ActionMenu
+                  label={isLeader ? 'Thêm' : 'Tùy chọn'}
+                  items={[
+                    ...(isLeader ? [
+                      { label: 'Sửa nhóm', onSelect: () => setEditOpen(true) },
+                      { label: 'Cài đặt cảnh báo', onSelect: () => setSettingsOpen(true) },
+                      { label: 'Lưu trữ nhóm', danger: true, onSelect: () => setArchiveOpen(true) },
+                    ] : []),
+                    {
+                      label: 'Rời nhóm', danger: true,
+                      disabled: isLeader && leaderCount <= 1,
+                      disabledReason: 'Bạn là Trưởng nhóm duy nhất.',
+                      onSelect: () => { setActionError(''); setDialog({ kind: 'leave' }); },
+                    },
+                  ]}
+                />
               </div>
             </header>
             {routeNotice && <p role="status" className="text-sm font-medium text-success-700">{routeNotice}</p>}
-            {refreshing && <p role="status" className="sr-only">Đang tải lại…</p>}
-            {refreshError && (
-              <div>
-                <p role="alert" className="text-sm text-danger-700 [overflow-wrap:anywhere]">{refreshError}</p>
-                <Button variant="secondary" className="mt-2 min-h-11" disabled={busy} isLoading={refreshing}
-                  onClick={() => { if (!pendingRef.current && !refreshingRef.current) void reload(true); }}>Tải lại</Button>
-              </div>
-            )}
-            {success && <p role="status" className="text-sm font-medium text-success-700">{success}</p>}
 
-            {isLeader && editOpen && (
-              <Card className="p-4 sm:p-6">
-                <h3 className="font-semibold text-slate-900">Sửa thông tin nhóm</h3>
-                <form noValidate className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end" onSubmit={e => { e.preventDefault(); saveEdit(); }}>
-                  <Input id="edit-name" label="Tên nhóm" maxLength={200} value={editName} disabled={busy} error={editError}
-                    onChange={e => { setEditName(e.target.value); setEditError(''); }} />
-                  <Input id="edit-desc" label="Mô tả" maxLength={1000} value={editDesc} disabled={busy} onChange={e => setEditDesc(e.target.value)} />
-                  <Button type="submit" className="min-h-11" disabled={busy} isLoading={pending === 'edit'}>Lưu</Button>
-                  {actionErrors.edit && <p role="alert" className="sm:col-span-3 text-sm text-danger-700 [overflow-wrap:anywhere]">{actionErrors.edit}</p>}
-                </form>
-              </Card>
-            )}
-
-            <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-              <section aria-labelledby="projects-h" className="min-w-0 space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 id="projects-h" className="text-lg font-semibold text-slate-900">Dự án ({projects.length})</h3>
-                  {isLeader && !projOpen && (
-                    <Button variant="secondary" className="min-h-11" disabled={busy} onClick={() => setProjOpen(true)}>Tạo dự án</Button>
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+              <section className="min-w-0 space-y-6" aria-label="Dự án và tiến độ">
+                <div>
+                  <h3 className="text-lg font-semibold text-ink">Dự án ({projects.length})</h3>
+                  {projects.length === 0 ? (
+                    <Card className="mt-3 p-4 sm:p-6"><EmptyState illustration="tasks" title="Chưa có dự án"
+                      body={isLeader ? 'Tạo dự án đầu tiên cho nhóm.' : 'Trưởng nhóm sẽ tạo dự án cho nhóm.'} /></Card>
+                  ) : (
+                    <ul className="mt-3 grid gap-4 md:grid-cols-2">
+                      {projects.map(p => {
+                        const dl = deadlineState(p.deadlineAt, p.status === 'Archived' ? 'Completed' : undefined);
+                        const pct = p.taskCount ? Math.round((p.completedCount / p.taskCount) * 100) : 0;
+                        return (
+                          <li key={p.id} className="min-w-0">
+                            <Link to={`/projects/${p.id}`} className="group block h-full rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600">
+                              <Card className="h-full p-4 transition-colors group-hover:border-primary-300">
+                                <div className="flex items-start justify-between gap-2 min-w-0">
+                                  <h4 className="min-w-0 font-semibold text-ink line-clamp-2 [overflow-wrap:anywhere] group-hover:text-primary-700">{p.name}</h4>
+                                  <Badge value={p.status} variant={p.status === 'Archived' ? 'neutral' : undefined}>{PROJECT_STATUS[p.status] ?? p.status}</Badge>
+                                </div>
+                                {p.subject && <p className="mt-1 text-sm text-ink-secondary">Môn: {p.subject}</p>}
+                                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-subtle" aria-hidden="true">
+                                  <div className="h-full rounded-full bg-primary-500" style={{ width: `${pct}%` }} />
+                                </div>
+                                <p className="mt-1.5 text-sm text-ink-secondary">
+                                  {p.completedCount}/{p.taskCount} công việc hoàn thành
+                                  {p.deadlineAt && (
+                                    <span className={dl.kind === 'overdue' ? 'font-medium text-danger-700' : dl.kind === 'today' ? 'font-medium text-warning-700' : ''}>
+                                      {' · '}{dl.label || `Hạn ${formatDate(p.deadlineAt)}`}
+                                    </span>
+                                  )}
+                                </p>
+                              </Card>
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
                   )}
                 </div>
-                {isLeader && projOpen && (
-                  <Card className="p-4">
-                    <form noValidate className="grid gap-3 sm:grid-cols-2 items-end" onSubmit={e => { e.preventDefault(); createProject(); }}>
-                      <Input id="proj-name" ref={projNameRef} label="Tên dự án" maxLength={200} value={proj.name} disabled={busy} error={projErrors.name}
-                        onChange={e => { setProj(x => ({ ...x, name: e.target.value })); if (projErrors.name) setProjErrors(x => ({ ...x, name: undefined })); }} />
-                      <Input id="proj-subject" label="Môn học (tuỳ chọn)" maxLength={100} value={proj.subject} disabled={busy} error={projErrors.subject}
-                        onChange={e => { setProj(x => ({ ...x, subject: e.target.value })); if (projErrors.subject) setProjErrors(x => ({ ...x, subject: undefined })); }} />
-                      <Input id="proj-deadline" label="Hạn (giờ Việt Nam, tuỳ chọn)" type="date" value={proj.deadline} disabled={busy}
-                        onChange={e => setProj(x => ({ ...x, deadline: e.target.value }))} />
-                      <Input id="proj-desc" label="Mô tả (tuỳ chọn)" maxLength={2000} value={proj.description} disabled={busy} error={projErrors.description}
-                        onChange={e => { setProj(x => ({ ...x, description: e.target.value })); if (projErrors.description) setProjErrors(x => ({ ...x, description: undefined })); }} />
-                      {actionErrors.project && <p role="alert" className="sm:col-span-2 text-sm text-danger-700 [overflow-wrap:anywhere]">{actionErrors.project}</p>}
-                      <div className="flex gap-2 sm:col-span-2">
-                        <Button type="submit" className="min-h-11" disabled={busy} isLoading={pending === 'project'}>Tạo dự án</Button>
-                        <Button type="button" variant="secondary" className="min-h-11" disabled={busy} onClick={() => setProjOpen(false)}>Hủy</Button>
-                      </div>
-                    </form>
-                  </Card>
-                )}
-                {projects.length === 0 ? (
-                  <Card className="p-4 sm:p-6"><EmptyState illustration="tasks" title="Chưa có dự án" body={isLeader ? 'Tạo dự án đầu tiên cho nhóm.' : 'Trưởng nhóm sẽ tạo dự án cho nhóm.'} /></Card>
-                ) : (
-                  <ul className="grid gap-4 md:grid-cols-2">
-                    {projects.map(p => (
-                      <li key={p.id} className="min-w-0">
-                        <Link to={`/projects/${p.id}`} className="group block h-full rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600">
-                          <Card className="h-full p-4 transition-colors group-hover:border-primary-300">
-                            <div className="flex items-start justify-between gap-2 min-w-0">
-                              <h4 className="min-w-0 font-semibold text-slate-900 line-clamp-2 [overflow-wrap:anywhere] group-hover:text-primary-700">{p.name}</h4>
-                              <Badge variant="neutral">{PROJECT_STATUS[p.status] ?? p.status}</Badge>
-                            </div>
-                            {p.subject && <p className="mt-1 text-sm text-slate-600">Môn: {p.subject}</p>}
-                            <p className="mt-1 text-sm text-slate-600">{p.completedCount}/{p.taskCount} công việc hoàn thành{p.deadlineAt ? ` · Hạn ${formatDate(p.deadlineAt)}` : ''}</p>
-                          </Card>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+
+                {archived.length > 0 && <ArchivedProjects rows={archived} canRestore={isLeader}
+                  onRestore={(p) => { setActionError(''); setDialog({ kind: 'restoreProject', projectId: p.id, name: p.name }); }} />}
 
                 {isLeader && progress && (
                   <Card className="p-4 sm:p-6">
-                    <h3 className="font-semibold text-slate-900">Tiến độ thành viên</h3>
-                    <p className="mt-1 text-sm text-slate-600">Tỷ lệ công việc hoàn thành: {progress.completedTasks}/{progress.totalTasks} ({Math.round(progress.percentComplete)}%)</p>
-                    {progress.unassignedTasks > 0 && <p className="mt-1 text-sm text-warning-700">{progress.unassignedTasks} công việc chưa giao</p>}
-                    <ul className="mt-3 divide-y divide-slate-100">
-                      {progress.members.map(m => (
-                        <li key={m.userId} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2 text-sm min-w-0">
-                          <span className="font-medium [overflow-wrap:anywhere]">{m.displayName}{!m.isActiveMember && <span className="font-normal text-slate-600"> (đã rời nhóm)</span>}</span>
-                          <span className="text-slate-600">{m.total} tổng · {m.inProgress} đang làm · {m.submitted} chờ duyệt · {m.changesRequested} cần sửa · {m.overdue} quá hạn · {m.completed} xong</span>
-                        </li>
-                      ))}
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <h3 className="font-semibold text-ink">Tiến độ thành viên</h3>
+                      <p className="text-sm text-ink-secondary">
+                        {progress.completedTasks}/{progress.totalTasks} hoàn thành · {Math.round(progress.percentComplete)}%
+                        {progress.unassignedTasks > 0 && <span className="text-warning-700"> · {progress.unassignedTasks} chưa giao</span>}
+                      </p>
+                    </div>
+                    <div className="mt-3 hidden grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_5.5rem_4.5rem_4.5rem] gap-x-3 border-b border-line pb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted sm:grid">
+                      <span>Thành viên</span><span>Trạng thái</span>
+                      <span className="text-right">Hoàn thành</span>
+                      <span className="text-right">Quá hạn</span>
+                      <span className="text-right">Nguy cơ</span>
+                    </div>
+                    <ul className="divide-y divide-line">
+                      {progress.members.map(m => {
+                        const toDo = m.total - m.inProgress - m.submitted - m.completed - m.changesRequested;
+                        return (
+                          <li key={m.userId}
+                            className="grid gap-y-2 py-3 min-w-0 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_5.5rem_4.5rem_4.5rem] sm:items-center sm:gap-x-3 sm:gap-y-0">
+                            <span className="min-w-0">
+                              <Link to={`/groups/${id}/members/${m.userId}`}
+                                className="text-sm font-medium text-primary-700 hover:underline [overflow-wrap:anywhere]">
+                                {m.displayName}
+                              </Link>
+                              {!m.isActiveMember && <span className="text-sm text-ink-secondary"> (đã rời nhóm)</span>}
+                            </span>
+                            <StatusBar size="sm" showLegend={false} counts={{
+                              ToDo: Math.max(0, toDo), InProgress: m.inProgress, Submitted: m.submitted,
+                              ChangesRequested: m.changesRequested, Completed: m.completed,
+                            }} />
+                            <p className="text-small text-ink-secondary sm:hidden">
+                              <span className="tabular-nums">{m.completed}/{m.total} hoàn thành</span>
+                              {' · '}<span className={`tabular-nums ${m.overdue > 0 ? 'font-medium text-danger-700' : ''}`}>{m.overdue} quá hạn</span>
+                              {' · '}<span className={`tabular-nums ${(m.atRisk ?? 0) > 0 ? 'font-medium text-warning-700' : ''}`}>{m.atRisk ?? 0} có nguy cơ</span>
+                            </p>
+                            <span className="hidden text-sm tabular-nums text-ink-secondary sm:block sm:text-right">{m.completed}/{m.total}</span>
+                            <span className={`hidden text-sm tabular-nums sm:block sm:text-right ${m.overdue > 0 ? 'font-medium text-danger-700' : 'text-ink-secondary'}`}>{m.overdue}</span>
+                            <span className={`hidden text-sm tabular-nums sm:block sm:text-right ${(m.atRisk ?? 0) > 0 ? 'font-medium text-warning-700' : 'text-ink-secondary'}`}>{m.atRisk ?? 0}</span>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </Card>
                 )}
+
                 {isLeader && (
                   <Card className="p-4 sm:p-6">
-                    <h3 className="font-semibold text-slate-900">Hoạt động gần đây</h3>
-                    {activity.length === 0 ? <p className="mt-2 text-sm text-slate-600">Chưa có hoạt động.</p> : (
-                      <ul className="mt-3 divide-y divide-slate-100">
-                        {activity.map((a: ActivityDto) => (
-                          <li key={a.id} className="py-2 text-sm min-w-0">
-                            <span className="font-medium [overflow-wrap:anywhere]">{a.actorName}</span> — <span className="[overflow-wrap:anywhere]">{a.summary}</span>
-                            <span className="ml-2 text-xs text-slate-600">{formatDateTime(a.createdAt)}</span>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="font-semibold text-ink">Hoạt động gần đây</h3>
+                      <Link to={`/groups/${id}/activity`} className="min-h-9 inline-flex items-center text-sm font-medium text-primary-700 hover:underline">
+                        Xem nhật ký đầy đủ
+                      </Link>
+                    </div>
+                    {activity.length === 0 ? <p className="mt-2 text-sm text-ink-secondary">Chưa có hoạt động.</p> : (
+                      <ul className="mt-3 divide-y divide-line">
+                        {activity.map(a => (
+                          <li key={a.id} className="flex items-start gap-2.5 py-2.5 text-sm min-w-0">
+                            <UserAvatar name={a.actorName} size={24} />
+                            <span className="min-w-0 flex-1">
+                              <span className="font-medium text-ink [overflow-wrap:anywhere]">{a.actorName}</span>
+                              {' — '}<span className="text-ink-secondary [overflow-wrap:anywhere]">{a.summary}</span>
+                            </span>
+                            <span className="shrink-0 text-xs text-ink-muted">{formatDateTime(a.createdAt)}</span>
                           </li>
                         ))}
                       </ul>
@@ -326,76 +301,433 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string }) {
 
               <aside className="min-w-0 space-y-6">
                 <Card className="p-4 sm:p-6">
-                  <h3 className="font-semibold text-slate-900">Thành viên ({group.members.length})</h3>
-                  <ul className="mt-3 divide-y divide-slate-100">
+                  <h3 className="font-semibold text-ink">Thành viên ({group.members.length})</h3>
+                  <ul className="mt-3 divide-y divide-line">
                     {group.members.map(m => {
                       const isMe = m.userId === userId;
                       const soleLeader = m.role === 'Leader' && leaderCount <= 1;
                       return (
-                        <li key={m.userId} className="flex flex-wrap items-center gap-2 py-2.5 min-w-0">
-                          <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-100 text-xs font-semibold text-primary-700">{initials(m.displayName)}</span>
+                        <li key={m.userId} className="flex items-center gap-2.5 py-2.5 min-w-0">
+                          <UserAvatar name={m.displayName} url={m.avatarUrl} size={32} />
                           <span className="min-w-0 flex-1">
-                            <span className="block text-sm font-medium [overflow-wrap:anywhere]">{m.displayName}{isMe ? ' (bạn)' : ''}</span>
-                            <RoleBadge role={m.role} />
-                            {isMe && soleLeader && <span className="mt-0.5 block text-xs text-slate-600">Trưởng nhóm duy nhất — không thể hạ vai trò hoặc rời.</span>}
+                            {(isLeader || isMe) ? (
+                              <Link to={`/groups/${id}/members/${m.userId}`}
+                                className="text-sm font-medium text-primary-700 hover:underline [overflow-wrap:anywhere]">
+                                {m.displayName}
+                              </Link>
+                            ) : (
+                              <span className="text-sm font-medium text-ink [overflow-wrap:anywhere]">{m.displayName}</span>
+                            )}
+                            {isMe && <span className="text-sm text-ink-secondary"> (bạn)</span>}
+                            <span className="mt-0.5 flex flex-wrap items-center gap-2">
+                              <RoleBadge role={m.role} />
+                              {isLeader && m.openTaskCount != null && m.openTaskCount > 0 && (
+                                <span className="text-xs text-ink-secondary">{m.openTaskCount} việc đang mở</span>
+                              )}
+                            </span>
                           </span>
                           {isLeader && !isMe && (
-                            <span className="flex w-full flex-wrap justify-end gap-1.5 pl-10">
-                              <Button size="sm" variant="secondary" className="min-h-11" disabled={busy}
-                                onClick={() => setDialog({ kind: 'role', memberId: m.userId, memberName: m.displayName, toRole: m.role === 'Leader' ? ROLE_NUM.Member : ROLE_NUM.Leader })}>
-                                {m.role === 'Leader' ? 'Hạ vai trò' : 'Làm trưởng nhóm'}
-                              </Button>
-                              <Button size="sm" variant="danger" className="min-h-11" disabled={busy || soleLeader}
-                                onClick={() => setDialog({ kind: 'remove', memberId: m.userId, memberName: m.displayName })}>Xóa</Button>
-                            </span>
+                            <ActionMenu
+                              label={<Icon name="more-horizontal" size={20} aria-hidden />}
+                              ariaLabel={`Thao tác với ${m.displayName}`}
+                              chevron={false}
+                              triggerClassName={buttonClasses({ variant: 'ghost', size: 'sm', className: 'min-h-11 min-w-11 px-0 sm:min-h-9 sm:min-w-9' })}
+                              items={[
+                                m.role === 'Leader'
+                                  ? { label: 'Hạ vai trò', onSelect: () => { setActionError(''); setDialog({ kind: 'role', memberId: m.userId, memberName: m.displayName, toRole: ROLE_NUM.Member }); } }
+                                  : { label: 'Làm trưởng nhóm', onSelect: () => { setActionError(''); setDialog({ kind: 'role', memberId: m.userId, memberName: m.displayName, toRole: ROLE_NUM.Leader }); } },
+                                {
+                                  label: 'Xóa khỏi nhóm', danger: true,
+                                  disabled: soleLeader, disabledReason: 'Bạn là Trưởng nhóm duy nhất.',
+                                  onSelect: () => { setActionError(''); setDialog({ kind: 'remove', memberId: m.userId, memberName: m.displayName }); },
+                                },
+                              ]}
+                            />
                           )}
                         </li>
                       );
                     })}
                   </ul>
-                  {isLeader && (
-                    <div className="mt-4 border-t border-slate-200 pt-4">
-                      <h4 className="text-sm font-semibold text-slate-900">Mã mời</h4>
-                      <p className="mt-1 text-xs text-slate-600">Chỉ mã vừa tạo trong phiên này được hiển thị.</p>
-                      {invite ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <code className="rounded-lg bg-slate-100 px-3 py-1.5 font-mono text-base tracking-wider">{invite.code}</code>
-                          <Button size="sm" variant="secondary" className="min-h-9" onClick={() => void copyCode()}>Sao chép mã</Button>
-                          <Button size="sm" variant="danger" className="min-h-9" disabled={busy} onClick={() => setInviteConfirm(true)}>Thu hồi</Button>
-                        </div>
-                      ) : (
-                        <Button size="sm" variant="secondary" className="mt-2 min-h-11" disabled={busy} isLoading={pending === 'invite'} onClick={createInvite}>Tạo mã mời</Button>
-                      )}
-                      {actionErrors.invite && !inviteConfirm && <p role="alert" className="mt-1 text-sm text-danger-700">{actionErrors.invite}</p>}
-                    </div>
-                  )}
                 </Card>
+
+                {isLeader && (
+                  <Card className="p-4 sm:p-6">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="font-semibold text-ink">Mã mời</h3>
+                      <Button size="sm" variant="secondary" className="min-h-9 gap-1" onClick={() => setInviteOpen(true)}>
+                        <Icon name="plus" size={14} />Tạo mã mời
+                      </Button>
+                    </div>
+                    {invitesQ.isPending ? <p className="mt-2 text-sm text-ink-secondary">Đang tải…</p>
+                      : invites.length === 0 ? <p className="mt-2 text-sm text-ink-secondary">Chưa có mã mời nào.</p>
+                        : (
+                          <>
+                            <ul className="mt-3 divide-y divide-line">
+                              {activeInvites.map(i => <InviteRow key={i.id} invite={i}
+                                onRevoke={() => { setActionError(''); setDialog({ kind: 'revokeInvite', invite: i }); }} />)}
+                            </ul>
+                            {deadInvites.length > 0 && (
+                              <details className="mt-4 border-t border-line pt-3">
+                                <summary className="min-h-9 cursor-pointer text-sm font-medium text-ink-secondary hover:text-ink">
+                                  Mã không còn hiệu lực ({deadInvites.length})
+                                </summary>
+                                <ul className="mt-1 divide-y divide-line">
+                                  {deadInvites.map(i => <InviteRow key={i.id} invite={i} />)}
+                                </ul>
+                              </details>
+                            )}
+                          </>
+                        )}
+                  </Card>
+                )}
               </aside>
             </div>
 
-            <ConfirmationDialog open={!!dialog} busy={busy} onClose={() => { if (!busy) setDialog(null); }}
-              title={dialog?.kind === 'leave' ? 'Rời nhóm' : dialog?.kind === 'remove' ? 'Xóa thành viên' : 'Đổi vai trò'}>
-              {dialog?.kind === 'leave' && <p>Bạn sẽ rời nhóm "{group.name}". Công việc được giao cho bạn <b>không</b> được tự động giao lại.{(() => { const n = group.members.find(x => x.userId === authService.currentUser()?.id)?.openTaskCount; return n ? ` ${n} công việc chưa hoàn thành sẽ chuyển về Chưa giao.` : ''; })()}</p>}
-              {dialog?.kind === 'remove' && (() => { const n = group.members.find(x => x.userId === dialog.memberId)?.openTaskCount; return n ? <p className="text-sm text-slate-600">{n} công việc chưa hoàn thành sẽ chuyển về Chưa giao.</p> : null; })()}
-              {dialog?.kind === 'remove' && <p>Xóa {dialog.memberName} khỏi nhóm? Công việc đã giao cho họ <b>không</b> được tự động giao lại.</p>}
-              {dialog?.kind === 'role' && <p>{dialog.toRole === ROLE_NUM.Member ? `Hạ ${dialog.memberName} xuống Thành viên?` : `Nâng ${dialog.memberName} lên Trưởng nhóm?`}</p>}
-              {actionErrors.member && <p role="alert" className="mt-3 text-sm text-danger-700 [overflow-wrap:anywhere]">{actionErrors.member}</p>}
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button variant={dialog?.kind === 'role' ? 'primary' : 'danger'} className="min-h-11" disabled={busy} isLoading={pending === 'member' || pending === 'leave'} onClick={confirmAction}>Xác nhận</Button>
-                <Button variant="secondary" className="min-h-11" disabled={busy} onClick={() => setDialog(null)}>Hủy</Button>
-              </div>
-            </ConfirmationDialog>
+            {projOpen && <ProjectDialog groupId={id} busy={busy} onClose={() => setProjOpen(false)} onCreated={() => { setProjOpen(false); toast.success('Đã tạo dự án.'); invalidate(); }} />}
+            {editOpen && <EditGroupDialog groupId={id} initialName={group.name} initialDesc={group.description ?? ''}
+              onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); toast.success('Đã cập nhật nhóm.'); invalidate(); }} />}
+            {archiveOpen && <ArchiveGroupDialog groupId={id} name={group.name} onClose={() => setArchiveOpen(false)} />}
+            {inviteOpen && <InviteDialog groupId={id} onClose={() => { setInviteOpen(false); void qc.invalidateQueries({ queryKey: qk.groupInvites(userId ?? '', id) }); }} />}
+            {settingsOpen && (
+              <GroupSettingsDialog groupId={id} open={settingsOpen} onClose={() => setSettingsOpen(false)} onSaved={invalidate} />
+            )}
 
-            <ConfirmationDialog open={inviteConfirm} busy={busy} onClose={() => { if (!busy) setInviteConfirm(false); }} title="Thu hồi mã mời">
-              <p>Thu hồi mã "{invite?.code}"? Người có mã cũ sẽ không tham gia được — cần tạo mã mới nếu đổi ý.</p>
-              {actionErrors.invite && <p role="alert" className="mt-3 text-sm text-danger-700 [overflow-wrap:anywhere]">{actionErrors.invite}</p>}
+            <ConfirmationDialog open={!!dialog} busy={busy} onClose={() => { if (!busy) setDialog(null); }}
+              title={dialog?.kind === 'leave' ? 'Rời nhóm'
+                : dialog?.kind === 'remove' ? 'Xóa thành viên'
+                  : dialog?.kind === 'role' ? 'Đổi vai trò'
+                    : dialog?.kind === 'restoreProject' ? 'Khôi phục dự án'
+                      : 'Thu hồi mã mời'}>
+              {dialog?.kind === 'leave' && (
+                <p>
+                  Bạn sẽ rời nhóm "{group.name}".
+                  {(meMember?.openTaskCount ?? 0) > 0 && ` ${meMember!.openTaskCount} công việc chưa hoàn thành của bạn sẽ chuyển về Chưa giao và các yêu cầu Marketplace đang hoạt động sẽ bị hủy.`}
+                  {(meMember?.openTaskCount ?? 0) === 0 && ' Các yêu cầu Marketplace đang hoạt động của bạn sẽ bị hủy.'}
+                </p>
+              )}
+              {dialog?.kind === 'remove' && (
+                <p>
+                  Xóa {dialog.memberName} khỏi nhóm "{group.name}"?
+                  {(() => { const n = group.members.find(x => x.userId === dialog.memberId)?.openTaskCount ?? 0;
+                    return n > 0 ? ` ${n} công việc chưa hoàn thành của họ sẽ chuyển về Chưa giao và các yêu cầu Marketplace đang hoạt động sẽ bị hủy.` : ' Các yêu cầu Marketplace đang hoạt động của họ sẽ bị hủy.'; })()}
+                </p>
+              )}
+              {dialog?.kind === 'role' && <p>{dialog.toRole === ROLE_NUM.Member ? `Hạ ${dialog.memberName} xuống Thành viên?` : `Nâng ${dialog.memberName} lên Trưởng nhóm?`}</p>}
+              {dialog?.kind === 'restoreProject' && <p>Khôi phục dự án "{dialog.name}"? Dự án sẽ hiện lại trong danh sách hoạt động của nhóm.</p>}
+              {dialog?.kind === 'revokeInvite' && <p>Thu hồi mã mời{(dialog.invite.label ? ` "${dialog.invite.label}"` : '')}? Người có mã cũ sẽ không tham gia được — cần tạo mã mới nếu đổi ý.</p>}
+              {actionError && <p role="alert" className="mt-3 text-sm text-danger-700 [overflow-wrap:anywhere]">{actionError}</p>}
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button variant="danger" className="min-h-11" disabled={busy} isLoading={pending === 'revoke'} onClick={confirmRevoke}>Thu hồi</Button>
-                <Button variant="secondary" className="min-h-11" disabled={busy} onClick={() => setInviteConfirm(false)}>Hủy</Button>
+                <Button
+                  variant={dialog?.kind === 'role' || dialog?.kind === 'restoreProject' ? 'primary' : 'danger'}
+                  className="min-h-11" disabled={busy}
+                  isLoading={busy}
+                  onClick={() => {
+                    if (!dialog) return;
+                    if (dialog.kind === 'leave') leaveM.mutate();
+                    else if (dialog.kind === 'remove') removeM.mutate(dialog.memberId);
+                    else if (dialog.kind === 'role') roleM.mutate({ memberId: dialog.memberId, toRole: dialog.toRole! });
+                    else if (dialog.kind === 'restoreProject') restoreProjectM.mutate(dialog.projectId);
+                    else if (dialog.kind === 'revokeInvite') revokeM.mutate(dialog.invite.id);
+                  }}>
+                  Xác nhận
+                </Button>
+                <Button variant="secondary" className="min-h-11" disabled={busy} onClick={() => setDialog(null)}>Hủy</Button>
               </div>
             </ConfirmationDialog>
           </>
         )}
     </div>
+  );
+}
+
+function InviteRow({ invite, onRevoke }: { invite: InviteListItemDto; onRevoke?: () => void }) {
+  return (
+    <li className="min-w-0 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="min-w-0 text-sm font-medium text-ink [overflow-wrap:anywhere]">{invite.label ?? 'Mã mời không nhãn'}</span>
+        <Badge variant={invite.status === 'Active' ? 'success' : 'neutral'}>{INVITE_STATUS[invite.status] ?? invite.status}</Badge>
+      </div>
+      <p className="mt-1 text-xs text-ink-secondary">
+        {invite.maxUses != null ? `Đã dùng ${invite.usedCount}/${invite.maxUses}` : `Đã dùng ${invite.usedCount} lượt`}
+        {' · '}{invite.expiresAt ? `Hết hạn ${formatDateTime(invite.expiresAt)}` : 'Không hết hạn'}
+      </p>
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs text-ink-muted">{invite.createdByName} · {formatDate(invite.createdAt)}</span>
+        {onRevoke && (
+          <Button size="sm" variant="danger" className="min-h-9" onClick={onRevoke}>Thu hồi</Button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function ArchivedProjects({ rows, canRestore, onRestore }: {
+  rows: { id: string; name: string; archivedAt?: string | null; taskCount: number; completedCount: number }[];
+  canRestore: boolean; onRestore: (p: { id: string; name: string }) => void;
+}) {
+  return (
+    <details className="group rounded-2xl border border-line bg-surface-subtle">
+      <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-ink">
+        Dự án đã lưu trữ ({rows.length})
+        <Icon name="chevron-down" size={16} className="transition-transform group-open:rotate-180" aria-hidden />
+      </summary>
+      <ul className="divide-y divide-line border-t border-line">
+        {rows.map(p => (
+          <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 min-w-0">
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-ink [overflow-wrap:anywhere]">{p.name}</span>
+              <span className="text-xs text-ink-secondary">
+                Lưu trữ {formatDate(p.archivedAt)} · {p.completedCount}/{p.taskCount} công việc
+              </span>
+            </span>
+            {canRestore && <Button size="sm" variant="secondary" className="min-h-9" onClick={() => onRestore(p)}>Khôi phục</Button>}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+// ── Dialogs ──
+
+function ProjectDialog({ groupId, busy, onClose, onCreated }: {
+  groupId: string; busy: boolean; onClose: () => void; onCreated: () => void;
+}) {
+  const [form, setForm] = useState({ name: '', description: '', subject: '', deadline: '' });
+  const [errors, setErrors] = useState<{ name?: string; description?: string; subject?: string; form?: string }>({});
+  const createM = useMutation({
+    mutationFn: () => projectsService.create(groupId, form.name.trim(), form.description.trim() || undefined,
+      form.subject.trim() || undefined,
+      form.deadline && Number.isFinite(Date.parse(form.deadline)) ? new Date(`${form.deadline}T23:59:00+07:00`).toISOString() : undefined),
+    onSuccess: onCreated,
+    onError: e => setErrors(x => ({ ...x, form: errMsg(e, 'Không tạo được dự án.') })),
+  });
+  const submit = () => {
+    const errs: typeof errors = {};
+    if (!form.name.trim()) errs.name = 'Nhập tên dự án.';
+    else if (form.name.trim().length > 200) errs.name = 'Tên dự án tối đa 200 ký tự.';
+    if (form.description.trim().length > 2000) errs.description = 'Mô tả tối đa 2.000 ký tự.';
+    if (form.subject.trim().length > 100) errs.subject = 'Môn học tối đa 100 ký tự.';
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+    createM.mutate();
+  };
+  return (
+    <ConfirmationDialog open busy={busy || createM.isPending} onClose={onClose} title="Tạo dự án">
+      <form noValidate className="space-y-4" onSubmit={e => { e.preventDefault(); submit(); }}>
+        <Input id="proj-name" label="Tên dự án" maxLength={200} value={form.name} disabled={createM.isPending}
+          error={errors.name} onChange={e => { setForm(x => ({ ...x, name: e.target.value })); if (errors.name) setErrors(x => ({ ...x, name: undefined })); }} />
+        <Input id="proj-subject" label="Môn học (tuỳ chọn)" maxLength={100} value={form.subject} disabled={createM.isPending}
+          error={errors.subject} onChange={e => { setForm(x => ({ ...x, subject: e.target.value })); if (errors.subject) setErrors(x => ({ ...x, subject: undefined })); }} />
+        <div>
+          <label htmlFor="proj-deadline" className="block text-sm font-medium text-ink-secondary mb-1">Hạn (tuỳ chọn)</label>
+          <input id="proj-deadline" type="date" value={form.deadline} disabled={createM.isPending}
+            onChange={e => setForm(x => ({ ...x, deadline: e.target.value }))}
+            className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label htmlFor="proj-desc" className="block text-sm font-medium text-ink-secondary mb-1">Mô tả (tuỳ chọn)</label>
+          <textarea id="proj-desc" rows={3} maxLength={2000} value={form.description} disabled={createM.isPending}
+            aria-invalid={!!errors.description}
+            onChange={e => { setForm(x => ({ ...x, description: e.target.value })); if (errors.description) setErrors(x => ({ ...x, description: undefined })); }}
+            className="w-full rounded-xl border border-line bg-surface px-4 py-2 text-base text-ink focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          {errors.description && <p role="alert" className="mt-1 text-sm text-danger-700">{errors.description}</p>}
+        </div>
+        {errors.form && <p role="alert" className="text-sm text-danger-700">{errors.form}</p>}
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" className="min-h-11" disabled={createM.isPending} isLoading={createM.isPending}>Tạo dự án</Button>
+          <Button type="button" variant="secondary" className="min-h-11" disabled={createM.isPending} onClick={onClose}>Hủy</Button>
+        </div>
+      </form>
+    </ConfirmationDialog>
+  );
+}
+
+function EditGroupDialog({ groupId, initialName, initialDesc, onClose, onSaved }: {
+  groupId: string; initialName: string; initialDesc: string; onClose: () => void; onSaved: () => void;
+}) {
+  const [name, setName] = useState(initialName);
+  const [desc, setDesc] = useState(initialDesc);
+  const [error, setError] = useState('');
+  const saveM = useMutation({
+    mutationFn: () => groupsManage.update(groupId, name.trim(), desc.trim() || undefined),
+    onSuccess: onSaved,
+    onError: e => setError(errMsg(e, 'Không cập nhật được nhóm.')),
+  });
+  return (
+    <ConfirmationDialog open busy={saveM.isPending} onClose={onClose} title="Sửa nhóm">
+      <form noValidate className="space-y-4" onSubmit={e => {
+        e.preventDefault();
+        if (!name.trim()) { setError('Nhập tên nhóm.'); return; }
+        setError('');
+        saveM.mutate();
+      }}>
+        <Input id="edit-name" label="Tên nhóm" maxLength={200} value={name} disabled={saveM.isPending}
+          onChange={e => { setName(e.target.value); if (error) setError(''); }} />
+        <div>
+          <label htmlFor="edit-desc" className="block text-sm font-medium text-ink-secondary mb-1">Mô tả (tuỳ chọn)</label>
+          <textarea id="edit-desc" rows={3} maxLength={1000} value={desc} disabled={saveM.isPending}
+            onChange={e => setDesc(e.target.value)}
+            className="w-full rounded-xl border border-line bg-surface px-4 py-2 text-base text-ink focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        {error && <p role="alert" className="text-sm text-danger-700">{error}</p>}
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" className="min-h-11" disabled={saveM.isPending} isLoading={saveM.isPending}>Lưu</Button>
+          <Button type="button" variant="secondary" className="min-h-11" disabled={saveM.isPending} onClick={onClose}>Hủy</Button>
+        </div>
+      </form>
+    </ConfirmationDialog>
+  );
+}
+
+function ArchiveGroupDialog({ groupId, name, onClose }: { groupId: string; name: string; onClose: () => void }) {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const userId = useCurrentUserId();
+  const [typed, setTyped] = useState('');
+  const [error, setError] = useState('');
+  const archiveM = useMutation({
+    mutationFn: () => groupsService.archiveGroup(groupId, typed),
+    onSuccess: () => {
+      toast.success('Đã lưu trữ nhóm.');
+      void qc.invalidateQueries({ queryKey: qk.myGroups(userId ?? '') });
+      void qc.invalidateQueries({ queryKey: qk.archivedGroups(userId ?? '') });
+      void qc.invalidateQueries({ queryKey: qk.leaderQueue(userId ?? '') });
+      void qc.invalidateQueries({ queryKey: qk.myTasks(userId ?? '') });
+      navigate('/groups');
+    },
+    onError: e => setError(errMsg(e, 'Không lưu trữ được nhóm.')),
+  });
+  return (
+    <ConfirmationDialog open busy={archiveM.isPending} onClose={onClose} title="Lưu trữ nhóm">
+      <ul className="list-disc space-y-1.5 pl-5 text-sm text-ink-secondary">
+        <li>Nhóm sẽ ẩn khỏi danh sách và mọi thành viên tạm thời không truy cập được.</li>
+        <li>Mã mời ngừng hoạt động.</li>
+        <li>Các yêu cầu Marketplace đang hoạt động bị hủy.</li>
+        <li>Trưởng nhóm có thể khôi phục trong mục Nhóm đã lưu trữ.</li>
+      </ul>
+      <form noValidate className="mt-4 space-y-3" onSubmit={e => {
+        e.preventDefault();
+        if (typed !== name) return;
+        archiveM.mutate();
+      }}>
+        <Input id="archive-name" label={`Nhập tên nhóm để xác nhận`} placeholder={name}
+          value={typed} disabled={archiveM.isPending} autoComplete="off"
+          onChange={e => { setTyped(e.target.value); if (error) setError(''); }} />
+        {error && <p role="alert" className="text-sm text-danger-700">{error}</p>}
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" variant="danger" className="min-h-11" disabled={typed !== name || archiveM.isPending}
+            isLoading={archiveM.isPending}>Lưu trữ nhóm</Button>
+          <Button type="button" variant="secondary" className="min-h-11" disabled={archiveM.isPending} onClick={onClose}>Hủy</Button>
+        </div>
+      </form>
+    </ConfirmationDialog>
+  );
+}
+
+type InviteExpiryChoice = '1d' | '7d' | '30d' | 'never';
+
+function InviteDialog({ groupId, onClose }: { groupId: string; onClose: () => void }) {
+  const toast = useToast();
+  const [label, setLabel] = useState('');
+  const [expiry, setExpiry] = useState<InviteExpiryChoice>('7d');
+  const [limitMode, setLimitMode] = useState<'unlimited' | 'limited'>('unlimited');
+  const [maxUses, setMaxUses] = useState('');
+  const [errors, setErrors] = useState<{ label?: string; maxUses?: string; form?: string }>({});
+  const [created, setCreated] = useState<{ code: string } | null>(null);
+  const [copyHint, setCopyHint] = useState('');
+
+  const createM = useMutation({
+    mutationFn: () => {
+      const days = expiry === '1d' ? 1 : expiry === '7d' ? 7 : expiry === '30d' ? 30 : null;
+      return groupsService.createInvite(groupId, {
+        label: label.trim() || undefined,
+        expiresAt: days ? new Date(Date.now() + days * 86_400_000).toISOString() : null,
+        maxUses: limitMode === 'limited' ? Number(maxUses) : null,
+      });
+    },
+    onSuccess: inv => setCreated({ code: inv.code }),
+    onError: e => setErrors(x => ({ ...x, form: errMsg(e, 'Không tạo được mã mời.') })),
+  });
+
+  const submit = () => {
+    const errs: typeof errors = {};
+    if (label.trim().length > 100) errs.label = 'Nhãn tối đa 100 ký tự.';
+    if (limitMode === 'limited') {
+      const n = Number(maxUses);
+      if (!Number.isInteger(n) || n < 1 || n > 500) errs.maxUses = 'Số lượt từ 1 đến 500.';
+    }
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+    createM.mutate();
+  };
+
+  const copy = async (text: string, what: string) => {
+    try { await navigator.clipboard.writeText(text); toast.success(`Đã sao chép ${what}.`); setCopyHint(''); }
+    catch { setCopyHint('Không sao chép được. Hãy chọn và chép thủ công.'); }
+  };
+
+  return (
+    <ConfirmationDialog open busy={createM.isPending} onClose={onClose} title="Tạo mã mời">
+      {created ? (
+        <div className="space-y-4">
+          <p className="text-sm text-ink-secondary">Chia sẻ mã hoặc liên kết cho thành viên mới.</p>
+          <div className="rounded-xl border border-line bg-surface-subtle p-4 text-center">
+            <code className="font-mono text-2xl font-semibold tracking-[0.2em] text-ink">{created.code}</code>
+            <p className="mt-2 break-all font-mono text-xs text-ink-secondary">{`${window.location.origin}/join/${created.code}`}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" className="min-h-11" onClick={() => void copy(created.code, 'mã')}>Sao chép mã</Button>
+            <Button variant="secondary" className="min-h-11" onClick={() => void copy(`${window.location.origin}/join/${created.code}`, 'liên kết')}>Sao chép liên kết</Button>
+          </div>
+          {copyHint && <p role="alert" className="text-sm text-danger-700">{copyHint}</p>}
+          <p className="text-xs text-ink-muted">Mã chỉ hiển thị một lần. Hãy sao chép trước khi đóng.</p>
+          <Button className="min-h-11 w-full" onClick={onClose}>Đóng</Button>
+        </div>
+      ) : (
+        <form noValidate className="space-y-4" onSubmit={e => { e.preventDefault(); submit(); }}>
+          <Input id="invite-label" label="Nhãn (tuỳ chọn)" maxLength={100} value={label} disabled={createM.isPending}
+            error={errors.label} hint="Giúp nhận ra mã này dùng cho ai, ví dụ “Lớp nhóm 3”."
+            onChange={e => { setLabel(e.target.value); if (errors.label) setErrors(x => ({ ...x, label: undefined })); }} />
+          <div>
+            <label htmlFor="invite-expiry" className="block text-sm font-medium text-ink-secondary mb-1">Hạn dùng</label>
+            <select id="invite-expiry" value={expiry} disabled={createM.isPending}
+              onChange={e => setExpiry(e.target.value as InviteExpiryChoice)}
+              className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-primary-600">
+              <option value="1d">1 ngày</option>
+              <option value="7d">7 ngày</option>
+              <option value="30d">30 ngày</option>
+              <option value="never">Không hết hạn</option>
+            </select>
+          </div>
+          <fieldset>
+            <legend className="text-sm font-medium text-ink-secondary">Số lượt dùng</legend>
+            <div className="mt-2 space-y-2">
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input type="radio" name="invite-uses" checked={limitMode === 'unlimited'} disabled={createM.isPending}
+                  onChange={() => setLimitMode('unlimited')} className="h-4 w-4 accent-primary-600" />
+                Không giới hạn
+              </label>
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input type="radio" name="invite-uses" checked={limitMode === 'limited'} disabled={createM.isPending}
+                  onChange={() => setLimitMode('limited')} className="h-4 w-4 accent-primary-600" />
+                Giới hạn
+              </label>
+              {limitMode === 'limited' && (
+                <Input id="invite-max" label="Số lượt (1–500)" value={maxUses} disabled={createM.isPending}
+                  inputMode="numeric" error={errors.maxUses}
+                  onChange={e => { setMaxUses(e.target.value); if (errors.maxUses) setErrors(x => ({ ...x, maxUses: undefined })); }} />
+              )}
+            </div>
+          </fieldset>
+          {errors.form && <p role="alert" className="text-sm text-danger-700">{errors.form}</p>}
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" className="min-h-11" disabled={createM.isPending} isLoading={createM.isPending}>Tạo mã</Button>
+            <Button type="button" variant="secondary" className="min-h-11" disabled={createM.isPending} onClick={onClose}>Hủy</Button>
+          </div>
+        </form>
+      )}
+    </ConfirmationDialog>
   );
 }

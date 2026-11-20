@@ -5,11 +5,11 @@ import Button from '../ui/Button';
 import Illustration, { type IllustrationName } from '../ui/Illustration';
 
 
-export function Breadcrumb({ items }: { items: { label: string; to?: string }[] }) {
+export function Breadcrumb({ items, hideCurrentBelowSm = false }: { items: { label: string; to?: string }[]; hideCurrentBelowSm?: boolean }) {
   return (
     <nav aria-label="Đường dẫn" className="flex flex-wrap items-center gap-1.5 text-sm">
       {items.map((it, i) => (
-        <span key={i} className="flex items-center gap-1.5 min-w-0">
+        <span key={i} className={`flex items-center gap-1.5 min-w-0${hideCurrentBelowSm && i === items.length - 1 ? ' max-sm:hidden' : ''}`}>
           {i > 0 && <Icon name="chevron-right" size={14} className="text-slate-500" />}
           {it.to
             ? <Link to={it.to} className="min-h-9 inline-flex items-center text-primary-700 font-medium hover:underline">{it.label}</Link>
@@ -32,12 +32,12 @@ export function Skeleton({ label }: { label: string }) {
   );
 }
 
-export function ErrorState({ message, onRetry, backTo, backLabel }: { message: string; onRetry: () => void; backTo?: string; backLabel?: string }) {
+export function ErrorState({ message, onRetry, backTo, backLabel }: { message: string; onRetry?: () => void; backTo?: string; backLabel?: string }) {
   return (
     <div>
       <p role="alert" className="flex items-start gap-1.5 text-sm text-danger-700 [overflow-wrap:anywhere]"><Icon name="alert" size={16} className="mt-0.5 shrink-0" />{message}</p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <Button variant="secondary" className="min-h-11" onClick={onRetry}>Thử lại</Button>
+        {onRetry && <Button variant="secondary" className="min-h-11" onClick={onRetry}>Thử lại</Button>}
         {backTo && <Link to={backTo} className="min-h-11 inline-flex items-center text-primary-700 font-medium hover:underline">{backLabel ?? 'Quay lại'}</Link>}
       </div>
     </div>

@@ -1,225 +1,230 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MainLayout from '../layouts/MainLayout';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import Icon from '../components/ui/Icon';
 import Button from '../components/ui/Button';
-import Input from '../components/ui/Input';
 import ResponsiveFilters from '../components/ui/ResponsiveFilters';
+import { ErrorState } from '../components/workspace/WorkspaceUI';
+import { SubmitTaskDialog } from '../components/tasks/TaskDialogs';
+import MyTaskRow from '../components/tasks/MyTaskRow';
+import { useToast } from '../components/ui/Toast';
+import { useCurrentUserId } from '../hooks/use-current-user-id';
+import { qk } from '../services/query-keys';
 import { dashboardService, type MyTaskDto } from '../services/dashboard';
-import { authService } from '../services/auth';
-import { formatDate, formatDateTime, STATUS_LABEL, PRIORITY_LABEL } from '../utils/presentation';
-import { buildDashboardModel, deadlineTime, readDashboardFilters, type DashboardPeriod } from '../components/dashboard/dashboard-model';
+import { tasksService, TaskStatus } from '../services/tasks';
+import { deadlineState } from '../utils/task-time';
+import { STATUS_LABEL, PRIORITY_LABEL, formatDate } from '../utils/presentation';
 
-const NAV_STATE = (search: string) => ({ navigationSection: '/my-tasks', returnTo: `/my-tasks${search}` });
 const errMsg = (e: unknown, fb: string) =>
-  typeof (e as { message?: unknown })?.message === 'string' && (e as { message?: unknown }).message ? (e as { message: string }).message : fb;
+  typeof (e as { message?: unknown })?.message === 'string' && (e as { message: string }).message ? (e as { message: string }).message : fb;
+
+const SECTIONS: { kind: string; label: string }[] = [
+  { kind: 'overdue', label: 'Quá hạn' },
+  { kind: 'today', label: 'Hôm nay' },
+  { kind: 'tomorrow', label: 'Ngày mai' },
+  { kind: 'soon', label: '7 ngày tới' },
+  { kind: 'later', label: 'Sau đó' },
+  { kind: 'none', label: 'Không có hạn' },
+];
 
 export default function MyTasks() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const userId = authService.currentUser()?.id;
+  const me = useCurrentUserId() ?? '';
+  const qc = useQueryClient();
+  const toast = useToast();
   const [params, setParams] = useSearchParams();
-  const filters = useMemo(() => readDashboardFilters(params), [params]);
-  const [state, setState] = useState<{ items: MyTaskDto[]; loading: boolean; error: string }>({ items: [], loading: true, error: '' });
-  const [attempt, setAttempt] = useState(0);
-  const [now, setNow] = useState(() => Date.now());
+  const [submitTask, setSubmitTask] = useState<MyTaskDto | null>(null);
 
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 60000);
-    const onFocus = () => setNow(Date.now());
-    window.addEventListener('focus', onFocus);
-    return () => { clearInterval(id); window.removeEventListener('focus', onFocus); };
-  }, []);
-
-  const fetchKey = `${attempt}:${userId ?? ''}`;
-  const [lastKey, setLastKey] = useState(fetchKey);
-  if (lastKey !== fetchKey) {
-    setLastKey(fetchKey);
-    setState({ items: [], loading: true, error: '' });
-  }
-  useEffect(() => {
-    let cancelled = false;
-    if (!authService.isLoggedIn()) { navigate('/login'); return; }
-    dashboardService.myTasks()
-      .then(items => { if (!cancelled) setState({ items, loading: false, error: '' }); })
-      .catch(e => { if (!cancelled) setState({ items: [], loading: false, error: errMsg(e, 'Không tải được công việc. Vui lòng thử lại.') }); });
-    return () => { cancelled = true; };
-  }, [fetchKey, navigate]);
-
-  const model = useMemo(() => buildDashboardModel(state.items, filters, now), [state.items, filters, now]);
-
+  const filters = useMemo(() => ({
+    status: params.get('status') ?? '',
+    project: params.get('project') ?? '',
+    priority: params.get('priority') ?? '',
+    done: params.get('done') === '1',
+  }), [params]);
   const updateFilters = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
-    for (const [key, value] of Object.entries(patch)) { if (!value) next.delete(key); else next.set(key, value); }
-    next.delete('page');
+    for (const [k, v] of Object.entries(patch)) { if (!v) next.delete(k); else next.set(k, v); }
     setParams(next, { replace: true });
   };
-  const clearFilters = () => setParams(new URLSearchParams(), { replace: true });
-  const setPage = (p: number) => {
-    const next = new URLSearchParams(params);
-    if (p <= 1) next.delete('page'); else next.set('page', String(p));
-    setParams(next, { replace: true });
-  };
-  const [searchDraft, setSearchDraft] = useState(filters.search);
-  const [lastAppliedSearch, setLastAppliedSearch] = useState(filters.search);
-  if (lastAppliedSearch !== filters.search) {
-    setLastAppliedSearch(filters.search);
-    setSearchDraft(filters.search);
-  }
-  const commitSearch = () => { if (searchDraft !== filters.search) updateFilters({ q: searchDraft || null }); };
-  const projectMissing = filters.project && !model.projects.some(p => p.id === filters.project);
-  const chips: string[] = [];
-  if (filters.period === 'today') chips.push('Hôm nay');
-  if (filters.period === 'overdue') chips.push('Quá hạn');
-  if (filters.date) chips.push(`Ngày ${formatDate(`${filters.date}T00:00:00+07:00`)}`);
-  if (filters.project) chips.push(`Dự án: ${model.projects.find(p => p.id === filters.project)?.name ?? 'Không còn trong danh sách'}`);
-  if (filters.status) chips.push(`Trạng thái: ${STATUS_LABEL[filters.status] ?? filters.status}`);
 
-  const row = (t: MyTaskDto) => {
-    const time = deadlineTime(t.deadlineAt);
-    const isOverdue = time !== null && time < now;
-    return (
-      <li key={t.id} className="border-b border-slate-100 last:border-0">
-        <Link to={`/tasks/${t.id}`} state={NAV_STATE(location.search)}
-          className="group grid grid-cols-[minmax(0,1fr)_20px] items-center gap-x-3 gap-y-2 rounded-lg px-2 py-4 hover:bg-slate-50">
-          <span className="min-w-0">
-            <span title={t.title} className="text-base font-semibold text-slate-900 group-hover:text-primary-700 [overflow-wrap:anywhere] line-clamp-2">{t.title}</span>
-            <span title={t.projectName} className="mt-0.5 block truncate text-sm text-slate-600">{t.projectName}</span>
-          </span>
-          <Icon name="chevron-right" size={18} className="col-start-2 row-start-1 row-span-2 text-slate-500" />
-          <span className="col-start-1 flex min-w-0 flex-wrap items-center gap-2">
-            <Badge value={t.priority} className={t.priority === 'Urgent' ? '!text-danger-700' : ''}>{PRIORITY_LABEL[t.priority] ?? t.priority}</Badge>
-            <Badge value={t.status} className={t.status === 'ChangesRequested' ? '!text-danger-700' : ''}>{STATUS_LABEL[t.status] ?? t.status}</Badge>
-            <span className={`basis-full text-sm sm:basis-auto ${isOverdue ? 'text-danger-700 font-medium' : 'text-slate-600'}`}>
-              {time === null ? 'Chưa đặt hạn' : `${isOverdue ? 'Quá hạn · ' : ''}${formatDateTime(t.deadlineAt!)}`}
-            </span>
-          </span>
-        </Link>
-      </li>
-    );
+  const tasksQ = useQuery({
+    queryKey: [...qk.myTasks(me), filters.done] as const,
+    queryFn: () => dashboardService.myTasks(filters.done),
+    enabled: !!me,
+  });
+
+  const helpingQ = useQuery({
+    queryKey: qk.helping(me), queryFn: () => dashboardService.helping(), enabled: !!me,
+  });
+  const helping = helpingQ.data ?? [];
+
+  const transitionM = useMutation({
+    mutationFn: ({ task, target, comment }: { task: MyTaskDto; target: string; comment?: string }) =>
+      tasksService.changeStatus(task.id, target === 'Submitted' ? TaskStatus.Submitted : TaskStatus.InProgress, comment),
+    onSuccess: (_d, { target }) => {
+      toast.success(target === 'Submitted' ? 'Đã nộp công việc để duyệt.' : 'Đã chuyển sang đang làm.');
+    },
+    onError: (e) => toast.error(errMsg(e, 'Không chuyển được trạng thái công việc.')),
+    onSettled: (_d, _e, { task }) => {
+      void qc.invalidateQueries({ queryKey: qk.myTasks(me) });
+      void qc.invalidateQueries({ queryKey: qk.task(me, task.id) });
+      void qc.invalidateQueries({ queryKey: qk.projectTasks(me, task.projectId) });
+    },
+  });
+
+  const items = useMemo(() => tasksQ.data ?? [], [tasksQ.data]);
+  const projects = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of items) if (!map.has(t.projectId)) map.set(t.projectId, t.projectName);
+    return [...map.entries()];
+  }, [items]);
+
+  const visible = items.filter(t => {
+    if (filters.status && t.status !== filters.status) return false;
+    if (filters.project && t.projectId !== filters.project) return false;
+    if (filters.priority && t.priority !== filters.priority) return false;
+    return true;
+  });
+
+  const sections = SECTIONS.map(s => ({
+    ...s,
+    tasks: visible.filter(t => deadlineState(t.deadlineAt, t.status).kind === s.kind),
+  })).filter(s => s.tasks.length > 0);
+
+  const activeFilterCount = [filters.status, filters.project, filters.priority].filter(Boolean).length;
+  const navState = { navigationSection: '/my-tasks', returnTo: `/my-tasks${params.size ? `?${params}` : ''}` };
+
+  const quickAction = (t: MyTaskDto) => {
+    const allowed = t.permissions?.allowedTransitions ?? [];
+    if (t.status === 'ToDo' && allowed.includes('InProgress')) {
+      return <Button size="sm" className="min-h-9" disabled={transitionM.isPending}
+        onClick={() => transitionM.mutate({ task: t, target: 'InProgress' })}>Bắt đầu</Button>;
+    }
+    if (t.status === 'ChangesRequested' && allowed.includes('InProgress')) {
+      return <Button size="sm" variant="secondary" className="min-h-9" disabled={transitionM.isPending}
+        onClick={() => transitionM.mutate({ task: t, target: 'InProgress' })}>Làm lại</Button>;
+    }
+    if (t.status === 'InProgress' && allowed.includes('Submitted')) {
+      return <Button size="sm" className="min-h-9" disabled={transitionM.isPending}
+        onClick={() => setSubmitTask(t)}>Nộp</Button>;
+    }
+    return null;
   };
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0">
-            <h2 className="text-title font-semibold text-ink">Việc của tôi</h2>
-            <p className="mt-2 text-base text-slate-600">Những công việc đang mở được giao cho bạn.</p>
-          </div>
-          <Button variant="secondary" className="min-h-11" onClick={() => setAttempt(a => a + 1)} disabled={state.loading}>Làm mới</Button>
+      <div className="max-w-5xl space-y-6">
+        <header>
+          <h2 className="text-title font-semibold text-ink">Việc của tôi</h2>
+          <p className="mt-1 text-small text-ink-muted">Các công việc được giao cho bạn, sắp xếp theo hạn.</p>
         </header>
 
-        <Card className="p-4 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-lg font-semibold text-slate-900">Danh sách công việc</h3>
-            <div role="group" aria-label="Lọc theo hạn" className="flex flex-wrap gap-0">
-              {([['all', 'Tất cả'], ['today', 'Hôm nay'], ['overdue', 'Quá hạn']] as [DashboardPeriod, string][]).map(([k, l]) => (
-                <button key={k} type="button" aria-pressed={filters.period === k && !filters.date}
-                  onClick={() => updateFilters({ period: k === 'all' ? null : k, date: null })}
-                  className={`min-h-11 rounded-lg px-3 text-sm font-medium border ${filters.period === k && !filters.date ? 'bg-primary-50 text-primary-700 border-primary-600' : 'text-slate-600 border-transparent hover:bg-slate-100'}`}>{l}</button>
-              ))}
+        <ResponsiveFilters activeCount={activeFilterCount} search={
+          <label className="flex min-h-11 cursor-pointer items-center gap-2 text-small font-medium text-ink">
+            <input type="checkbox" checked={filters.done}
+              onChange={e => updateFilters({ done: e.target.checked ? '1' : null })}
+              className="h-4 w-4 rounded border-line accent-primary-600" />
+            Hiện việc đã hoàn thành
+          </label>
+        }>
+          <div className="flex flex-wrap items-end gap-3">
+            <select aria-label="Lọc trạng thái" value={filters.status} onChange={e => updateFilters({ status: e.target.value || null })}
+              className="min-h-11 min-w-0 max-w-full rounded-xl border border-line bg-white px-3 py-2">
+              <option value="">Tất cả trạng thái</option>
+              {Object.keys(STATUS_LABEL).map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+            </select>
+            <select aria-label="Lọc dự án" value={filters.project} onChange={e => updateFilters({ project: e.target.value || null })}
+              className="min-h-11 min-w-0 max-w-full rounded-xl border border-line bg-white px-3 py-2">
+              <option value="">Mọi dự án</option>
+              {projects.map(([pid, name]) => <option key={pid} value={pid}>{name}</option>)}
+            </select>
+            <select aria-label="Lọc ưu tiên" value={filters.priority} onChange={e => updateFilters({ priority: e.target.value || null })}
+              className="min-h-11 min-w-0 max-w-full rounded-xl border border-line bg-white px-3 py-2">
+              <option value="">Mọi ưu tiên</option>
+              {(['Low', 'Medium', 'High', 'Urgent'] as const).map(p => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
+            </select>
+            {activeFilterCount > 0 && (
+              <button type="button" className="min-h-9 text-small font-medium text-primary-700 hover:underline"
+                onClick={() => updateFilters({ status: null, project: null, priority: null })}>Xóa lọc</button>
+            )}
+          </div>
+        </ResponsiveFilters>
+
+        {tasksQ.isPending ? (
+          <div className="space-y-4">
+            <p role="status" className="sr-only">Đang tải công việc…</p>
+            <div aria-hidden="true" className="space-y-4 motion-safe:animate-pulse">
+              {[0, 1, 2].map(i => <div key={i} className="h-28 rounded-2xl bg-surface-subtle" />)}
             </div>
           </div>
+        ) : tasksQ.isError ? (
+          <ErrorState message={errMsg(tasksQ.error, 'Không tải được công việc.')} onRetry={() => void tasksQ.refetch()} />
+        ) : items.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-small text-ink-muted">
+              {filters.done ? 'Chưa có công việc nào được giao cho bạn.' : 'Chưa có công việc nào đang mở được giao cho bạn.'}
+            </p>
+          </Card>
+        ) : sections.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-small text-ink-muted">Không có công việc khớp bộ lọc.{' '}
+              <button type="button" className="font-medium text-primary-700 hover:underline"
+                onClick={() => updateFilters({ status: null, project: null, priority: null })}>Xóa bộ lọc</button></p>
+          </Card>
+        ) : (
+          sections.map(s => (
+            <section key={s.kind} aria-labelledby={`sec-${s.kind}`}>
+              <h3 id={`sec-${s.kind}`} className={`text-section font-semibold ${s.kind === 'overdue' ? 'text-danger-700' : 'text-ink'}`}>
+                {s.label} <span className="tabular-nums font-normal text-ink-muted">({s.tasks.length})</span>
+              </h3>
+              <Card className="mt-2 p-0 overflow-hidden">
+                <ul className="divide-y divide-line">
+                  {s.tasks.map(t => <MyTaskRow key={t.id} task={t} navState={navState} action={quickAction(t)} />)}
+                </ul>
+              </Card>
+            </section>
+          ))
+        )}
 
-          {state.loading ? (
-            <>
-              <p role="status" className="sr-only">Đang tải công việc…</p>
-              <div aria-hidden="true" className="mt-4 space-y-3 motion-safe:animate-pulse">
-                <div className="h-11 rounded-xl bg-slate-100" />
-                <div className="grid gap-3 md:grid-cols-3">{[0, 1, 2].map(i => <div key={i} className="h-11 rounded-xl bg-slate-100" />)}</div>
-                {[0, 1, 2].map(i => <div key={i} className="h-14 rounded-lg bg-slate-100" />)}
-              </div>
-            </>
-          ) : state.error ? (
-            <div className="mt-4">
-              <p role="alert" className="text-sm text-danger-700 [overflow-wrap:anywhere]">{state.error}</p>
-              <Button variant="secondary" className="mt-3" onClick={() => setAttempt(a => a + 1)}>Thử lại</Button>
-            </div>
-          ) : (
-            <>
-              <div className="mt-4 space-y-3">
-                <ResponsiveFilters activeCount={[filters.project, filters.status, filters.date].filter(Boolean).length} search={
-                <Input id="mytasks-search" label="Tìm công việc" type="search" value={searchDraft}
-                  placeholder="Tên việc hoặc dự án" title="Nhấn Enter hoặc rời ô để áp dụng tìm kiếm"
-                  onChange={e => setSearchDraft(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitSearch(); } }}
-                  onBlur={commitSearch}
-                  className="rounded-xl" />
-                }>
-                <div className="grid gap-3 md:grid-cols-3 min-w-0">
-                  <div className="min-w-0">
-                    <label htmlFor="mytasks-project" className="block text-sm font-medium text-slate-700 mb-1">Dự án</label>
-                    <select id="mytasks-project" value={filters.project} onChange={e => updateFilters({ project: e.target.value || null })}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 focus:outline-none focus:ring-2">
-                      <option value="">Tất cả dự án</option>
-                      {model.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      {projectMissing && <option value={filters.project}>Dự án không còn trong danh sách</option>}
-                    </select>
-                  </div>
-                  <div className="min-w-0">
-                    <label htmlFor="mytasks-status" className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
-                    <select id="mytasks-status" value={filters.status} onChange={e => updateFilters({ status: e.target.value || null })}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 focus:outline-none focus:ring-2">
-                      <option value="">Tất cả trạng thái</option>
-                      {(['ToDo', 'InProgress', 'Submitted', 'ChangesRequested'] as const).map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-                    </select>
-                  </div>
-                  <div className="min-w-0">
-                    <Input id="mytasks-date" label="Ngày đến hạn" type="date" value={filters.date ?? ''}
-                      onChange={e => updateFilters({ date: e.target.value || null, period: null })} className="rounded-xl" />
-                    <p className="mt-1 text-xs text-slate-600">Theo giờ Việt Nam.</p>
-                  </div>
-                </div>
-                </ResponsiveFilters>
-                {model.hasFilters && (
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="text-slate-600">Đang lọc</span>
-                    {chips.map(c => <Badge key={c} className="max-w-full [overflow-wrap:anywhere]">{c}</Badge>)}
-                    <button onClick={clearFilters} className="min-h-9 text-primary-700 font-medium hover:underline">Xóa bộ lọc</button>
-                  </div>
-                )}
-              </div>
-
-              <p role="status" aria-live="polite" className="mt-4 text-sm text-slate-600">
-                {model.total ? `${model.from}–${model.to} trong ${model.total} công việc` : '0 công việc phù hợp'}
-              </p>
-              {model.total === 0 ? (
-                model.hasFilters ? (
-                  <div className="py-8 text-center">
-                    <Icon name="tasks" size={32} className="mx-auto text-slate-500" />
-                    <p className="mt-3 font-medium text-slate-900">Không có công việc khớp bộ lọc</p>
-                    <p className="mt-1 text-sm text-slate-600">Thử đổi từ khóa, dự án hoặc ngày đến hạn.</p>
-                    <Button variant="secondary" className="mt-4" onClick={clearFilters}>Xóa bộ lọc</Button>
-                  </div>
-                ) : (
-                  <div className="py-8 text-center">
-                    <Icon name="tasks" size={32} className="mx-auto text-slate-500" />
-                    <p className="mt-3 font-medium text-slate-900">Bạn chưa có công việc đang mở</p>
-                    <p className="mt-1 text-sm text-slate-600">Công việc được giao sẽ xuất hiện tại đây.</p>
-                    <Link to="/groups" className="mt-4 min-h-11 inline-flex items-center text-primary-700 font-medium hover:underline">Mở nhóm của tôi</Link>
-                  </div>
-                )
-              ) : (
-                <ul className="mt-2">{model.pageTasks.map(row)}</ul>
-              )}
-              {model.pageCount > 1 && (
-                <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                  <Button variant="secondary" size="sm" aria-label="Trang trước" disabled={model.page <= 1} onClick={() => setPage(model.page - 1)} className="min-h-11 gap-1">
-                    <Icon name="chevron-left" size={16} /><span className="hidden sm:inline">Trang trước</span>
-                  </Button>
-                  <span className="text-sm text-slate-600 whitespace-nowrap">Trang {model.page} / {model.pageCount}</span>
-                  <Button variant="secondary" size="sm" aria-label="Trang sau" disabled={model.page >= model.pageCount} onClick={() => setPage(model.page + 1)} className="min-h-11 gap-1">
-                    <span className="hidden sm:inline">Trang sau</span><Icon name="chevron-right" size={16} />
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </Card>
+        {helping.length > 0 && (
+          <section aria-labelledby="sec-helping">
+            <h3 id="sec-helping" className="text-section font-semibold text-ink">
+              Bạn đang hỗ trợ <span className="tabular-nums font-normal text-ink-muted">({helping.length})</span>
+            </h3>
+            <Card className="mt-2 p-0 overflow-hidden">
+              <ul className="divide-y divide-line">
+                {helping.map(h => (
+                  <li key={h.helperRowId} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3">
+                    <span className="min-w-0 flex-1 basis-56">
+                      <Link to={`/tasks/${h.taskId}`} state={navState}
+                        className="font-medium text-primary-700 hover:underline [overflow-wrap:anywhere]">{h.title}</Link>
+                      <span className="block text-small text-ink-secondary">{h.projectName} · {h.groupName}</span>
+                      <span className="block text-caption text-ink-muted">Phụ trách: {h.assigneeName || 'Chưa giao'}</span>
+                      <span className="mt-0.5 block text-small text-ink-secondary line-clamp-2">{h.scope}</span>
+                    </span>
+                    <span className="flex shrink-0 flex-wrap items-center gap-2">
+                      <Badge value={h.status}>{STATUS_LABEL[h.status] ?? h.status}</Badge>
+                      <span className="text-small text-ink-muted whitespace-nowrap">
+                        {h.deadlineAt ? formatDate(h.deadlineAt) : 'Chưa đặt hạn'}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </section>
+        )}
       </div>
+
+      {submitTask && (
+        <SubmitTaskDialog busy={transitionM.isPending}
+          onClose={() => setSubmitTask(null)}
+          onSubmit={(note) => transitionM.mutate(
+            { task: submitTask, target: 'Submitted', comment: note || undefined },
+            { onSuccess: () => setSubmitTask(null) },
+          )} />
+      )}
     </MainLayout>
   );
 }

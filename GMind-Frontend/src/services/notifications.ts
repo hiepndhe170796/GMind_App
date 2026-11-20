@@ -47,6 +47,7 @@ export interface NotificationTarget { href: string; label: string; }
 export const notificationTarget = (n: NotificationDto): NotificationTarget | null => {
   if (n.type === 'MemberRemoved') return null; // informational only
   const kind = n.relatedEntityType ?? '', id = n.relatedEntityId ?? '';
+  if (n.type === 'GroupArchived') return { href: '/groups', label: 'Xem nhóm đã lưu trữ' };
   if (!GUID.test(id)) return null;
   switch (kind) {
     case 'Task': return { href: `/tasks/${id}`, label: 'Xem công việc' };
@@ -63,13 +64,24 @@ const TYPE_ICON: Record<string, IconName> = {
   TaskApproved: 'check', TaskChangesRequested: 'tasks',
   MarketplaceRequestCreated: 'link', MarketplaceRequestApproved: 'check', MarketplaceRequestRejected: 'link',
   DeadlineReminder: 'calendar', OverdueAlert: 'bell', StaleTaskWarning: 'bell',
+  AtRiskWarning: 'calendar', LeaderReminder: 'bell',
   MemberInvited: 'users', MemberJoined: 'users', MemberRemoved: 'users',
   CommentAdded: 'bell',
+  MarketplaceResponseNeeded: 'link', MarketplaceRecipientAccepted: 'check', MarketplaceRecipientDeclined: 'link',
+  MarketplaceClaimed: 'link', MarketplaceOpenRequest: 'link',
+  HelperAdded: 'users', HelperEnded: 'users',
+  GroupArchived: 'alert', GroupRestored: 'check',
 };
 export const typeIcon = (type: string): IconName => Object.hasOwn(TYPE_ICON, type) ? TYPE_ICON[type] : 'bell';
 const TYPE_TONE: Record<string, string> = {
   TaskApproved: 'text-success-700', TaskChangesRequested: 'text-warning-700', MarketplaceRequestApproved: 'text-success-700',
   MarketplaceRequestRejected: 'text-danger-700', OverdueAlert: 'text-danger-700', StaleTaskWarning: 'text-warning-700',
+  AtRiskWarning: 'text-warning-700', LeaderReminder: 'text-accent-700',
+  MarketplaceResponseNeeded: 'text-accent-700', MarketplaceRecipientAccepted: 'text-success-700',
+  MarketplaceRecipientDeclined: 'text-ink-muted', MarketplaceClaimed: 'text-accent-700',
+  MarketplaceOpenRequest: 'text-primary-600',
+  HelperAdded: 'text-accent-700', HelperEnded: 'text-ink-muted',
+  GroupArchived: 'text-warning-700', GroupRestored: 'text-success-700',
 };
 export const typeTone = (type: string) => Object.hasOwn(TYPE_TONE, type) ? TYPE_TONE[type]
   : Object.hasOwn(TYPE_ICON, type) ? 'text-primary-600' : 'text-slate-600';

@@ -8,6 +8,7 @@ import UserAvatar from '../components/account/UserAvatar';
 import { useNotificationCount } from '../components/notifications/useNotificationCount';
 import Icon, { type IconName } from '../components/ui/Icon';
 import Logo from '../components/ui/Logo';
+import { formatHeaderDate } from '../utils/presentation';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -31,6 +32,7 @@ const TITLES: [RegExp, string][] = [
   [/^\/notifications/, 'Thông báo'],
   [/^\/calendar/, 'Lịch công việc'],
   [/^\/join-group/, 'Tham gia nhóm'],
+  [/^\/join\//, 'Nhóm của tôi'],
   [/^\/profile(?:\/|$)/, 'Hồ sơ'],
   [/^\/settings(?:\/|$)/, 'Cài đặt'],
 ];
@@ -99,7 +101,7 @@ const MainLayoutShell = ({ children, contentWidth }: MainLayoutProps) => {
   const hint = (location.state as { navigationSection?: unknown } | null)?.navigationSection;
   const section = location.pathname.startsWith('/tasks/')
     ? (hint === '/dashboard' ? '/dashboard' : hint === '/groups' ? '/groups' : hint === '/calendar' ? '/calendar' : hint === '/notifications' ? '/notifications' : '/my-tasks')
-    : /^(\/groups(?:\/|$)|\/projects\/|\/join-group(?:\/|$))/.test(location.pathname) ? '/groups'
+    : /^(\/groups(?:\/|$)|\/projects\/|\/join(?:-group)?(?:\/|$))/.test(location.pathname) ? '/groups'
     : NAV.find(item => location.pathname === item.to || location.pathname.startsWith(item.to + '/'))?.to;
 
   if (lastKey !== location.key) {
@@ -147,7 +149,7 @@ const MainLayoutShell = ({ children, contentWidth }: MainLayoutProps) => {
     window.addEventListener('focus', update);
     return () => { clearInterval(timer); window.removeEventListener('focus', update); };
   }, []);
-  const today = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(headerNow));
+  const today = formatHeaderDate(new Date(headerNow));
 
   return (
     <div className="app-surface min-h-screen">
@@ -167,7 +169,7 @@ const MainLayoutShell = ({ children, contentWidth }: MainLayoutProps) => {
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="text-section font-semibold text-ink truncate">{title}</h1>
-            <p className="hidden sm:block text-caption text-ink-muted capitalize tabular-nums">{today}</p>
+            <p className="hidden sm:block text-caption text-ink-muted tabular-nums">{today}</p>
           </div>
           <Link to="/notifications" aria-label={unread == null ? 'Thông báo, chưa cập nhật số chưa đọc' : `Thông báo, ${unread} chưa đọc${unreadError ? ', số liệu chưa làm mới' : ''}`}
             title={unreadError ? 'Chưa làm mới được số thông báo chưa đọc' : 'Mở thông báo'}

@@ -26,3 +26,12 @@ export function formatDateTime(value?: string | null): string {
   return Number.isNaN(d.getTime()) ? 'Chưa đặt hạn'
     : new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
 }
+
+/** Header date like "Thứ Sáu, 20 tháng 11, 2026" — built from parts so browsers that capitalize "Tháng" don't leak it. */
+export function formatHeaderDate(d: Date): string {
+  const parts = new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh', weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric',
+  }).formatToParts(d);
+  const get = (t: string) => parts.find(p => p.type === t)?.value ?? '';
+  return `${get('weekday')}, ${get('day')} tháng ${get('month')}, ${get('year')}`;
+}

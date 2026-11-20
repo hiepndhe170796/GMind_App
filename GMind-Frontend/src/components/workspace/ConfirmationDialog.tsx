@@ -1,22 +1,24 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-export default function ConfirmationDialog({ open, title, children, onClose, busy }: {
+export default function ConfirmationDialog({ open, title, children, onClose, busy, size = 'md' }: {
   open: boolean; title: string; children: ReactNode; onClose: () => void; busy?: boolean;
+  size?: 'md' | 'lg';
 }) {
   const busyRef = useRef(busy);
   const onCloseRef = useRef(onClose);
   useEffect(() => { busyRef.current = busy; onCloseRef.current = onClose; });
   if (!open) return null;
   return (
-    <DialogShell title={title} busyRef={busyRef} onCloseRef={onCloseRef}>{children}</DialogShell>
+    <DialogShell title={title} busyRef={busyRef} onCloseRef={onCloseRef} size={size}>{children}</DialogShell>
   );
 }
 
-function DialogShell({ title, children, busyRef, onCloseRef }: {
+function DialogShell({ title, children, busyRef, onCloseRef, size }: {
   title: string; children: ReactNode;
   busyRef: { current: boolean | undefined };
   onCloseRef: { current: () => void };
+  size: 'md' | 'lg';
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -44,7 +46,7 @@ function DialogShell({ title, children, busyRef, onCloseRef }: {
   }, []);
 
   return createPortal(
-    <dialog ref={ref} aria-labelledby={titleId} className="app-surface w-[26rem] max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] rounded-3xl border border-line bg-white p-0 shadow-overlay backdrop:bg-ink/40 motion-safe:animate-dialog-in">
+    <dialog ref={ref} aria-labelledby={titleId} className={`app-surface ${size === 'lg' ? 'w-[42rem]' : 'w-[26rem]'} max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] rounded-3xl border border-line bg-white p-0 shadow-overlay backdrop:bg-ink/40 motion-safe:animate-dialog-in`}>
       <div className="p-5 sm:p-6 overflow-y-auto max-h-[calc(100dvh-2rem)]">
         <h3 id={titleId} className="text-section font-semibold text-ink">{title}</h3>
         <div className="mt-3 text-body text-ink-secondary">{children}</div>
