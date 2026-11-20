@@ -80,10 +80,54 @@ namespace GMind.Infrastructure.Migrations
                     b.ToTable("ActivityLogs");
                 });
 
+            modelBuilder.Entity("GMind.Domain.Entities.ContributionCredit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreditedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId");
+
+                    b.HasIndex("TaskId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ProjectId", "UserId");
+
+                    b.ToTable("ContributionCredits");
+                });
+
             modelBuilder.Entity("GMind.Domain.Entities.Group", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ArchivedByUserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreatedAt")
@@ -105,6 +149,8 @@ namespace GMind.Infrastructure.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ArchivedByUserId");
 
                     b.HasIndex("CreatedByUserId");
 
@@ -132,6 +178,10 @@ namespace GMind.Infrastructure.Migrations
 
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<int?>("MaxUses")
                         .HasColumnType("int");
@@ -187,11 +237,41 @@ namespace GMind.Infrastructure.Migrations
                     b.ToTable("GroupMembers");
                 });
 
+            modelBuilder.Entity("GMind.Domain.Entities.GroupSettings", b =>
+                {
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("RiskHoursBeforeDeadline")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RiskProgressBelowPercent")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StaleAfterHours")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("GroupId");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.ToTable("GroupSettings");
+                });
+
             modelBuilder.Entity("GMind.Domain.Entities.MarketplaceRequest", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ClaimedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -199,11 +279,19 @@ namespace GMind.Infrastructure.Migrations
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("HelpScope")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Reason")
                         .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("RecipientComment")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
@@ -216,6 +304,9 @@ namespace GMind.Infrastructure.Migrations
                     b.Property<Guid>("RequestedByUserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("ReviewComment")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
@@ -227,6 +318,7 @@ namespace GMind.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("int");
 
                     b.Property<Guid?>("TargetUserId")
@@ -526,6 +618,50 @@ namespace GMind.Infrastructure.Migrations
                     b.ToTable("TaskComments");
                 });
 
+            modelBuilder.Entity("GMind.Domain.Entities.TaskHelper", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("EndedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("HelperUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("MarketplaceRequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EndedByUserId");
+
+                    b.HasIndex("HelperUserId");
+
+                    b.HasIndex("MarketplaceRequestId");
+
+                    b.HasIndex("TaskId", "HelperUserId")
+                        .IsUnique()
+                        .HasFilter("[EndedAt] IS NULL");
+
+                    b.ToTable("TaskHelpers");
+                });
+
             modelBuilder.Entity("GMind.Domain.Entities.TaskLink", b =>
                 {
                     b.Property<Guid>("Id")
@@ -600,6 +736,38 @@ namespace GMind.Infrastructure.Migrations
                     b.HasIndex("TaskId");
 
                     b.ToTable("TaskReviews");
+                });
+
+            modelBuilder.Entity("GMind.Domain.Entities.TaskSubmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("SubmittedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubmittedByUserId");
+
+                    b.HasIndex("TaskId", "Version")
+                        .IsUnique();
+
+                    b.ToTable("TaskSubmissions");
                 });
 
             modelBuilder.Entity("GMind.Domain.Entities.User", b =>
@@ -695,13 +863,55 @@ namespace GMind.Infrastructure.Migrations
                     b.Navigation("Project");
                 });
 
+            modelBuilder.Entity("GMind.Domain.Entities.ContributionCredit", b =>
+                {
+                    b.HasOne("GMind.Domain.Entities.Group", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GMind.Domain.Entities.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GMind.Domain.Entities.Task", "Task")
+                        .WithMany()
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GMind.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Group");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("Task");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("GMind.Domain.Entities.Group", b =>
                 {
+                    b.HasOne("GMind.Domain.Entities.User", "ArchivedBy")
+                        .WithMany()
+                        .HasForeignKey("ArchivedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("GMind.Domain.Entities.User", "CreatedBy")
                         .WithMany("CreatedGroups")
                         .HasForeignKey("CreatedByUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("ArchivedBy");
 
                     b.Navigation("CreatedBy");
                 });
@@ -742,6 +952,24 @@ namespace GMind.Infrastructure.Migrations
                     b.Navigation("Group");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GMind.Domain.Entities.GroupSettings", b =>
+                {
+                    b.HasOne("GMind.Domain.Entities.Group", "Group")
+                        .WithOne()
+                        .HasForeignKey("GMind.Domain.Entities.GroupSettings", "GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GMind.Domain.Entities.User", "UpdatedBy")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Group");
+
+                    b.Navigation("UpdatedBy");
                 });
 
             modelBuilder.Entity("GMind.Domain.Entities.MarketplaceRequest", b =>
@@ -917,6 +1145,39 @@ namespace GMind.Infrastructure.Migrations
                     b.Navigation("Task");
                 });
 
+            modelBuilder.Entity("GMind.Domain.Entities.TaskHelper", b =>
+                {
+                    b.HasOne("GMind.Domain.Entities.User", "EndedBy")
+                        .WithMany()
+                        .HasForeignKey("EndedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("GMind.Domain.Entities.User", "Helper")
+                        .WithMany()
+                        .HasForeignKey("HelperUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GMind.Domain.Entities.MarketplaceRequest", "MarketplaceRequest")
+                        .WithMany()
+                        .HasForeignKey("MarketplaceRequestId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("GMind.Domain.Entities.Task", "Task")
+                        .WithMany()
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("EndedBy");
+
+                    b.Navigation("Helper");
+
+                    b.Navigation("MarketplaceRequest");
+
+                    b.Navigation("Task");
+                });
+
             modelBuilder.Entity("GMind.Domain.Entities.TaskLink", b =>
                 {
                     b.HasOne("GMind.Domain.Entities.User", "CreatedBy")
@@ -962,6 +1223,25 @@ namespace GMind.Infrastructure.Migrations
                     b.Navigation("Task");
                 });
 
+            modelBuilder.Entity("GMind.Domain.Entities.TaskSubmission", b =>
+                {
+                    b.HasOne("GMind.Domain.Entities.User", "SubmittedBy")
+                        .WithMany()
+                        .HasForeignKey("SubmittedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GMind.Domain.Entities.Task", "Task")
+                        .WithMany("Submissions")
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SubmittedBy");
+
+                    b.Navigation("Task");
+                });
+
             modelBuilder.Entity("GMind.Domain.Entities.Group", b =>
                 {
                     b.Navigation("ActivityLogs");
@@ -997,6 +1277,8 @@ namespace GMind.Infrastructure.Migrations
                     b.Navigation("ReminderDeliveries");
 
                     b.Navigation("Reviews");
+
+                    b.Navigation("Submissions");
 
                     b.Navigation("Subtasks");
                 });

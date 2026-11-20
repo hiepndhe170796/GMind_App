@@ -191,7 +191,7 @@ public class IntegrityM0Tests
         await using var db = NewDb();
         var l = NewUser("L"); var g = NewGroup(l.Id);
         db.Users.Add(l); db.Groups.Add(g); db.GroupMembers.Add(Member(g.Id, l.Id, Role.Leader)); await db.SaveChangesAsync();
-        var dto = await NewGroupService(db).CreateInviteAsync(l.Id, g.Id, null, null);
+        var dto = await NewGroupService(db).CreateInviteAsync(l.Id, g.Id, null, null, null);
         Assert.NotNull(dto.Code);
         var saved = await db.GroupInvites.FindAsync(dto.Id);
         Assert.Null(saved!.Code);
@@ -215,16 +215,20 @@ public class IntegrityM0Tests
         await ReminderProcessor.ProcessRemindersAsync(db, now, default);
         Assert.Single(await db.Notifications.Where(n => n.RelatedEntityId == task.Id).ToListAsync());
     }
-    [Fact] public async Task Stale_SkipsLeaderlessGroup()
+    [Fact] public async Task Stale_NotifiesAssignee_NeverEmptyRecipient()
     {
         await using var db = NewDb();
         var m = NewUser("M"); var g = NewGroup(m.Id); var p = NewProject(g.Id);
-        var task = NewTask(p.Id, m.Id, TaskStatus.InProgress, "T", null); task.UpdatedAt = DateTime.UtcNow.AddDays(-4);
+        var task = NewTask(p.Id, m.Id, TaskStatus.InProgress, "T", null); task.UpdatedAt = DateTime.UtcNow.AddHours(-25);
         db.Users.Add(m); db.Groups.Add(g); db.Projects.Add(p); db.Tasks.Add(task);
         db.GroupMembers.Add(Member(g.Id, m.Id, Role.Member)); // Member, not Leader — no active Leader
         await db.SaveChangesAsync();
-        await ReminderProcessor.ProcessStaleTasksAsync(db, DateTime.UtcNow, default);
-        Assert.Empty(await db.Notifications.Where(n => n.RelatedEntityId == task.Id).ToListAsync());
+        await ReminderProcessor.ProcessRiskAsync(db, DateTime.UtcNow, default);
+        var notifs = await db.Notifications.Where(n => n.RelatedEntityId == task.Id).ToListAsync();
+        Assert.Single(notifs);
+        Assert.Equal(m.Id, notifs[0].RecipientUserId); // assignee still warned without any Leader
+        Assert.Equal(NotificationType.StaleTaskWarning, notifs[0].Type);
+        Assert.DoesNotContain(notifs, n => n.RecipientUserId == Guid.Empty);
     }
 
     // (a) RemoveMember unassigns + notifies other Leaders with count

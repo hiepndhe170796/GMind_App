@@ -36,7 +36,7 @@ public class ReminderWorker : BackgroundService
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 var now = DateTime.UtcNow;
                 await ReminderProcessor.ProcessRemindersAsync(db, now, stoppingToken);
-                await ReminderProcessor.ProcessStaleTasksAsync(db, now, stoppingToken);
+                await ReminderProcessor.ProcessRiskAsync(db, now, stoppingToken);
             }
             catch (Exception ex)
             {

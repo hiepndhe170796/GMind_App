@@ -19,6 +19,9 @@ public class GroupInvite
     [MaxLength(20)]
     public string? Code { get; set; }
 
+    [MaxLength(100)]
+    public string? Label { get; set; }
+
     public Guid CreatedByUserId { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

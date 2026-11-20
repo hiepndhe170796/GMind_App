@@ -15,11 +15,15 @@ public interface IApplicationDbContext
     DbSet<TaskLink> TaskLinks { get; }
     DbSet<TaskComment> TaskComments { get; }
     DbSet<TaskReview> TaskReviews { get; }
+    DbSet<TaskSubmission> TaskSubmissions { get; }
     DbSet<Notification> Notifications { get; }
     DbSet<ReminderDelivery> ReminderDeliveries { get; }
     DbSet<ActivityLog> ActivityLogs { get; }
     DbSet<MarketplaceRequest> MarketplaceRequests { get; }
     DbSet<NotificationPreference> NotificationPreferences { get; }
+    DbSet<GroupSettings> GroupSettings { get; }
+    DbSet<ContributionCredit> ContributionCredits { get; }
+    DbSet<TaskHelper> TaskHelpers { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

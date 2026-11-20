@@ -21,11 +21,15 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<TaskLink> TaskLinks { get; set; }
     public DbSet<TaskComment> TaskComments { get; set; }
     public DbSet<TaskReview> TaskReviews { get; set; }
+    public DbSet<TaskSubmission> TaskSubmissions { get; set; }
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<ReminderDelivery> ReminderDeliveries { get; set; }
     public DbSet<ActivityLog> ActivityLogs { get; set; }
     public DbSet<MarketplaceRequest> MarketplaceRequests { get; set; }
     public DbSet<NotificationPreference> NotificationPreferences { get; set; }
+    public DbSet<GroupSettings> GroupSettings { get; set; }
+    public DbSet<ContributionCredit> ContributionCredits { get; set; }
+    public DbSet<TaskHelper> TaskHelpers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +50,10 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasOne(g => g.CreatedBy)
                 .WithMany(u => u.CreatedGroups)
                 .HasForeignKey(g => g.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(g => g.ArchivedBy)
+                .WithMany()
+                .HasForeignKey(g => g.ArchivedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -156,6 +164,20 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // TaskSubmission
+        modelBuilder.Entity<TaskSubmission>(entity =>
+        {
+            entity.HasIndex(s => new { s.TaskId, s.Version }).IsUnique();
+            entity.HasOne(s => s.Task)
+                .WithMany(t => t.Submissions)
+                .HasForeignKey(s => s.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(s => s.SubmittedBy)
+                .WithMany()
+                .HasForeignKey(s => s.SubmittedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         // Notification
         modelBuilder.Entity<Notification>(entity =>
         {
@@ -184,6 +206,42 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // GroupSettings: one optional row per group (PK = GroupId)
+        modelBuilder.Entity<GroupSettings>(entity =>
+        {
+            entity.HasOne(s => s.Group)
+                .WithOne()
+                .HasForeignKey<GroupSettings>(s => s.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(s => s.UpdatedBy)
+                .WithMany()
+                .HasForeignKey(s => s.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ContributionCredit: one credit per task (append-only ledger)
+        modelBuilder.Entity<ContributionCredit>(entity =>
+        {
+            entity.HasIndex(c => c.TaskId).IsUnique();
+            entity.HasIndex(c => new { c.ProjectId, c.UserId });
+            entity.HasOne(c => c.Task)
+                .WithMany()
+                .HasForeignKey(c => c.TaskId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(c => c.Project)
+                .WithMany()
+                .HasForeignKey(c => c.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(c => c.Group)
+                .WithMany()
+                .HasForeignKey(c => c.GroupId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         // ActivityLog
         modelBuilder.Entity<ActivityLog>(entity =>
         {
@@ -202,9 +260,10 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasIndex(a => new { a.GroupId, a.CreatedAt });
         });
 
-        // MarketplaceRequest
+        // MarketplaceRequest — Status is the concurrency token for every transition.
         modelBuilder.Entity<MarketplaceRequest>(entity =>
         {
+            entity.Property(m => m.Status).IsConcurrencyToken();
             entity.HasOne(m => m.Group)
                 .WithMany(g => g.MarketplaceRequests)
                 .HasForeignKey(m => m.GroupId)
@@ -232,6 +291,31 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasOne(m => m.Reviewer)
                 .WithMany()
                 .HasForeignKey(m => m.ReviewerUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // TaskHelper: at most one active helper row per (task, user)
+        modelBuilder.Entity<TaskHelper>(entity =>
+        {
+            entity.HasIndex(h => new { h.TaskId, h.HelperUserId })
+                .IsUnique()
+                .HasFilter("[EndedAt] IS NULL");
+            entity.HasIndex(h => h.HelperUserId);
+            entity.HasOne(h => h.Task)
+                .WithMany()
+                .HasForeignKey(h => h.TaskId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(h => h.Helper)
+                .WithMany()
+                .HasForeignKey(h => h.HelperUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(h => h.MarketplaceRequest)
+                .WithMany()
+                .HasForeignKey(h => h.MarketplaceRequestId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(h => h.EndedBy)
+                .WithMany()
+                .HasForeignKey(h => h.EndedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

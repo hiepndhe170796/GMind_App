@@ -29,6 +29,7 @@ public class NotificationService : INotificationService
     private IQueryable<Notification> VisibleTo(Guid userId)
         => _context.Notifications.Where(n => n.RecipientUserId == userId && n.Recipient.IsActive
             && (n.GroupId == null || n.Type == NotificationType.MemberRemoved
+                || n.Type == NotificationType.GroupArchived
                 || _context.GroupMembers.Any(m => m.GroupId == n.GroupId && m.UserId == userId
                     && m.IsActive && m.User.IsActive && !m.Group.IsArchived)));
 
@@ -36,7 +37,7 @@ public class NotificationService : INotificationService
         string? relatedEntityType = null, Guid? relatedEntityId = null, CancellationToken ct = default)
     {
         if (!await _context.Users.AnyAsync(u => u.Id == recipientUserId && u.IsActive, ct)) return;
-        if (groupId != null && type != NotificationType.MemberRemoved
+        if (groupId != null && type != NotificationType.MemberRemoved && type != NotificationType.GroupArchived
             && !await _context.GroupMembers.AnyAsync(m => m.GroupId == groupId && m.UserId == recipientUserId
                 && m.IsActive && !m.Group.IsArchived, ct)) return;
         _context.Notifications.Add(new Notification

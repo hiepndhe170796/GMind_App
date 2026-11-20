@@ -70,51 +70,118 @@ public static class ReminderProcessor
         await db.SaveChangesAsync(ct);
     }
 
-    public static async System.Threading.Tasks.Task ProcessStaleTasksAsync(
+    /// <summary>RISK-02..04: at-risk, stale and leader-overdue warnings in a few batched queries.</summary>
+    public static async System.Threading.Tasks.Task ProcessRiskAsync(
         ApplicationDbContext db, DateTime nowUtc, CancellationToken ct)
     {
-        var stale = await db.Tasks
-            .Include(t => t.Project)
-            .Where(t => t.Status == TaskStatus.InProgress && t.UpdatedAt < nowUtc.AddDays(-3)
-                && t.Project.ArchivedAt == null && !t.Project.Group.IsArchived)
-            .ToListAsync(ct);
+        // Candidates: top-level, assigned, not completed, in active projects/groups —
+        // deadline within the widest risk window OR InProgress old enough for the tightest stale window.
+        var maxRiskHours = (await db.GroupSettings.Select(s => (int?)s.RiskHoursBeforeDeadline).MaxAsync(ct)) ?? 8;
+        var minStaleHours = (await db.GroupSettings.Select(s => (int?)s.StaleAfterHours).MinAsync(ct)) ?? 24;
+        var riskCutoff = nowUtc.AddHours(Math.Max(maxRiskHours, 8));
+        var staleCutoff = nowUtc.AddHours(-Math.Min(minStaleHours, 24));
 
-        // Skip groups with no active Leader — never write Guid.Empty as recipient.
-        var leaderGroups = await db.GroupMembers
-            .Where(m => stale.Select(t => t.Project.GroupId).Contains(m.GroupId)
-                && m.Role == Role.Leader && m.IsActive)
-            .Select(m => new { m.GroupId, m.UserId })
+        var candidates = await db.Tasks
+            .Where(t => t.ParentTaskId == null && t.AssigneeUserId != null
+                && t.Status != TaskStatus.Completed
+                && t.Project.ArchivedAt == null && !t.Project.Group.IsArchived
+                && ((t.DeadlineAt != null && t.DeadlineAt <= riskCutoff)
+                    || (t.Status == TaskStatus.InProgress && t.UpdatedAt <= staleCutoff)))
+            .Select(t => new
+            {
+                t.Id, t.Title, t.Status, t.AssigneeUserId, t.DeadlineAt,
+                t.ProgressPercent, t.UpdatedAt, t.Project.GroupId,
+                AssigneeName = t.Assignee!.DisplayName
+            })
             .ToListAsync(ct);
-        var leadersByGroup = leaderGroups.GroupBy(g => g.GroupId).ToDictionary(g => g.Key, g => g.Select(x => x.UserId).ToList());
+        if (candidates.Count == 0) return;
 
-        foreach (var task in stale)
+        var groupIds = candidates.Select(t => t.GroupId).Distinct().ToList();
+        var thresholds = await GroupThresholdsLoader.ForGroupsAsync(db, groupIds, ct);
+        var leadersByGroup = (await db.GroupMembers
+                .Where(m => groupIds.Contains(m.GroupId) && m.Role == Role.Leader && m.IsActive)
+                .Select(m => new { m.GroupId, m.UserId })
+                .ToListAsync(ct))
+            .GroupBy(m => m.GroupId).ToDictionary(g => g.Key, g => g.Select(x => x.UserId).ToList());
+
+        var taskIds = candidates.Select(t => t.Id).ToList();
+        var existingKeys = await db.ReminderDeliveries
+            .Where(r => taskIds.Contains(r.TaskId))
+            .Select(r => r.DeduplicationKey)
+            .ToHashSetAsync(ct);
+
+        foreach (var task in candidates)
         {
-            if (!leadersByGroup.TryGetValue(task.Project.GroupId, out var leaders) || leaders.Count == 0)
-                continue;
-            var dedupKey = $"stale:{task.Id}:{nowUtc:yyyyMMdd}";
-            if (await db.ReminderDeliveries.AnyAsync(r => r.DeduplicationKey == dedupKey, ct))
-                continue;
-            foreach (var leaderId in leaders)
+            var t = thresholds[task.GroupId];
+            var flags = TaskRisk.Evaluate(task.Status, null, task.AssigneeUserId, task.DeadlineAt,
+                task.ProgressPercent, task.UpdatedAt, t, nowUtc);
+            var leaders = leadersByGroup.GetValueOrDefault(task.GroupId) ?? [];
+            var assigneeId = task.AssigneeUserId!.Value;
+
+            if (flags.IsAtRisk)
             {
-                db.Notifications.Add(new Notification
+                var key = $"risk:{task.Id}:{task.DeadlineAt!.Value.Ticks}";
+                if (!existingKeys.Contains(key))
                 {
-                    Id = Guid.NewGuid(), RecipientUserId = leaderId,
-                    GroupId = task.Project.GroupId,
-                    Type = NotificationType.StaleTaskWarning,
-                    Title = "Task bị đình trệ",
-                    Body = $"Task '{task.Title}' không có cập nhật hơn 3 ngày",
-                    RelatedEntityType = "Task", RelatedEntityId = task.Id
-                });
+                    var hoursLeft = Math.Max(0, (int)Math.Ceiling((task.DeadlineAt.Value - nowUtc).TotalHours));
+                    var body = $"'{task.Title}' còn {hoursLeft} giờ đến hạn ({VnTime.Format(task.DeadlineAt.Value)}) nhưng tiến độ mới {task.ProgressPercent}%.";
+                    foreach (var rid in LeadersPlus(leaders, assigneeId))
+                        db.Notifications.Add(Make(rid, task.GroupId, NotificationType.AtRiskWarning,
+                            "Công việc có nguy cơ trễ", body, task.Id));
+                    db.ReminderDeliveries.Add(Delivery(task.Id, assigneeId, ReminderType.AtRisk, key, nowUtc));
+                    existingKeys.Add(key);
+                }
             }
-            db.ReminderDeliveries.Add(new ReminderDelivery
+
+            if (flags.IsStale)
             {
-                Id = Guid.NewGuid(), TaskId = task.Id,
-                RecipientUserId = leaders[0],
-                ReminderType = ReminderType.Overdue,
-                ScheduledFor = nowUtc, SentAt = nowUtc,
-                DeduplicationKey = dedupKey, Status = "StaleWarning"
-            });
+                var key = $"stale:{task.Id}:{task.UpdatedAt.Ticks}";
+                if (!existingKeys.Contains(key))
+                {
+                    var hours = (int)Math.Floor((nowUtc - task.UpdatedAt).TotalHours);
+                    var body = $"'{task.Title}' chưa có cập nhật trong {hours} giờ.";
+                    foreach (var rid in LeadersPlus(leaders, assigneeId))
+                        db.Notifications.Add(Make(rid, task.GroupId, NotificationType.StaleTaskWarning,
+                            "Công việc bị đình trệ", body, task.Id));
+                    db.ReminderDeliveries.Add(Delivery(task.Id, assigneeId, ReminderType.Stale, key, nowUtc));
+                    existingKeys.Add(key);
+                }
+            }
+
+            if (flags.IsOverdue)
+            {
+                var key = $"overdue-leaders:{task.Id}:{task.DeadlineAt!.Value.Ticks}";
+                if (!existingKeys.Contains(key))
+                {
+                    var body = $"'{task.Title}' của {task.AssigneeName} đã quá hạn ({VnTime.Format(task.DeadlineAt.Value)}).";
+                    foreach (var rid in leaders.Where(l => l != assigneeId))
+                        db.Notifications.Add(Make(rid, task.GroupId, NotificationType.OverdueAlert,
+                            "Công việc quá hạn", body, task.Id));
+                    var recipient = leaders.FirstOrDefault(l => l != assigneeId, assigneeId);
+                    db.ReminderDeliveries.Add(Delivery(task.Id, recipient, ReminderType.Overdue, key, nowUtc));
+                    existingKeys.Add(key);
+                }
+            }
         }
         await db.SaveChangesAsync(ct);
     }
+
+    private static IEnumerable<Guid> LeadersPlus(IEnumerable<Guid> leaders, Guid assigneeId)
+        => leaders.Contains(assigneeId) ? leaders : leaders.Append(assigneeId);
+
+    private static Notification Make(Guid recipient, Guid groupId, NotificationType type, string title, string body, Guid taskId)
+        => new()
+        {
+            Id = Guid.NewGuid(), RecipientUserId = recipient, GroupId = groupId,
+            Type = type, Title = title, Body = body,
+            RelatedEntityType = "Task", RelatedEntityId = taskId
+        };
+
+    private static ReminderDelivery Delivery(Guid taskId, Guid recipient, ReminderType type, string key, DateTime nowUtc)
+        => new()
+        {
+            Id = Guid.NewGuid(), TaskId = taskId, RecipientUserId = recipient,
+            ReminderType = type, ScheduledFor = nowUtc, SentAt = nowUtc,
+            DeduplicationKey = key, Status = "Sent"
+        };
 }

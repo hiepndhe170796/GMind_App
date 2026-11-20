@@ -47,6 +47,25 @@ public class TasksController : ControllerBase
     public async Task<IActionResult> ChangeStatus(Guid id, [FromBody] StatusRequest req, CancellationToken ct)
         => Ok(await _tasks.ChangeStatusAsync(User.GetUserId(), id, req.Status, req.Comment, ct));
 
+    [HttpPost("tasks/{id:guid}/remind")]
+    public async Task<IActionResult> Remind(Guid id, CancellationToken ct)
+    {
+        await _tasks.RemindAsync(User.GetUserId(), id, ct);
+        return Ok(new { message = "Reminder sent" });
+    }
+
+    [HttpPatch("tasks/{id:guid}/progress")]
+    public async Task<IActionResult> Progress(Guid id, [FromBody] ProgressRequest req, CancellationToken ct)
+        => Ok(await _tasks.UpdateProgressAsync(User.GetUserId(), id, req.ProgressPercent, ct));
+
+    [HttpGet("tasks/{id:guid}/subtasks")]
+    public async Task<IActionResult> Subtasks(Guid id, CancellationToken ct)
+        => Ok(await _tasks.ListSubtasksAsync(User.GetUserId(), id, ct));
+
+    [HttpGet("tasks/{id:guid}/submissions")]
+    public async Task<IActionResult> Submissions(Guid id, CancellationToken ct)
+        => Ok(await _detail.ListSubmissionsAsync(User.GetUserId(), id, ct));
+
     [HttpGet("tasks/{id:guid}/comments")]
     public async Task<IActionResult> Comments(Guid id, CancellationToken ct)
         => Ok(await _detail.ListCommentsAsync(User.GetUserId(), id, ct));
@@ -79,6 +98,17 @@ public class TasksController : ControllerBase
     {
         await _detail.DeleteLinkAsync(User.GetUserId(), linkId, ct);
         return Ok(new { message = "Link deleted" });
+    }
+
+    [HttpGet("tasks/{id:guid}/helpers")]
+    public async Task<IActionResult> Helpers(Guid id, CancellationToken ct)
+        => Ok(await _tasks.ListHelpersAsync(User.GetUserId(), id, ct));
+
+    [HttpPost("tasks/{id:guid}/helpers/{helperRowId:guid}/end")]
+    public async Task<IActionResult> EndHelper(Guid id, Guid helperRowId, CancellationToken ct)
+    {
+        await _tasks.EndHelperAsync(User.GetUserId(), id, helperRowId, ct);
+        return Ok(new { message = "Helper ended" });
     }
 
     [HttpGet("tasks/{id:guid}/reviews")]
@@ -119,6 +149,12 @@ public class StatusRequest
 
     [MaxLength(2000, ErrorMessage = "Nhận xét tối đa 2000 ký tự.")]
     public string? Comment { get; set; }
+}
+
+public class ProgressRequest
+{
+    [Range(0, 100, ErrorMessage = "Tiến độ phải từ 0 đến 100.")]
+    public int ProgressPercent { get; set; }
 }
 
 public class CommentRequest

@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using GMind.API.Common;
 using GMind.Application.Services.Projects;
+using GMind.Application.Services.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,8 +13,13 @@ namespace GMind.API.Controllers;
 public class ProjectsController : ControllerBase
 {
     private readonly IProjectService _projects;
+    private readonly ITaskDetailService _detail;
 
-    public ProjectsController(IProjectService projects) => _projects = projects;
+    public ProjectsController(IProjectService projects, ITaskDetailService detail)
+    {
+        _projects = projects;
+        _detail = detail;
+    }
 
     [HttpGet("groups/{groupId:guid}/projects")]
     public async Task<IActionResult> List(Guid groupId, CancellationToken ct)
@@ -31,11 +37,34 @@ public class ProjectsController : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] ProjectRequest req, CancellationToken ct)
         => Ok(await _projects.UpdateAsync(User.GetUserId(), id, req.Name, req.Description, req.Subject, req.DeadlineAt, ct));
 
+    [HttpGet("projects/{id:guid}/links")]
+    public async Task<IActionResult> Links(Guid id, CancellationToken ct)
+        => Ok(await _detail.ListProjectLinksAsync(User.GetUserId(), id, ct));
+
+    [HttpPost("projects/{id:guid}/links")]
+    public async Task<IActionResult> AddLink(Guid id, [FromBody] LinkRequest req, CancellationToken ct)
+        => Ok(await _detail.AddProjectLinkAsync(User.GetUserId(), id, req.Url, req.DisplayName, req.Type, ct));
+
+    [HttpGet("projects/{id:guid}/contributions")]
+    public async Task<IActionResult> Contributions(Guid id, CancellationToken ct)
+        => Ok(await _projects.GetContributionsAsync(User.GetUserId(), id, ct));
+
     [HttpPost("projects/{id:guid}/archive")]
     public async Task<IActionResult> Archive(Guid id, CancellationToken ct)
     {
         await _projects.ArchiveAsync(User.GetUserId(), id, ct);
         return Ok(new { message = "Project archived" });
+    }
+
+    [HttpGet("groups/{groupId:guid}/projects/archived")]
+    public async Task<IActionResult> ArchivedProjects(Guid groupId, CancellationToken ct)
+        => Ok(await _projects.ListArchivedAsync(User.GetUserId(), groupId, ct));
+
+    [HttpPost("projects/{id:guid}/restore")]
+    public async Task<IActionResult> Restore(Guid id, CancellationToken ct)
+    {
+        await _projects.RestoreAsync(User.GetUserId(), id, ct);
+        return Ok(new { message = "Project restored" });
     }
 }
 

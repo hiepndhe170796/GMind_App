@@ -26,8 +26,12 @@ public class TaskAuthorizationTests
     private const string PrivateDescription = "PRIVATE_SENTINEL_DESCRIPTION";
     private const string PrivateLink = "https://private.example/sentinel";
 
+    // M2: summary DTOs legitimately carry progressPercent/points as null for non-viewers;
+    // they only leak when they hold a real value.
     private static readonly string[] PrivateFields =
-        ["description", "progressPercent", "estimateHours", "points", "createdByUserId", "createdAt", "submittedAt", "completedAt"];
+        ["description", "estimateHours", "createdByUserId", "createdAt", "submittedAt", "completedAt"];
+
+    private static readonly string[] NullAllowedFields = ["progressPercent", "points"];
 
     private sealed class Fixture : IAsyncDisposable
     {
@@ -186,6 +190,10 @@ public class TaskAuthorizationTests
     {
         foreach (var field in PrivateFields)
             Assert.False(task.TryGetProperty(field, out _), $"summary leaked {field}");
+        if (task.TryGetProperty("canViewDetails", out var cvd) && cvd.GetBoolean()) return;
+        foreach (var field in NullAllowedFields)
+            Assert.True(!task.TryGetProperty(field, out var v) || v.ValueKind == JsonValueKind.Null,
+                $"summary leaked {field}");
     }
 
     [Theory]
@@ -216,7 +224,8 @@ public class TaskAuthorizationTests
         {
             var id = item.GetProperty("id").GetGuid();
             var canView = item.GetProperty("canViewDetails").GetBoolean();
-            var expected = who == "leader" || (who == "assignee" && (id == f.TaskT.Id || id == f.TaskSubmitted.Id))
+            // M2: a parent task's assignee can also view its subtasks' details (TaskChild's parent is TaskT).
+            var expected = who == "leader" || (who == "assignee" && (id == f.TaskT.Id || id == f.TaskSubmitted.Id || id == f.TaskChild.Id))
                 || (who == "member" && id == f.TaskChild.Id);
             Assert.Equal(expected, canView);
         }
