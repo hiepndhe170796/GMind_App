@@ -95,3 +95,34 @@ sắc mới (B) nếu làm app đẹp hơn. Các ràng buộc bản demo cơ b�
 | Q11 | Cách giao nhận Git theo milestone | NON-BLOCKING | Commit local theo milestone trên nhánh feature; không push/merge khi chưa duyệt |
 
 Giả định mặc định nếu NON-BLOCKING chưa được trả lời: dùng cột "Đề xuất".
+
+## Stage 2 — M2 quyết định nghiệp vụ (giả định đã ghi nhận, chờ chủ sản phẩm xác nhận)
+
+- **Đơn vị thống kê (BR-11):** tiến độ dự án, trạng thái dự án, tiến độ nhóm/thành viên và điểm đóng góp tính theo *công việc cấp trên cùng* (task không có `ParentTaskId`). Công việc con là phần chia nhỏ của một công việc chính, không được đếm như một đơn vị KPI riêng. Danh sách việc cá nhân (Việc của tôi, Dashboard, Lịch) vẫn hiển thị mọi mục được giao cho người dùng, kể cả công việc con, và số đếm ở các màn hình cá nhân đếm đúng các mục trong danh sách đó. Lý do: người phụ trách được tự tạo công việc con (Q9); nếu đếm theo task lá, việc chia nhỏ sẽ làm thay đổi KPI dự án và cho phép dự án "Hoàn thành" trong khi công việc chính chưa được duyệt.
+- **Luồng công việc con:** Cần làm ↔ Đang làm → Hoàn thành, và mở lại Hoàn thành → Đang làm khi công việc chính chưa Chờ duyệt/Hoàn thành. Không có Chờ duyệt/Cần chỉnh sửa và không có bản ghi duyệt; người thao tác: người phụ trách công việc con, người phụ trách công việc chính hoặc Trưởng nhóm. Công việc con không có % tiến độ và không có điểm.
+- **Nộp công việc chính:** chỉ nộp được khi mọi công việc con đã Hoàn thành; khi nộp có thể kèm ghi chú bàn giao (≤ 2000 ký tự), lưu theo phiên bản nộp.
+- **Tiến độ % (TASK-04):** chỉ người phụ trách cập nhật, chỉ khi công việc chính đang ở "Đang làm"; giá trị 0–100; đặt 100% không tự hoàn thành — vẫn phải nộp và được duyệt; khi được duyệt hệ thống đặt 100%.
+- **Tạo/sửa công việc con:** Trưởng nhóm tạo cho mọi công việc chính; người phụ trách công việc chính tạo công việc con cho chính mình (giao cho bản thân hoặc để trống). Người tạo là người phụ trách công việc chính được sửa/xóa công việc con mình tạo khi chưa hoàn thành. Không thêm công việc con vào công việc đang Chờ duyệt hoặc đã Hoàn thành.
+- **Điểm (TASK-07, Q7):** chỉ Trưởng nhóm đặt, chỉ cho công việc chính, số nguyên dương.
+- **Xóa công việc:** không xóa công việc đã Hoàn thành, công việc còn công việc con, hoặc công việc đã có yêu cầu Marketplace (giữ lịch sử); liên kết tài liệu của công việc bị xóa cùng.
+- **Tài liệu dự án (FILE-01/03):** mọi thành viên đang hoạt động xem và thêm liên kết cấp dự án; người tạo hoặc Trưởng nhóm xóa, có xác nhận và ghi log.
+
+## Stage 2 — M3 quyết định nghiệp vụ (giả định đã ghi nhận, chờ chủ sản phẩm xác nhận)
+- **Ngưỡng cảnh báo theo nhóm:** mặc định có nguy cơ trễ khi còn ≤ 8 giờ đến hạn và tiến độ < 70%; đình trệ khi công việc đang làm không có cập nhật ≥ 24 giờ. Trưởng nhóm chỉnh trong Cài đặt nhóm (1–168 giờ; 1–100%; 1–720 giờ). Cảnh báo chỉ áp dụng cho công việc chính có người phụ trách.
+- **Người nhận cảnh báo (RISK-04):** người phụ trách và mọi Trưởng nhóm đang hoạt động của nhóm nhận cảnh báo quá hạn, có nguy cơ trễ và đình trệ. Mỗi loại cảnh báo gửi một lần cho mỗi hạn (quá hạn, nguy cơ) hoặc mỗi lần ngừng cập nhật (đình trệ); đổi hạn hoặc có cập nhật mới thì có thể cảnh báo lại.
+- **Nhắc việc thủ công (PROG-04):** Trưởng nhóm nhắc người phụ trách một công việc chưa hoàn thành, tối đa một lần mỗi giờ cho mỗi công việc.
+- **Điểm đóng góp:** ghi nhận vào sổ điểm (không ghi đè) tại thời điểm duyệt; chuyển giao sau đó không làm mất điểm đã ghi nhận. Công việc đã hoàn thành trước khi có sổ điểm được ghi bù một lần khi cập nhật cơ sở dữ liệu. Thành viên chỉ xem điểm và tỷ lệ của mình cùng tổng điểm dự án; Trưởng nhóm xem toàn bộ.
+
+## Stage 2 — M4 quyết định nghiệp vụ (giả định đã ghi nhận, chờ chủ sản phẩm xác nhận)
+1. **Marketplace 3 bên (Q3 = A):** Chuyển giao/Hoán đổi có người nhận → "Chờ người nhận" → người nhận Đồng ý → "Chờ duyệt" → Trưởng nhóm Duyệt hoặc Từ chối. Người nhận Từ chối → "Người nhận từ chối" (kết thúc).
+2. **Nhận việc (Claim):** Chuyển giao không chọn người nhận và Cần hỗ trợ không chọn người hỗ trợ được đăng ở trạng thái "Đang mở"; mọi thành viên đang hoạt động (trừ người tạo) có thể Nhận; nhận đồng nghĩa với đồng ý → "Chờ duyệt". Hoán đổi luôn phải chọn thành viên và công việc của họ.
+3. **Cần hỗ trợ (Q4 = A):** bắt buộc mô tả phần cần hỗ trợ. Khi được duyệt, người hỗ trợ được ghi trên công việc, được xem chi tiết và bình luận; không đổi trạng thái, không thêm tài liệu, không nhận điểm. Trưởng nhóm hoặc người phụ trách có thể kết thúc hỗ trợ; người hỗ trợ rời/bị xóa khỏi nhóm thì tự kết thúc.
+4. Trưởng nhóm có thể Từ chối ở mọi giai đoạn chưa kết thúc, chỉ Duyệt khi "Chờ duyệt". Trưởng nhóm là người tạo hoặc người nhận của yêu cầu thì không được duyệt/từ chối nếu nhóm có Trưởng nhóm khác (mở rộng quy tắc tự duyệt Q6); nhóm một Trưởng nhóm thì được, log ghi "(tự duyệt)".
+5. Yêu cầu đang hoạt động (Đang mở / Chờ người nhận / Chờ duyệt) tự hủy khi: công việc được giao lại hoặc hoàn thành; dự án hoặc nhóm bị lưu trữ; người tạo hoặc người nhận rời nhóm; một yêu cầu khác của cùng công việc được duyệt. Mỗi công việc chỉ có một yêu cầu đang hoạt động cho mỗi loại. Chỉ tạo yêu cầu cho công việc chính (không cho công việc con).
+6. Workload (số công việc đang mở của người tạo và người nhận) chỉ hiển thị cho Trưởng nhóm (BR-05, BR-22).
+7. Yêu cầu "Đang mở" được thông báo cho mọi thành viên đang hoạt động trừ người tạo; Trưởng nhóm được thông báo khi yêu cầu chuyển sang "Chờ duyệt".
+8. **Lưu trữ nhóm:** chỉ Trưởng nhóm, phải gõ đúng tên nhóm. Nhóm lưu trữ bị đóng băng: ẩn khỏi danh sách, không truy cập được nội dung cho đến khi một Trưởng nhóm khôi phục; mã mời không dùng được; yêu cầu Marketplace đang hoạt động bị hủy; thành viên được thông báo. Mục "Nhóm đã lưu trữ" hiện tên, thời điểm và người lưu trữ. (Chế độ xem chỉ đọc để giai đoạn sau.)
+9. **Dự án lưu trữ:** thành viên thấy danh sách dự án đã lưu trữ (tên, thời điểm, số công việc); chỉ Trưởng nhóm khôi phục; nội dung không truy cập được khi đang lưu trữ.
+10. **Mã mời:** nhãn tùy chọn (≤ 100 ký tự), hạn dùng từ 1 giờ đến 90 ngày hoặc không hạn, số lượt 1–500 hoặc không giới hạn. Mã chỉ hiển thị một lần khi tạo (chỉ lưu hash); bản rõ của các mã cũ được xóa khỏi cơ sở dữ liệu khi đã có hash. Trạng thái: Đang hoạt động / Hết hạn / Hết lượt / Đã thu hồi.
+11. **Nhật ký hoạt động:** chỉ Trưởng nhóm; lọc theo người thực hiện, dự án, loại (Công việc, Trạng thái & duyệt, Thành viên, Dự án, Marketplace, Nhóm) và khoảng ngày theo giờ Việt Nam; mới nhất trước; tải thêm 30 dòng mỗi lần.
+12. **Nhắc việc:** server trả `remindedRecently` khi Trưởng nhóm đã nhắc công việc trong khung giờ đồng hồ hiện tại (quy tắc tối đa 1 lần/giờ của M3), để giao diện hiện "Đã nhắc" cả sau khi tải lại trang.
