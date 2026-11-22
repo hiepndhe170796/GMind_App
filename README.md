@@ -133,6 +133,7 @@ npm run build
 - Config keys: `Auth:FrontendUrl` (mặc định `http://localhost:5173`) và `Auth:LocalMailboxPath`.
 - Các môi trường khác không có mailbox; các tính năng email báo chưa được cấu hình cho tới khi gắn một email provider thật.
 - SignalR chạy trên một server; scale-out cần backplane ví dụ Redis.
+- Tệp tải lên lưu tại `%LOCALAPPDATA%\GMind\Files` (config `Storage:RootPath`); phải backup cùng database. Giới hạn: 10 MB/tệp, 5 tệp/tin nhắn, 1 GB/nhóm, 2 MB/avatar — tất cả config qua `Storage:*`. Chưa có quét virus.
 
 ### Chạy trong Visual Studio
 
