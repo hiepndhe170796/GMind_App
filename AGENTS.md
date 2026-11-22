@@ -69,3 +69,4 @@ Work incrementally. Do not attempt to implement the entire product in one enormo
 - Frontend: `npm --prefix GMind-Frontend run dev|lint|build`; unit tests `npm --prefix GMind-Frontend run test -- --run <file>`.
 - Frontend project build: `dotnet build GMind-Frontend/GMind-Frontend.esproj` (JS SDK runs `npm run build` -> `dist/`).
 - Visual Studio configuration: open `GMind.slnx`, select startup profile `GMind - API + Frontend` (`GMind.slnLaunch`) for API (`http`) + Vite and http://localhost:5173. Project builds and proxy/login were verified; the actual GUI Run/F5 flow still needs confirmation.
+- Realtime hub: `/hubs/realtime` (Vite dev proxy forwards `/hubs` with `ws`); dev mailbox at `/dev/mailbox` backed by `GET /api/dev/mailbox` (Development and loopback only).

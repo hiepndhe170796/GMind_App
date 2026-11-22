@@ -126,6 +126,14 @@ Frontend sẽ chạy tại `http://localhost:5173` (strict port)
 npm run build
 ```
 
+### Realtime và email trong môi trường phát triển
+
+- Vite dev proxy forward `/hubs` (WebSocket) tới API; hub realtime là `/hubs/realtime`. Khi kết nối rớt, app hiển thị "Đang kết nối lại…" và fallback polling 60 giây.
+- Development mailbox: mọi email (đặt lại mật khẩu, xác minh đổi email, thông báo đổi email) được ghi vào `%LOCALAPPDATA%\GMind\Mailbox` và xem tại `http://localhost:5173/dev/mailbox`. Chỉ chạy ở môi trường Development và chỉ nhận request loopback.
+- Config keys: `Auth:FrontendUrl` (mặc định `http://localhost:5173`) và `Auth:LocalMailboxPath`.
+- Các môi trường khác không có mailbox; các tính năng email báo chưa được cấu hình cho tới khi gắn một email provider thật.
+- SignalR chạy trên một server; scale-out cần backplane ví dụ Redis.
+
 ### Chạy trong Visual Studio
 
 1. Mở `GMind.slnx`. Solution gồm backend (`GMind-Backend/*`) và frontend `GMind-Frontend/GMind-Frontend.esproj`.
@@ -155,7 +163,7 @@ npm run build           # typecheck + production build
 ```
 
 ### Database
-Migration `AddAuthVersion` (thêm `Users.AuthVersion`, additive, không xóa dữ liệu) đã được tạo; apply bằng `Update-Database` trong Package Manager Console (Default project `GMind.Infrastructure`, Startup `GMind.API`). Sau migration, các phiên đăng nhập cũ bị thu hồi — người dùng cần đăng nhập lại. Luồng F5 trong Visual Studio GUI chưa được verify tự động (đã verify bằng CLI build + proxy/runtime).
+Database mới cần chạy `dotnet ef database update --project GMind-Backend/GMind.Infrastructure --startup-project GMind-Backend/GMind.API` để apply toàn bộ migrations; migration mới nhất là `20261120113746_AddUserSessionsAndEmailChange`. Migration đó thay các cột `Users.RefreshToken*` cũ bằng bảng `UserSessions`, nên mọi phiên đăng nhập hiện có sẽ kết thúc và người dùng phải đăng nhập lại. API không tự chạy migration.
 
 ## 📦 Các Tính Năng (Theo BA Specification)
 
@@ -224,4 +232,3 @@ Dự án được phát triển bởi [Tên đội nhóm].
 
 ### Bản xem trước giao diện A2
 - Shell xanh nhạt + sidebar trắng mới; Dashboard tổng quan, Project board/list, TaskDetail hai cột đã redesign light-only và responsive (mobile menu `<dialog>`).
-- Còn lại của A2 (profile, quên/đặt lại mật khẩu qua mailbox local) chưa làm — chờ duyệt thiết kế.
