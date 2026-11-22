@@ -877,7 +877,7 @@ public class M5Tests
                 new RealtimeAddedNotification(pushed.Id, memberId, g.Id, pushed.Type, pushed.Title, pushed.Body, null, null, pushed.CreatedAt),
                 new RealtimeAddedNotification(invisibleToOutsider.Id, outsiderId, g.Id, invisibleToOutsider.Type, invisibleToOutsider.Title, invisibleToOutsider.Body, null, null, invisibleToOutsider.CreatedAt)
             ],
-            [t.Id], [p.Id], [gArchived.Id], [gArchived.Id]));
+            [t.Id], [p.Id], [gArchived.Id], [gArchived.Id], []));
 
         await dispatcher.StartAsync(default);
         var deadline = DateTime.UtcNow.AddSeconds(10);

@@ -603,9 +603,9 @@ public class GroupService : IGroupService
             "Transfer" or "Swap" or "NeedHelp" => "marketplace",
             _ => null,
         },
-        "TaskLink" => "task",
+        "TaskLink" or "StoredFile" => "task",
         "GroupMember" => "member",
-        "Project" => "project",
+        "Project" or "ProjectMessage" => "project",
         "MarketplaceRequest" or "TaskHelper" => "marketplace",
         "Group" or "GroupSettings" or "GroupInvite" => "group",
         _ => null,
@@ -627,10 +627,10 @@ public class GroupService : IGroupService
                 "task" => q.Where(a => (a.EntityType == "Task"
                         && (a.Action == "Create" || a.Action == "Update" || a.Action == "Assign"
                             || a.Action == "Delete" || a.Action == "Progress" || a.Action == "Remind"))
-                    || a.EntityType == "TaskLink"),
+                    || a.EntityType == "TaskLink" || a.EntityType == "StoredFile"),
                 "status" => q.Where(a => a.EntityType == "Task" && a.Action == "StatusChange"),
                 "member" => q.Where(a => a.EntityType == "GroupMember"),
-                "project" => q.Where(a => a.EntityType == "Project"),
+                "project" => q.Where(a => a.EntityType == "Project" || a.EntityType == "ProjectMessage"),
                 "marketplace" => q.Where(a => a.EntityType == "MarketplaceRequest" || a.EntityType == "TaskHelper"
                     || (a.EntityType == "Task" && (a.Action == "Transfer" || a.Action == "Swap" || a.Action == "NeedHelp"))),
                 "group" => q.Where(a => a.EntityType == "Group" || a.EntityType == "GroupSettings" || a.EntityType == "GroupInvite"),

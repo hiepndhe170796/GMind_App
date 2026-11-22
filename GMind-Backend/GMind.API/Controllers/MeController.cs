@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using GMind.API.Common;
+using GMind.Application.Common;
 using GMind.Application.Services.Auth;
+using GMind.Application.Services.Files;
 using GMind.Application.Services.Notifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,13 +15,17 @@ namespace GMind.API.Controllers;
 [Authorize]
 public class MeController : ControllerBase
 {
+    private const long AvatarUploadLimit = StorageOptions.DefaultMaxAvatarBytes + 65_536;
+
     private readonly IAuthService _authService;
     private readonly INotificationService _notifications;
+    private readonly IFileService _files;
 
-    public MeController(IAuthService authService, INotificationService notifications)
+    public MeController(IAuthService authService, INotificationService notifications, IFileService files)
     {
         _authService = authService;
         _notifications = notifications;
+        _files = files;
     }
 
     /// <summary>Lấy hồ sơ người dùng hiện tại.</summary>
@@ -37,6 +43,23 @@ public class MeController : ControllerBase
         var user = await _authService.UpdateProfileAsync(User.GetUserId(), request.DisplayName, request.AvatarUrl, ct);
         return Ok(user);
     }
+
+    /// <summary>Tải ảnh đại diện (png/jpeg/webp ≤ 2 MB, trình duyệt đã cắt 256px).</summary>
+    [HttpPut("avatar")]
+    [EnableRateLimiting("uploads")]
+    [RequestSizeLimit(AvatarUploadLimit)]
+    public async Task<IActionResult> SetAvatar(IFormFile? file, CancellationToken ct)
+    {
+        if (file is null)
+            throw new Application.Common.Exceptions.BadRequestException("Vui lòng chọn tệp.");
+        return Ok(await _files.SetAvatarAsync(User.GetUserId(),
+            new UploadedFile(file.FileName, file.Length, file.OpenReadStream), ct));
+    }
+
+    /// <summary>Gỡ ảnh đại diện đã tải lên.</summary>
+    [HttpDelete("avatar")]
+    public async Task<IActionResult> ClearAvatar(CancellationToken ct)
+        => Ok(await _files.ClearAvatarAsync(User.GetUserId(), ct));
 
     /// <summary>Đổi mật khẩu.</summary>
     [HttpPatch("password")]
@@ -111,6 +134,7 @@ public class UpdateProfileRequest : IValidatableObject
     public IEnumerable<ValidationResult> Validate(ValidationContext _)
     {
         if (AvatarUrl is null) yield break;
+        if (AvatarUrl.StartsWith("/api/avatars/", StringComparison.Ordinal)) yield break;
         if (string.IsNullOrWhiteSpace(AvatarUrl) || !Uri.TryCreate(AvatarUrl, UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
             || string.IsNullOrWhiteSpace(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo)

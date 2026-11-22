@@ -1,4 +1,3 @@
-using System.Text;
 using GMind.Application.Common;
 using GMind.Application.Common.Exceptions;
 using GMind.Domain.Entities;
@@ -83,7 +82,7 @@ public class NotificationService : INotificationService
 
         if (!string.IsNullOrEmpty(cursor))
         {
-            var (boundary, boundaryIds) = DecodeCursor(cursor);
+            var (boundary, boundaryIds) = BoundaryCursor.Decode(cursor);
             var boundaryUtc = DateTime.SpecifyKind(boundary, DateTimeKind.Utc);
             q = q.Where(n => n.CreatedAt < boundaryUtc || (n.CreatedAt == boundaryUtc && !boundaryIds.Contains(n.Id)));
         }
@@ -100,39 +99,9 @@ public class NotificationService : INotificationService
             rows.RemoveAt(take);
             var boundary = rows[^1].CreatedAt;
             var ids = rows.Where(r => r.CreatedAt == boundary).Select(r => r.Id);
-            next = EncodeCursor(boundary, ids);
+            next = BoundaryCursor.Encode(boundary, ids);
         }
         return new NotificationPageDto(rows, next);
-    }
-
-    private static string EncodeCursor(DateTime boundary, IEnumerable<Guid> ids)
-    {
-        var raw = $"{boundary.Ticks}|{string.Join(',', ids)}";
-        return Convert.ToBase64String(Encoding.UTF8.GetBytes(raw)).Replace('+', '-').Replace('/', '_').TrimEnd('=');
-    }
-
-    private static (DateTime Boundary, HashSet<Guid> Ids) DecodeCursor(string cursor)
-    {
-        try
-        {
-            var raw = Encoding.UTF8.GetString(Convert.FromBase64String(PadBase64(cursor)));
-            var parts = raw.Split('|', 2);
-            if (parts.Length != 2 || !long.TryParse(parts[0], out var ticks)) throw new FormatException();
-            var boundary = new DateTime(ticks, DateTimeKind.Utc);
-            var ids = parts[1].Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => Guid.Parse(s)).ToHashSet();
-            return (boundary, ids);
-        }
-        catch
-        {
-            throw new BadRequestException("Con trỏ phân trang không hợp lệ.");
-        }
-    }
-
-    private static string PadBase64(string base64Url)
-    {
-        var s = base64Url.Replace('-', '+').Replace('_', '/');
-        return s.PadRight(s.Length + (4 - s.Length % 4) % 4, '=');
     }
 
     public async Task<int> GetUnreadCountAsync(Guid userId, CancellationToken ct = default)

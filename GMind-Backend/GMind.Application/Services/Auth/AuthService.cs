@@ -28,6 +28,7 @@ public class AuthService : IAuthService
     private readonly IClientInfo? _clientInfo;
     private readonly IEmailSender? _emailSender;
     private readonly IRealtimeSessions? _realtimeSessions;
+    private readonly IFileStorage? _fileStorage;
 
     public AuthService(
         IApplicationDbContext context,
@@ -37,7 +38,8 @@ public class AuthService : IAuthService
         ILogger<AuthService> logger,
         IClientInfo? clientInfo = null,
         IEmailSender? emailSender = null,
-        IRealtimeSessions? realtimeSessions = null)
+        IRealtimeSessions? realtimeSessions = null,
+        IFileStorage? fileStorage = null)
     {
         _context = context;
         _passwordHasher = passwordHasher;
@@ -47,6 +49,7 @@ public class AuthService : IAuthService
         _clientInfo = clientInfo;
         _emailSender = emailSender;
         _realtimeSessions = realtimeSessions;
+        _fileStorage = fileStorage;
     }
 
     public async Task<UserDto> RegisterAsync(string displayName, string email, string password, CancellationToken ct = default)
@@ -192,10 +195,30 @@ public class AuthService : IAuthService
         var user = await _context.Users.FindAsync(new object[] { userId }, ct)
             ?? throw new NotFoundException("Không tìm thấy người dùng này.");
 
+        var url = avatarUrl?.Trim();
+        var managedPath = user.AvatarFileId is Guid managedId ? $"/api/avatars/{managedId}" : null;
+        // A managed-avatar path is only valid when it points at the caller's own current file.
+        if (url != null && url.StartsWith("/api/avatars/", StringComparison.Ordinal) && url != managedPath)
+            throw new BadRequestException("Ảnh đại diện không hợp lệ.");
+        var retireId = managedPath != null && url != managedPath ? user.AvatarFileId : (Guid?)null;
+
         user.DisplayName = displayName.Trim();
-        user.AvatarUrl = avatarUrl?.Trim();
+        user.AvatarUrl = url;
+        if (retireId != null) user.AvatarFileId = null;
         user.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
+
+        if (retireId is Guid oldId)
+        {
+            var old = await _context.StoredFiles.FirstOrDefaultAsync(
+                f => f.Id == oldId && f.Kind == FileKind.Avatar && f.DeletedAt == null, ct);
+            if (old != null)
+            {
+                old.DeletedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync(ct);
+                if (_fileStorage is not null) await _fileStorage.DeleteAsync(old.StorageKey, ct);
+            }
+        }
         return ToDto(user);
     }
 

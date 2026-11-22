@@ -34,12 +34,14 @@ public class TaskService : ITaskService
     private readonly IApplicationDbContext _context;
     private readonly IResourceAccess _access;
     private readonly Notifications.INotificationService _notifications;
+    private readonly IFileStorage? _storage;
 
-    public TaskService(IApplicationDbContext context, IResourceAccess access, Notifications.INotificationService notifications)
+    public TaskService(IApplicationDbContext context, IResourceAccess access, Notifications.INotificationService notifications, IFileStorage? storage = null)
     {
         _context = context;
         _access = access;
         _notifications = notifications;
+        _storage = storage;
     }
 
     public async Task<TaskDetailDto> CreateAsync(Guid userId, Guid projectId, string title, string? description, Guid? assigneeUserId, Priority priority, DateTime? deadlineAt, decimal? estimateHours, int? points, Guid? parentTaskId, CancellationToken ct = default)
@@ -421,9 +423,15 @@ public class TaskService : ITaskService
 
         var links = await _context.TaskLinks.Where(l => l.TaskId == taskId).ToListAsync(ct);
         _context.TaskLinks.RemoveRange(links);
+        // Soft-delete the task's files and detach them before the task row goes away (FK is NoAction).
+        var files = await _context.StoredFiles
+            .Where(f => f.TaskId == taskId && f.DeletedAt == null).ToListAsync(ct);
+        foreach (var f in files) { f.DeletedAt = DateTime.UtcNow; f.TaskId = null; }
         _context.ActivityLogs.Add(Log(userId, task.Project.GroupId, task.ProjectId, "Task", task.Id, "Delete", $"Xóa công việc '{task.Title}'"));
         _context.Tasks.Remove(task);
         await _context.SaveChangesAsync(ct);
+        if (_storage is not null)
+            foreach (var f in files) await _storage.DeleteAsync(f.StorageKey, ct);
     }
 
     /// <summary>PROG-04: Leader nudges the assignee — at most once per task per hour.</summary>

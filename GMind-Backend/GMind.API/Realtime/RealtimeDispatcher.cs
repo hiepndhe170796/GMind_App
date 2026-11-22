@@ -59,9 +59,16 @@ public sealed class RealtimeDispatcher : BackgroundService
             .Select(p => new { p.Id, p.GroupId })
             .ToListAsync(ct);
 
+        // discussion events only reach members of live projects in non-archived groups.
+        var discussionRows = batch.DiscussionProjectIds.Count == 0 ? [] : await db.Projects.AsNoTracking()
+            .Where(p => batch.DiscussionProjectIds.Contains(p.Id) && p.ArchivedAt == null && !p.Group.IsArchived)
+            .Select(p => new { p.Id, p.GroupId })
+            .ToListAsync(ct);
+
         var groupIds = batch.GroupIds
             .Concat(taskRows.Select(t => t.GroupId))
             .Concat(projectRows.Select(p => p.GroupId))
+            .Concat(discussionRows.Select(p => p.GroupId))
             .Concat(batch.Notifications.Where(n => n.GroupId != null).Select(n => n.GroupId!.Value))
             .Distinct().ToList();
 
@@ -89,6 +96,14 @@ public sealed class RealtimeDispatcher : BackgroundService
             if (members.Count == 0) continue;
             await _hub.Clients.Users(members.Select(m => m.ToString()).ToList())
                 .SendAsync("changed", new { taskIds, projectIds, groupIds = gIds }, ct);
+        }
+
+        // discussion → one { projectId } event to the project's group members (live projects only).
+        foreach (var row in discussionRows)
+        {
+            if (!membersByGroup.TryGetValue(row.GroupId, out var members) || members.Count == 0) continue;
+            await _hub.Clients.Users(members.Select(m => m.ToString()).ToList())
+                .SendAsync("discussion", new { projectId = row.Id }, ct);
         }
 
         // notification → visible-only, with the recipient's unread count (one grouped query each).

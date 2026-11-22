@@ -23,6 +23,9 @@ public class User
     [MaxLength(500)]
     public string? AvatarUrl { get; set; }
 
+    /// <summary>Managed avatar file; AvatarUrl is "/api/avatars/{AvatarFileId}" while set.</summary>
+    public Guid? AvatarFileId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
@@ -42,4 +45,5 @@ public class User
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
     public ICollection<MarketplaceRequest> MarketplaceRequests { get; set; } = new List<MarketplaceRequest>();
     public ICollection<ActivityLog> ActivityLogs { get; set; } = new List<ActivityLog>();
+    public StoredFile? AvatarFile { get; set; }
 }

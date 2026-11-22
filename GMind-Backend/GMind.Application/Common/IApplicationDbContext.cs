@@ -26,6 +26,9 @@ public interface IApplicationDbContext
     DbSet<TaskHelper> TaskHelpers { get; }
     DbSet<UserSession> UserSessions { get; }
     DbSet<EmailChangeRequest> EmailChangeRequests { get; }
+    DbSet<StoredFile> StoredFiles { get; }
+    DbSet<ProjectMessage> ProjectMessages { get; }
+    DbSet<ProjectMessageMention> ProjectMessageMentions { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

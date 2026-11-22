@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using GMind.API;
 using GMind.API.Common;
@@ -65,6 +66,26 @@ builder.Services.AddRateLimiter(options =>
             Window = TimeSpan.FromMinutes(rl.GetValue<double?>("RecoveryWindowMinutes") ?? 15),
             QueueLimit = 0,
         }));
+    // Per-user limits for uploads and discussion sends (user id claim, fallback client IP).
+    static string UserOrIp(HttpContext ctx)
+        => ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)
+           ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    options.AddPolicy("uploads", httpContext => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: UserOrIp(httpContext),
+        factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rl.GetValue<int?>("UploadPermitLimit") ?? 30,
+            Window = TimeSpan.FromMinutes(rl.GetValue<double?>("UploadWindowMinutes") ?? 1),
+            QueueLimit = 0,
+        }));
+    options.AddPolicy("chat-send", httpContext => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: UserOrIp(httpContext),
+        factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rl.GetValue<int?>("ChatSendPermitLimit") ?? 30,
+            Window = TimeSpan.FromMinutes(rl.GetValue<double?>("ChatSendWindowMinutes") ?? 1),
+            QueueLimit = 0,
+        }));
 });
 
 builder.Services.AddHealthChecks().AddCheck<DatabaseReadinessCheck>("database", tags: ["ready"]);
@@ -97,9 +118,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("Frontend");
 if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
-app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
 app.MapHub<GMind.API.Realtime.RealtimeHub>("/hubs/realtime",
     options => options.CloseOnAuthenticationExpiration = true);

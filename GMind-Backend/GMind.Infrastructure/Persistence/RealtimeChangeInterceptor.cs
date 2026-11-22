@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using GMind.Application.Common;
 using GMind.Domain.Entities;
+using GMind.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using TaskEntity = GMind.Domain.Entities.Task;
@@ -25,6 +26,7 @@ public sealed class RealtimeChangeInterceptor : SaveChangesInterceptor
         public List<Guid> ProjectIds { get; } = [];
         public List<Guid> GroupIds { get; } = [];
         public List<Guid> ArchivedGroupIds { get; } = [];
+        public List<Guid> DiscussionProjectIds { get; } = [];
     }
 
     private void Collect(DbContext? context)
@@ -55,6 +57,15 @@ public sealed class RealtimeChangeInterceptor : SaveChangesInterceptor
                     break;
                 case TaskLink l:
                     if (l.TaskId is Guid linkTaskId) pending.TaskIds.Add(linkTaskId);
+                    else pending.ProjectIds.Add(l.ProjectId);
+                    break;
+                case StoredFile f:
+                    if (f.Kind == FileKind.Task && f.TaskId is Guid fileTaskId) pending.TaskIds.Add(fileTaskId);
+                    else if (f.Kind == FileKind.Project && f.ProjectId is Guid fileProjectId) pending.ProjectIds.Add(fileProjectId);
+                    else if (f.Kind == FileKind.Message && f.ProjectId is Guid msgProjectId) pending.DiscussionProjectIds.Add(msgProjectId);
+                    break;
+                case ProjectMessage pm:
+                    pending.DiscussionProjectIds.Add(pm.ProjectId);
                     break;
                 case TaskSubmission s:
                     pending.TaskIds.Add(s.TaskId);
@@ -92,7 +103,7 @@ public sealed class RealtimeChangeInterceptor : SaveChangesInterceptor
         var batch = new RealtimeBatch(
             pending.Notifications, pending.TaskIds.Distinct().ToList(),
             pending.ProjectIds.Distinct().ToList(), pending.GroupIds.Distinct().ToList(),
-            pending.ArchivedGroupIds.Distinct().ToList());
+            pending.ArchivedGroupIds.Distinct().ToList(), pending.DiscussionProjectIds.Distinct().ToList());
         if (!batch.IsEmpty) _outbox.Enqueue(batch);
     }
 

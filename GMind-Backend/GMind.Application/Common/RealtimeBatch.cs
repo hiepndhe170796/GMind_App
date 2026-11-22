@@ -20,7 +20,9 @@ public sealed record RealtimeBatch(
     List<Guid> TaskIds,
     List<Guid> ProjectIds,
     List<Guid> GroupIds,
-    List<Guid> ArchivedGroupIds)
+    List<Guid> ArchivedGroupIds,
+    List<Guid> DiscussionProjectIds)
 {
-    public bool IsEmpty => Notifications.Count == 0 && TaskIds.Count == 0 && ProjectIds.Count == 0 && GroupIds.Count == 0;
+    public bool IsEmpty => Notifications.Count == 0 && TaskIds.Count == 0 && ProjectIds.Count == 0 && GroupIds.Count == 0
+        && DiscussionProjectIds.Count == 0;
 }

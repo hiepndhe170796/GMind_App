@@ -513,6 +513,66 @@ namespace GMind.Infrastructure.Migrations
                     b.ToTable("Projects");
                 });
 
+            modelBuilder.Entity("GMind.Domain.Entities.ProjectMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AuthorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ReplyToMessageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorUserId");
+
+                    b.HasIndex("DeletedByUserId");
+
+                    b.HasIndex("ReplyToMessageId");
+
+                    b.HasIndex("ProjectId", "CreatedAt", "Id");
+
+                    b.ToTable("ProjectMessages");
+                });
+
+            modelBuilder.Entity("GMind.Domain.Entities.ProjectMessageMention", b =>
+                {
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("MessageId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("ProjectMessageMentions");
+                });
+
             modelBuilder.Entity("GMind.Domain.Entities.ReminderDelivery", b =>
                 {
                     b.Property<Guid>("Id")
@@ -552,6 +612,80 @@ namespace GMind.Infrastructure.Migrations
                     b.HasIndex("TaskId");
 
                     b.ToTable("ReminderDeliveries");
+                });
+
+            modelBuilder.Entity("GMind.Domain.Entities.StoredFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Extension")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<Guid?>("GroupId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("MessageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("OriginalName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MessageId");
+
+                    b.HasIndex("StorageKey")
+                        .IsUnique();
+
+                    b.HasIndex("TaskId");
+
+                    b.HasIndex("UploadedByUserId");
+
+                    b.HasIndex("GroupId", "DeletedAt");
+
+                    b.HasIndex("ProjectId", "Kind");
+
+                    b.ToTable("StoredFiles", t =>
+                        {
+                            t.HasCheckConstraint("CK_StoredFiles_Scope", "([Kind] = 4 AND [GroupId] IS NULL AND [ProjectId] IS NULL) OR ([Kind] <> 4 AND [GroupId] IS NOT NULL AND [ProjectId] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("GMind.Domain.Entities.Task", b =>
@@ -823,6 +957,9 @@ namespace GMind.Infrastructure.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(0);
 
+                    b.Property<Guid?>("AvatarFileId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("AvatarUrl")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -860,6 +997,8 @@ namespace GMind.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AvatarFileId");
 
                     b.HasIndex("Email")
                         .IsUnique();
@@ -1170,6 +1309,58 @@ namespace GMind.Infrastructure.Migrations
                     b.Navigation("Group");
                 });
 
+            modelBuilder.Entity("GMind.Domain.Entities.ProjectMessage", b =>
+                {
+                    b.HasOne("GMind.Domain.Entities.User", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GMind.Domain.Entities.User", "DeletedBy")
+                        .WithMany()
+                        .HasForeignKey("DeletedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("GMind.Domain.Entities.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GMind.Domain.Entities.ProjectMessage", "ReplyTo")
+                        .WithMany()
+                        .HasForeignKey("ReplyToMessageId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Author");
+
+                    b.Navigation("DeletedBy");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("ReplyTo");
+                });
+
+            modelBuilder.Entity("GMind.Domain.Entities.ProjectMessageMention", b =>
+                {
+                    b.HasOne("GMind.Domain.Entities.ProjectMessage", "Message")
+                        .WithMany("Mentions")
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GMind.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Message");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("GMind.Domain.Entities.ReminderDelivery", b =>
                 {
                     b.HasOne("GMind.Domain.Entities.User", "Recipient")
@@ -1187,6 +1378,45 @@ namespace GMind.Infrastructure.Migrations
                     b.Navigation("Recipient");
 
                     b.Navigation("Task");
+                });
+
+            modelBuilder.Entity("GMind.Domain.Entities.StoredFile", b =>
+                {
+                    b.HasOne("GMind.Domain.Entities.Group", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("GMind.Domain.Entities.ProjectMessage", "Message")
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("GMind.Domain.Entities.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("GMind.Domain.Entities.Task", "Task")
+                        .WithMany()
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("GMind.Domain.Entities.User", "UploadedBy")
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Group");
+
+                    b.Navigation("Message");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("Task");
+
+                    b.Navigation("UploadedBy");
                 });
 
             modelBuilder.Entity("GMind.Domain.Entities.Task", b =>
@@ -1338,6 +1568,16 @@ namespace GMind.Infrastructure.Migrations
                     b.Navigation("Task");
                 });
 
+            modelBuilder.Entity("GMind.Domain.Entities.User", b =>
+                {
+                    b.HasOne("GMind.Domain.Entities.StoredFile", "AvatarFile")
+                        .WithMany()
+                        .HasForeignKey("AvatarFileId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("AvatarFile");
+                });
+
             modelBuilder.Entity("GMind.Domain.Entities.UserSession", b =>
                 {
                     b.HasOne("GMind.Domain.Entities.User", "User")
@@ -1369,6 +1609,11 @@ namespace GMind.Infrastructure.Migrations
                     b.Navigation("Links");
 
                     b.Navigation("Tasks");
+                });
+
+            modelBuilder.Entity("GMind.Domain.Entities.ProjectMessage", b =>
+                {
+                    b.Navigation("Mentions");
                 });
 
             modelBuilder.Entity("GMind.Domain.Entities.Task", b =>

@@ -32,6 +32,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<TaskHelper> TaskHelpers { get; set; }
     public DbSet<UserSession> UserSessions { get; set; }
     public DbSet<EmailChangeRequest> EmailChangeRequests { get; set; }
+    public DbSet<StoredFile> StoredFiles { get; set; }
+    public DbSet<ProjectMessage> ProjectMessages { get; set; }
+    public DbSet<ProjectMessageMention> ProjectMessageMentions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -351,6 +354,48 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 .WithMany()
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // StoredFile: no cascade paths — every scope FK is NoAction and code nulls TaskId itself.
+        modelBuilder.Entity<StoredFile>(entity =>
+        {
+            entity.ToTable(t => t.HasCheckConstraint("CK_StoredFiles_Scope",
+                "([Kind] = 4 AND [GroupId] IS NULL AND [ProjectId] IS NULL) OR ([Kind] <> 4 AND [GroupId] IS NOT NULL AND [ProjectId] IS NOT NULL)"));
+            entity.HasIndex(f => f.StorageKey).IsUnique();
+            entity.HasIndex(f => new { f.ProjectId, f.Kind });
+            entity.HasIndex(f => f.TaskId);
+            entity.HasIndex(f => f.MessageId);
+            entity.HasIndex(f => new { f.GroupId, f.DeletedAt });
+            entity.HasOne(f => f.Group).WithMany().HasForeignKey(f => f.GroupId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(f => f.Project).WithMany().HasForeignKey(f => f.ProjectId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(f => f.Task).WithMany().HasForeignKey(f => f.TaskId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(f => f.Message).WithMany().HasForeignKey(f => f.MessageId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(f => f.UploadedBy).WithMany().HasForeignKey(f => f.UploadedByUserId).OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // ProjectMessage: replies point inside the same project; mention rows cascade with the message.
+        modelBuilder.Entity<ProjectMessage>(entity =>
+        {
+            entity.HasIndex(m => new { m.ProjectId, m.CreatedAt, m.Id });
+            entity.HasOne(m => m.Project).WithMany().HasForeignKey(m => m.ProjectId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(m => m.Author).WithMany().HasForeignKey(m => m.AuthorUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(m => m.ReplyTo).WithMany().HasForeignKey(m => m.ReplyToMessageId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(m => m.DeletedBy).WithMany().HasForeignKey(m => m.DeletedByUserId).OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<ProjectMessageMention>(entity =>
+        {
+            entity.HasKey(m => new { m.MessageId, m.UserId });
+            entity.HasOne(m => m.Message).WithMany(p => p.Mentions).HasForeignKey(m => m.MessageId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(m => m.User).WithMany().HasForeignKey(m => m.UserId).OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasOne(u => u.AvatarFile)
+                .WithMany()
+                .HasForeignKey(u => u.AvatarFileId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
     }
 }
