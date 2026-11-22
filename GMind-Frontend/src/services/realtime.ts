@@ -12,6 +12,7 @@ export interface RealtimeChanged {
   taskIds?: string[] | null; projectIds?: string[] | null; groupIds?: string[] | null;
 }
 export interface RealtimeSessionRevoked { sessionId?: string | null }
+export interface RealtimeDiscussion { projectId?: string | null }
 
 /** [0, 2000, 5000, 10000] then 30 s forever — spec-mandated reconnect policy. */
 export const REALTIME_RETRY_DELAYS = [0, 2000, 5000, 10_000];
@@ -30,7 +31,7 @@ export const realtimeHubUrl = (): string =>
   `${(import.meta.env.VITE_API_URL ?? '').trim().replace(/\/+$/, '')}/hubs/realtime`;
 
 type Listener = (payload: never) => void;
-type EventName = 'notification' | 'changed' | 'session-revoked';
+type EventName = 'notification' | 'changed' | 'session-revoked' | 'discussion';
 
 export interface RealtimeConnection {
   readonly status: RealtimeStatus;
@@ -38,6 +39,7 @@ export interface RealtimeConnection {
   on(event: 'notification', cb: (payload: RealtimeNotification) => void): () => void;
   on(event: 'changed', cb: (payload: RealtimeChanged) => void): () => void;
   on(event: 'session-revoked', cb: (payload: RealtimeSessionRevoked) => void): () => void;
+  on(event: 'discussion', cb: (payload: RealtimeDiscussion) => void): () => void;
   onReconnected(cb: () => void): () => void;
   start(): Promise<void>;
   stop(): Promise<void>;
@@ -54,7 +56,7 @@ export function createRealtimeConnection(): RealtimeConnection {
   let status: RealtimeStatus = 'connecting';
   const statusListeners = new Set<(s: RealtimeStatus) => void>();
   const listeners: Record<EventName, Set<Listener>> = {
-    notification: new Set(), changed: new Set(), 'session-revoked': new Set(),
+    notification: new Set(), changed: new Set(), 'session-revoked': new Set(), discussion: new Set(),
   };
   const reconnectedListeners = new Set<() => void>();
 
@@ -70,6 +72,7 @@ export function createRealtimeConnection(): RealtimeConnection {
   connection.on('notification', (p: RealtimeNotification) => emit('notification', p));
   connection.on('changed', (p: RealtimeChanged) => emit('changed', p));
   connection.on('session-revoked', (p: RealtimeSessionRevoked) => emit('session-revoked', p));
+  connection.on('discussion', (p: RealtimeDiscussion) => emit('discussion', p));
   connection.onreconnecting(() => setStatus('reconnecting'));
   connection.onreconnected(() => {
     setStatus('connected');

@@ -352,7 +352,8 @@ describe('TaskDetail M2 — subtasks, links, comments', () => {
     const del = vi.spyOn(tasksService, 'deleteLink').mockResolvedValue({});
     renderPage();
     await screen.findByText('PRIVATE_LINK');
-    const url = screen.getByLabelText('Liên kết');
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm liên kết' }));
+    const url = await screen.findByLabelText('Liên kết');
     fireEvent.change(url, { target: { value: 'javascript:alert(1)' } });
     fireEvent.submit(url.closest('form')!);
     expect(add).not.toHaveBeenCalled();
@@ -750,7 +751,7 @@ describe('TaskDetail M4 — helpers', () => {
     renderPage();
     await screen.findByText('PRIVATE_TASK');
     expect(screen.queryByRole('button', { name: 'Gửi bình luận' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Thêm tài liệu' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Thêm liên kết' })).toBeTruthy();
   });
 
   it('assignee gets the marketplace entry link on an open top-level task', async () => {

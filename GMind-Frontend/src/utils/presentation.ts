@@ -41,6 +41,19 @@ export function formatRelative(value?: string | null, now: number = Date.now()):
   return `${Math.floor(hours / 24)} ngày trước`;
 }
 
+/** vi-VN byte size: "512 B", "12 KB", "1,2 MB" (1 decimal for MB, none below). */
+export function formatBytes(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return '0 B';
+  if (n < 1024) return `${Math.round(n)} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  if (n < 1024 * 1024 * 1024) {
+    const mb = Math.round((n / (1024 * 1024)) * 10) / 10;
+    return `${mb.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} MB`;
+  }
+  const gb = Math.round((n / (1024 * 1024 * 1024)) * 10) / 10;
+  return `${gb.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} GB`;
+}
+
 /** Header date like "Thứ Sáu, 20 tháng 11, 2026" — built from parts so browsers that capitalize "Tháng" don't leak it. */
 export function formatHeaderDate(d: Date): string {
   const parts = new Intl.DateTimeFormat('vi-VN', {

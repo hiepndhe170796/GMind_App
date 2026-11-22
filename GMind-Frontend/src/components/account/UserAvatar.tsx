@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { isSafeAvatarUrl } from '../../utils/account-form';
 
+const apiBase = (import.meta.env.VITE_API_URL ?? '').trim().replace(/\/+$/, '');
+
 export default function UserAvatar({ name, url, size = 40 }: { name: string; url?: string | null; size?: number }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const safe = url && isSafeAvatarUrl(url) ? url : null;
+  const raw = url && isSafeAvatarUrl(url) ? url : null;
+  const safe = raw?.startsWith('/') ? `${apiBase}${raw}` : raw;
   const initials = name.trim().split(/\s+/).slice(0, 2).map(w => Array.from(w)[0]?.toUpperCase() ?? '').join('') || '?';
   if (!safe || failedUrl === safe) {
     return (

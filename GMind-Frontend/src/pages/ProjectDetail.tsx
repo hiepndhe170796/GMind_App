@@ -18,8 +18,11 @@ import { useToast } from '../components/ui/Toast';
 import { useCurrentUserId } from '../hooks/use-current-user-id';
 import { qk } from '../services/query-keys';
 import { projectsService, projectsManage, projectLinks, type ProjectDto } from '../services/projects';
-import { tasksService, TaskStatus, type TaskSummaryDto, type LinkDto } from '../services/tasks';
+import { tasksService, TaskStatus, type TaskSummaryDto } from '../services/tasks';
 import { groupsService, type ActivityDto } from '../services/groups';
+import { filesService } from '../services/files';
+import ProjectDocuments from '../components/projects/ProjectDocuments';
+import ProjectDiscussion from '../components/projects/ProjectDiscussion';
 import { deadlineState } from '../utils/task-time';
 import { formatDate, formatDateTime, STATUS_LABEL, PRIORITY_LABEL, dayKey } from '../utils/presentation';
 
@@ -27,13 +30,6 @@ const errMsg = (e: unknown, fb: string) =>
   typeof (e as { message?: unknown })?.message === 'string' && (e as { message: string }).message ? (e as { message: string }).message : fb;
 const errStatus = (e: unknown) => (e as { status?: number })?.status;
 const initials = (n?: string | null) => (n || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
-const hostname = (u: string) => { try { return new URL(u).hostname; } catch { return u; } };
-function httpUrl(value: string): string | null {
-  const trimmed = value.trim();
-  if (!/^https?:\/\//i.test(trimmed)) return null;
-  try { const parsed = new URL(trimmed); return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? trimmed : null; }
-  catch { return null; }
-}
 const vnToIso = (v: string) => (v ? new Date(`${v}:00+07:00`).toISOString() : undefined);
 
 const STATUS_NUM: Record<string, number> = {
@@ -49,8 +45,12 @@ const PROJECT_STATUS_LABEL: Record<string, string> = {
 type DialogKind =
   | { kind: 'submit' | 'changes'; task: TaskSummaryDto }
   | { kind: 'edit' | 'archive' | 'create' }
-  | { kind: 'delete-link'; link: LinkDto }
   | null;
+
+type ProjectTab = 'tasks' | 'discussion' | 'files';
+const TAB_ORDER: ProjectTab[] = ['tasks', 'discussion', 'files'];
+const TAB_LABEL: Record<ProjectTab, string> = { tasks: 'Công việc', discussion: 'Thảo luận', files: 'Tài liệu' };
+const parseTab = (v: string | null): ProjectTab => v === 'discussion' || v === 'files' ? v : 'tasks';
 
 export default function ProjectDetail() {
   const { id = '' } = useParams();
@@ -77,6 +77,9 @@ export default function ProjectDetail() {
   });
   const linksQ = useQuery({
     queryKey: qk.projectLinks(me, id), queryFn: () => projectLinks.links(id), enabled: !!me && !!id,
+  });
+  const filesQ = useQuery({
+    queryKey: qk.projectFiles(me, id), queryFn: () => filesService.listProjectFiles(id), enabled: !!me && !!id,
   });
   const isLeader = groupQ.data?.myRole === 'Leader';
   const activityQ = useQuery({
@@ -107,6 +110,28 @@ export default function ProjectDetail() {
   };
   const clearFilters = () => updateFilters({ q: null, status: null, assignee: null, priority: null, sort: null });
   const activeFilterCount = [filters.q, filters.status, filters.assignee, filters.priority].filter(Boolean).length;
+
+  /* ---------- tabs (URL-synced, roving tabindex) ---------- */
+  const activeTab = parseTab(params.get('tab'));
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const setTab = (t: ProjectTab) => {
+    const next = new URLSearchParams(params);
+    if (t === 'tasks') next.delete('tab'); else next.set('tab', t);
+    setParams(next, { replace: true });
+  };
+  const onTabKeyDown = (e: React.KeyboardEvent, index: number) => {
+    let next = -1;
+    if (e.key === 'ArrowRight') next = (index + 1) % TAB_ORDER.length;
+    else if (e.key === 'ArrowLeft') next = (index - 1 + TAB_ORDER.length) % TAB_ORDER.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = TAB_ORDER.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    setTab(TAB_ORDER[next]);
+    tabRefs.current[next]?.focus();
+  };
+  const docsCount = (linksQ.data?.length ?? 0) + (filesQ.data?.length ?? 0);
+  const docsCountLoaded = !linksQ.isPending && !filesQ.isPending;
 
   /* ---------- derived rows ---------- */
   const tasks = useMemo(() => tasksQ.data ?? [], [tasksQ.data]);
@@ -203,23 +228,6 @@ export default function ProjectDetail() {
     else transitionM.mutate({ task, target });
   };
 
-  const addLinkM = useMutation({
-    mutationFn: ({ url, name }: { url: string; name?: string }) => projectLinks.addLink(id, url, name),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: qk.projectLinks(me, id) });
-      toast.success('Đã thêm tài liệu.');
-    },
-    onError: (e) => toast.error(errMsg(e, 'Không thêm được tài liệu.')),
-  });
-  const deleteLinkM = useMutation({
-    mutationFn: (linkId: string) => tasksService.deleteLink(linkId),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: qk.projectLinks(me, id) });
-      setDialog(null);
-      toast.success('Đã xóa tài liệu.');
-    },
-    onError: (e) => toast.error(errMsg(e, 'Không xóa được tài liệu.')),
-  });
   const archiveM = useMutation({
     mutationFn: () => projectsManage.archive(id),
     onSuccess: () => {
@@ -307,6 +315,35 @@ export default function ProjectDetail() {
             </div>
           </Card>
 
+          {/* ---------- tabs ---------- */}
+          <div role="tablist" aria-label="Nội dung dự án" className="flex gap-1 overflow-x-auto border-b border-line">
+            {TAB_ORDER.map((t, i) => (
+              <button key={t} ref={el => { tabRefs.current[i] = el; }}
+                id={`ptab-${t}`} role="tab" type="button"
+                aria-selected={activeTab === t} aria-controls={`ppanel-${t}`}
+                tabIndex={activeTab === t ? 0 : -1}
+                onClick={() => setTab(t)} onKeyDown={e => onTabKeyDown(e, i)}
+                className={`min-h-11 shrink-0 border-b-2 px-3 text-small font-medium transition-colors sm:px-4 ${
+                  activeTab === t
+                    ? 'border-primary-600 text-primary-700'
+                    : 'border-transparent text-ink-secondary hover:text-ink'}`}>
+                {t === 'files' && docsCountLoaded ? `Tài liệu (${docsCount})` : TAB_LABEL[t]}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === 'discussion' && (
+            <div id="ppanel-discussion" role="tabpanel" aria-labelledby="ptab-discussion" tabIndex={0}>
+              <ProjectDiscussion projectId={id} members={members} />
+            </div>
+          )}
+          {activeTab === 'files' && (
+            <div id="ppanel-files" role="tabpanel" aria-labelledby="ptab-files" tabIndex={0}>
+              <ProjectDocuments projectId={id} uid={me} canAdd busy={transitionM.isPending} />
+            </div>
+          )}
+          {activeTab === 'tasks' && (
+          <div id="ppanel-tasks" role="tabpanel" aria-labelledby="ptab-tasks" tabIndex={0} className="space-y-6">
           {/* ---------- filters + view toggle ---------- */}
           <ResponsiveFilters activeCount={activeFilterCount} search={
             <form role="search" onSubmit={e => e.preventDefault()}>
@@ -384,41 +421,6 @@ export default function ProjectDetail() {
             <KanbanBoard tasks={boardTasks} busy={transitionM.isPending}
               justApprovedId={justApprovedId} onTransition={requestTransition} />
           )}
-
-          {/* ---------- project documents ---------- */}
-          <Card className="p-4 sm:p-6">
-            <h3 className="text-section font-semibold text-ink">Tài liệu dự án</h3>
-            {linksQ.isPending ? (
-              <p role="status" className="mt-3 text-small text-ink-muted">Đang tải tài liệu…</p>
-            ) : (linksQ.data ?? []).length === 0 ? (
-              <p className="mt-3 text-small text-ink-muted">Chưa có tài liệu nào. Thêm liên kết tài liệu chung cho dự án.</p>
-            ) : (
-              <ul className="mt-3 divide-y divide-line">
-                {(linksQ.data ?? []).map(l => (
-                  <li key={l.id} className="flex items-center gap-3 py-2.5 min-w-0">
-                    <Icon name="link" size={16} className="shrink-0 text-ink-muted" />
-                    <div className="min-w-0 flex-1">
-                      <a href={l.url} target="_blank" rel="noopener noreferrer"
-                        className="block truncate text-small font-medium text-primary-700 hover:underline">
-                        {l.displayName || l.url}
-                      </a>
-                      <p className="text-caption text-ink-muted truncate">
-                        {hostname(l.url)}{l.createdByName ? ` · ${l.createdByName}` : ''}{l.createdAt ? ` · ${formatDateTime(l.createdAt)}` : ''}
-                      </p>
-                    </div>
-                    {l.canDelete && (
-                      <button type="button" aria-label={`Xóa tài liệu ${l.displayName || l.url}`}
-                        onClick={() => setDialog({ kind: 'delete-link', link: l })}
-                        className="min-h-9 rounded-lg px-2 text-small font-medium text-danger-700 hover:bg-danger-50">
-                        Xóa
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <AddProjectLinkForm busy={addLinkM.isPending} onAdd={(url, name) => addLinkM.mutate({ url, name })} />
-          </Card>
 
           {/* ---------- members + activity + contributions ---------- */}
           <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
@@ -512,6 +514,8 @@ export default function ProjectDetail() {
               </Card>
             )}
           </div>
+          </div>
+          )}
         </div>
       )}
 
@@ -543,14 +547,6 @@ export default function ProjectDetail() {
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="secondary" disabled={archiveM.isPending} onClick={() => setDialog(null)}>Hủy</Button>
           <Button variant="danger" isLoading={archiveM.isPending} onClick={() => archiveM.mutate()}>Lưu trữ</Button>
-        </div>
-      </ConfirmationDialog>
-      <ConfirmationDialog open={dialog?.kind === 'delete-link'} title="Xóa tài liệu" busy={deleteLinkM.isPending} onClose={() => setDialog(null)}>
-        <p>Xóa liên kết “{dialog?.kind === 'delete-link' ? (dialog.link.displayName || dialog.link.url) : ''}”?</p>
-        <div className="mt-5 flex justify-end gap-2">
-          <Button variant="secondary" disabled={deleteLinkM.isPending} onClick={() => setDialog(null)}>Hủy</Button>
-          <Button variant="danger" isLoading={deleteLinkM.isPending}
-            onClick={() => { if (dialog?.kind === 'delete-link') deleteLinkM.mutate(dialog.link.id); }}>Xóa</Button>
         </div>
       </ConfirmationDialog>
     </MainLayout>
@@ -617,34 +613,6 @@ function TaskRow({ task: t, childrenTasks, viaChild, expanded, onToggle, navStat
         </ul>
       )}
     </li>
-  );
-}
-
-/* ---------- add project link ---------- */
-function AddProjectLinkForm({ busy, onAdd }: { busy: boolean; onAdd: (url: string, name?: string) => void }) {
-  const [url, setUrl] = useState('');
-  const [name, setName] = useState('');
-  const [error, setError] = useState('');
-  const sentRef = useRef(false);
-  const submit = () => {
-    if (sentRef.current) return;
-    const parsed = httpUrl(url);
-    if (!parsed) { setError('Liên kết phải bắt đầu bằng http:// hoặc https://'); return; }
-    if (name.trim().length > 200) { setError('Tên hiển thị tối đa 200 ký tự.'); return; }
-    sentRef.current = true;
-    onAdd(parsed, name.trim() || undefined);
-    sentRef.current = false;
-    setUrl(''); setName(''); setError('');
-  };
-  return (
-    <form noValidate className="mt-4 grid gap-3 sm:grid-cols-[1fr_14rem_auto] items-end"
-      onSubmit={e => { e.preventDefault(); submit(); }}>
-      <Input id="plink-url" label="Thêm liên kết" placeholder="https://…" value={url} disabled={busy}
-        error={error} onChange={e => { setUrl(e.target.value); if (error) setError(''); }} />
-      <Input id="plink-name" label="Tên hiển thị (không bắt buộc)" maxLength={200} value={name} disabled={busy}
-        onChange={e => setName(e.target.value)} />
-      <Button type="submit" className="min-h-11" disabled={busy} isLoading={busy}>Thêm</Button>
-    </form>
   );
 }
 

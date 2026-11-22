@@ -56,6 +56,23 @@ export const authService = {
   async changePassword(currentPassword: string, newPassword: string, confirmPassword: string): Promise<void> {
     await api.patch('/api/me/password', { currentPassword, newPassword, confirmPassword });
   },
+  async uploadAvatar(blob: Blob): Promise<UserInfo> {
+    const id = getSessionSnapshot()?.id;
+    const fd = new FormData();
+    const name = blob.type === 'image/png' ? 'avatar.png' : 'avatar.webp';
+    fd.append('file', blob, name);
+    const res = await api.put('/api/me/avatar', fd);
+    const user = res.data.data as UserInfo;
+    if (id) updateSessionUser(user, id);
+    return user;
+  },
+  async removeAvatar(): Promise<UserInfo> {
+    const id = getSessionSnapshot()?.id;
+    const res = await api.delete('/api/me/avatar');
+    const user = res.data.data as UserInfo;
+    if (id) updateSessionUser(user, id);
+    return user;
+  },
   async listSessions(): Promise<SessionInfoDto[]> {
     return (await api.get('/api/me/sessions')).data.data;
   },

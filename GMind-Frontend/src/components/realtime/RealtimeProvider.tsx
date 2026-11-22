@@ -5,9 +5,11 @@ import {
   createRealtimeConnection,
   type RealtimeChanged,
   type RealtimeConnection,
+  type RealtimeDiscussion,
   type RealtimeNotification,
   type RealtimeStatus,
 } from '../../services/realtime';
+import { qk } from '../../services/query-keys';
 import { notificationTarget } from '../../services/notifications';
 import { clearSession, getSessionSnapshot } from '../../services/session';
 import { useToast } from '../ui/Toast';
@@ -47,9 +49,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     notification: new Set<(p: RealtimeNotification) => void>(),
     changed: new Set<(p: RealtimeChanged) => void>(),
     revoked: new Set<(p: { sessionId?: string | null }) => void>(),
+    discussion: new Set<(p: RealtimeDiscussion) => void>(),
   });
-  const locationRef = useRef(location.pathname);
-  locationRef.current = location.pathname;
+  const locationRef = useRef(location.pathname + location.search);
+  locationRef.current = location.pathname + location.search;
 
   useEffect(() => {
     const uid = getSessionSnapshot()?.user.id;
@@ -82,6 +85,12 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       });
       if (document.hidden) return;
       if (locationRef.current.startsWith('/notifications')) return;
+      // Discussion notification for the project whose discussion tab is open → silent (badge still updates).
+      if ((payload.type === 'MentionedInDiscussion' || payload.type === 'DiscussionReply')) {
+        const [path, search = ''] = locationRef.current.split('?');
+        if (path === `/projects/${payload.relatedEntityId}`
+          && new URLSearchParams(search).get('tab') === 'discussion') return;
+      }
       const target = notificationTarget({ ...payload, isRead: false });
       toast.info(truncate(payload.body), {
         title: payload.title,
@@ -95,6 +104,21 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         pendingIds.add(id);
       }
       changedTimer ??= window.setTimeout(flushChanged, CHANGE_COALESCE_MS);
+    });
+
+    let discussionTimer: number | null = null;
+    const pendingDiscussions = new Set<string>();
+    const offDiscussion = connection.on('discussion', payload => {
+      for (const cb of [...subscribers.current.discussion]) cb(payload);
+      if (payload.projectId) pendingDiscussions.add(payload.projectId);
+      discussionTimer ??= window.setTimeout(() => {
+        discussionTimer = null;
+        const ids = new Set(pendingDiscussions);
+        pendingDiscussions.clear();
+        for (const pid of ids) {
+          void queryClient.invalidateQueries({ queryKey: qk.projectDiscussion(uid ?? '', pid) });
+        }
+      }, CHANGE_COALESCE_MS);
     });
 
     const offRevoked = connection.on('session-revoked', payload => {
@@ -141,7 +165,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(firstStartTimer);
       if (retryTimer !== null) window.clearTimeout(retryTimer);
       if (changedTimer !== null) window.clearTimeout(changedTimer);
-      offStatus(); offNotification(); offChanged(); offRevoked(); offReconnected();
+      if (discussionTimer !== null) window.clearTimeout(discussionTimer);
+      offStatus(); offNotification(); offChanged(); offRevoked(); offReconnected(); offDiscussion();
       if (startIssued) void connection.stop().catch(() => undefined);
     };
     // One connection per mount (keyed by session.id upstream); subscribers read latest refs.
@@ -152,6 +177,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     subscribeNotification(cb) { subscribers.current.notification.add(cb); return () => subscribers.current.notification.delete(cb); },
     subscribeChanged(cb) { subscribers.current.changed.add(cb); return () => subscribers.current.changed.delete(cb); },
     subscribeSessionRevoked(cb) { subscribers.current.revoked.add(cb); return () => subscribers.current.revoked.delete(cb); },
+    subscribeDiscussion(cb) { subscribers.current.discussion.add(cb); return () => subscribers.current.discussion.delete(cb); },
   }), []);
 
   const value = useMemo(() => ({ status, ...events }), [status, events]);

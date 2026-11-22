@@ -21,6 +21,9 @@ import {
 } from '../services/tasks';
 import { projectsService } from '../services/projects';
 import { groupsService, type GroupMemberDto } from '../services/groups';
+import { filesService, type FileDto } from '../services/files';
+import DocumentsCard from '../components/files/DocumentsCard';
+import type { UploadFn } from '../components/files/FileUploader';
 import { deadlineState } from '../utils/task-time';
 import { formatDate, formatDateTime, STATUS_LABEL, PRIORITY_LABEL, timestamp } from '../utils/presentation';
 
@@ -28,13 +31,6 @@ const errMsg = (e: unknown, fb: string) =>
   typeof (e as { message?: unknown })?.message === 'string' && (e as { message?: unknown }).message ? (e as { message: string }).message : fb;
 const errStatus = (e: unknown) => (e as { status?: number })?.status;
 const initials = (n?: string | null) => (n || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
-const hostname = (u: string) => { try { return new URL(u).hostname; } catch { return u; } };
-function httpUrl(value: string): string | null {
-  const trimmed = value.trim();
-  if (!/^https?:\/\//i.test(trimmed)) return null;
-  try { const parsed = new URL(trimmed); return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? trimmed : null; }
-  catch { return null; }
-}
 function vnInputValue(iso?: string | null): string {
   if (!iso) return '';
   const d = timestamp(iso);
@@ -68,6 +64,7 @@ function TaskPage({ id }: { id: string }) {
   const [dialog, setDialog] = useState<DialogKind>(null);
   const [justApproved, setJustApproved] = useState(false);
   const [confirmLink, setConfirmLink] = useState<string | null>(null);
+  const [confirmFile, setConfirmFile] = useState<FileDto | null>(null);
   const [confirmComment, setConfirmComment] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
 
@@ -97,6 +94,7 @@ function TaskPage({ id }: { id: string }) {
   });
   const commentsQ = useQuery({ queryKey: qk.taskComments(me, id), queryFn: () => tasksService.comments(id), enabled: detailOn });
   const linksQ = useQuery({ queryKey: qk.taskLinks(me, id), queryFn: () => tasksService.links(id), enabled: detailOn });
+  const filesQ = useQuery({ queryKey: qk.taskFiles(me, id), queryFn: () => filesService.listTaskFiles(id), enabled: detailOn });
   const helpersQ = useQuery({ queryKey: qk.taskHelpers(me, id), queryFn: () => tasksService.listHelpers(id), enabled: detailOn });
   const reviewsQ = useQuery({ queryKey: qk.taskReviews(me, id), queryFn: () => tasksService.reviews(id), enabled: detailOn });
   const submissionsQ = useQuery({ queryKey: qk.taskSubmissions(me, id), queryFn: () => tasksService.submissions(id), enabled: detailOn });
@@ -106,11 +104,19 @@ function TaskPage({ id }: { id: string }) {
     void qc.invalidateQueries({ queryKey: qk.taskSubtasks(me, id) });
     void qc.invalidateQueries({ queryKey: qk.taskComments(me, id) });
     void qc.invalidateQueries({ queryKey: qk.taskLinks(me, id) });
+    void qc.invalidateQueries({ queryKey: qk.taskFiles(me, id) });
     void qc.invalidateQueries({ queryKey: qk.taskReviews(me, id) });
     void qc.invalidateQueries({ queryKey: qk.taskSubmissions(me, id) });
     if (task?.projectId) void qc.invalidateQueries({ queryKey: qk.projectTasks(me, task.projectId) });
     void qc.invalidateQueries({ queryKey: qk.myTasks(me) });
   };
+
+  const uploadTaskFile: UploadFn = (file, opts) => filesService.uploadTaskFile(id, file, opts);
+  const addLinkM = useMutation({
+    mutationFn: ({ url, name }: { url: string; name?: string }) => tasksService.addLink(id, url, name),
+    onSuccess: () => { invalidateAll(); toast.success('Đã thêm tài liệu.'); },
+  });
+  const addLink = async (url: string, name?: string) => { await addLinkM.mutateAsync({ url, name }); };
 
   const statusM = useMutation({
     mutationFn: ({ status, comment }: { status: number; comment?: string }) => tasksService.changeStatus(id, status, comment),
@@ -151,12 +157,12 @@ function TaskPage({ id }: { id: string }) {
       <div className="mx-auto max-w-6xl space-y-6">
         <p role="status" className="sr-only">Đang tải công việc…</p>
         <div aria-hidden="true" className="space-y-6 motion-safe:animate-pulse">
-          <div className="h-4 w-56 rounded bg-slate-100" />
-          <div className="h-8 w-72 rounded bg-slate-100" />
-          <div className="flex gap-2"><div className="h-7 w-24 rounded-full bg-slate-100" /><div className="h-7 w-24 rounded-full bg-slate-100" /></div>
+          <div className="h-4 w-56 rounded bg-surface-subtle" />
+          <div className="h-8 w-72 rounded bg-surface-subtle" />
+          <div className="flex gap-2"><div className="h-7 w-24 rounded-full bg-surface-subtle" /><div className="h-7 w-24 rounded-full bg-surface-subtle" /></div>
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <div className="space-y-6"><div className="h-40 rounded-2xl bg-slate-100" /><div className="h-64 rounded-2xl bg-slate-100" /></div>
-            <div className="h-72 rounded-2xl bg-slate-100 max-xl:hidden" />
+            <div className="space-y-6"><div className="h-40 rounded-2xl bg-surface-subtle" /><div className="h-64 rounded-2xl bg-surface-subtle" /></div>
+            <div className="h-72 rounded-2xl bg-surface-subtle max-xl:hidden" />
           </div>
         </div>
       </div>
@@ -356,11 +362,17 @@ function TaskPage({ id }: { id: string }) {
           <HandoffTimeline submissions={submissions} reviews={reviews} isSubtask={!!detail.parentTaskId} />
 
           <DocumentsCard
-            links={links} busy={busy}
-            onDelete={(linkId) => setConfirmLink(linkId)}
-            invalidate={invalidateAll}
+            title="Tài liệu"
+            links={links}
+            files={filesQ.data ?? []}
+            busy={busy}
             canAdd={perms.canAddLink === true}
-            taskId={id}
+            uploadFn={uploadTaskFile}
+            onAddLink={perms.canAddLink === true ? addLink : undefined}
+            onDeleteLink={l => setConfirmLink(l.id)}
+            onDeleteFile={f => setConfirmFile(f)}
+            onFilesChanged={() => void qc.invalidateQueries({ queryKey: qk.taskFiles(me, id) })}
+            emptyText="Chưa có tài liệu đính kèm."
           />
 
           <CommentsCard
@@ -438,6 +450,10 @@ function TaskPage({ id }: { id: string }) {
         <p>Xóa liên kết tài liệu này khỏi công việc?</p>
         <DeleteLinkConfirm linkId={confirmLink} invalidate={invalidateAll} onDone={() => setConfirmLink(null)} />
       </ConfirmationDialog>
+      <ConfirmationDialog open={confirmFile != null} title="Xóa tệp" onClose={() => setConfirmFile(null)}>
+        <p>Xóa tệp “{confirmFile?.name}”? Hành động không thể hoàn tác.</p>
+        <DeleteFileConfirm fileId={confirmFile?.id ?? null} invalidate={invalidateAll} onDone={() => setConfirmFile(null)} />
+      </ConfirmationDialog>
       <ConfirmationDialog open={confirmComment != null} title="Xóa bình luận" onClose={() => setConfirmComment(null)}>
         <p>Xóa bình luận này? Hành động không thể hoàn tác.</p>
         <DeleteCommentConfirm commentId={confirmComment} invalidate={invalidateAll} onDone={() => setConfirmComment(null)} />
@@ -495,7 +511,7 @@ function ProgressPanel({ task, me, invalidate, className = '' }: { task: TaskDet
         </div>
       ) : (
         <div className="mt-3" role="img" aria-label={`Tiến độ ${task.progressPercent}%`}>
-          <div className="h-1.5 w-full rounded-full bg-slate-200">
+          <div className="h-1.5 w-full rounded-full bg-surface-subtle">
             <div className={`h-1.5 rounded-full ${task.status === 'Completed' ? 'bg-success-600' : 'bg-primary-500'}`} style={{ width: `${task.progressPercent}%` }} />
           </div>
         </div>
@@ -563,7 +579,7 @@ function SubtasksCard({ taskId, detail, subtasks, perms, busy, invalidate }: {
                   aria-label={done ? `Mở lại ${s.title}` : target === TaskStatus.InProgress ? `Bắt đầu ${s.title}` : `Hoàn thành ${s.title}`}
                   aria-pressed={done}
                   onClick={() => target != null && toggleM.mutate({ subId: s.id, status: target })}
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${done ? 'border-success-600 bg-success-600 text-white' : 'border-slate-300 bg-white text-transparent hover:border-primary-500'}`}>
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${done ? 'border-success-600 bg-success-600 text-white' : 'border-line bg-white text-transparent hover:border-primary-500'}`}>
                   <Icon name="check" size={14} />
                 </button>
                 <div className="min-w-0 flex-1">
@@ -651,80 +667,6 @@ function HandoffTimeline({ submissions, reviews, isSubtask }: { submissions: Sub
   );
 }
 
-/* ---------- Tài liệu ---------- */
-function DocumentsCard({ taskId, links, busy, canAdd, invalidate, onDelete }: {
-  taskId: string; links: import('../services/tasks').LinkDto[]; busy: boolean; canAdd: boolean;
-  invalidate: () => void; onDelete: (linkId: string) => void;
-}) {
-  const toast = useToast();
-  const [url, setUrl] = useState('');
-  const [name, setName] = useState('');
-  const [error, setError] = useState('');
-  const urlRef = useRef<HTMLInputElement>(null);
-  const sendingRef = useRef(false);
-  const addM = useMutation({
-    mutationFn: () => tasksService.addLink(taskId, url.trim(), name.trim() || undefined),
-    onSuccess: () => { setUrl(''); setName(''); setError(''); invalidate(); toast.success('Đã thêm tài liệu.'); },
-    onError: (e) => { setError(errMsg(e, 'Không thể thêm liên kết.')); urlRef.current?.focus(); },
-    onSettled: () => { sendingRef.current = false; },
-  });
-  const submit = () => {
-    if (sendingRef.current) return;
-    if (!httpUrl(url)) { setError('Liên kết phải bắt đầu bằng http:// hoặc https://.'); urlRef.current?.focus(); return; }
-    sendingRef.current = true;
-    addM.mutate();
-  };
-
-  return (
-    <Card className="p-4 sm:p-6">
-      <h3 className="text-section font-semibold text-ink">Tài liệu</h3>
-      {links.length === 0 ? (
-        <p className="mt-3 text-small text-ink-muted">Chưa có tài liệu đính kèm.</p>
-      ) : (
-        <ul className="mt-3 divide-y divide-line">
-          {links.map(l => {
-            const safe = httpUrl(l.url);
-            return (
-              <li key={l.id} className="flex items-center gap-3 py-2.5 min-w-0">
-                <Icon name="link" size={16} className="shrink-0 text-ink-muted" />
-                <div className="min-w-0 flex-1">
-                  {safe ? (
-                    <a href={safe} target="_blank" rel="noopener noreferrer" className="text-small font-medium text-primary-700 hover:underline [overflow-wrap:anywhere]">
-                      {l.displayName || hostname(l.url)}<span className="sr-only"> (mở tab mới)</span>
-                    </a>
-                  ) : <span className="text-small text-ink-muted [overflow-wrap:anywhere]">{l.displayName || l.url}</span>}
-                  <p className="text-caption text-ink-muted [overflow-wrap:anywhere]">
-                    {safe && l.displayName ? `${hostname(l.url)} · ` : ''}{l.createdByName ? `${l.createdByName} · ` : ''}{formatDateTime(l.createdAt)}
-                  </p>
-                </div>
-                {l.canDelete && (
-                  <button type="button" aria-label={`Xóa tài liệu ${l.displayName || l.url}`} disabled={busy}
-                    onClick={() => onDelete(l.id)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-danger-50 hover:text-danger-600 disabled:opacity-50">
-                    <Icon name="close" size={16} />
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {canAdd && (
-        <form noValidate className="mt-4 border-t border-line pt-4" onSubmit={e => { e.preventDefault(); submit(); }}>
-          <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-            <Input id="link-name" label="Tên hiển thị" placeholder="Tên tài liệu (không bắt buộc)" maxLength={200}
-              value={name} disabled={busy || addM.isPending} onChange={e => setName(e.target.value)} />
-            <Input id="link-url" ref={urlRef} label="Liên kết" type="url" placeholder="https://..." maxLength={2000}
-              value={url} disabled={busy || addM.isPending} error={error}
-              onChange={e => { setUrl(e.target.value); if (error) setError(''); }} />
-            <Button type="submit" variant="secondary" disabled={busy} isLoading={addM.isPending}>Thêm tài liệu</Button>
-          </div>
-        </form>
-      )}
-    </Card>
-  );
-}
-
 function DeleteLinkConfirm({ linkId, invalidate, onDone }: { linkId: string | null; invalidate: () => void; onDone: () => void }) {
   const toast = useToast();
   const [error, setError] = useState('');
@@ -732,6 +674,25 @@ function DeleteLinkConfirm({ linkId, invalidate, onDone }: { linkId: string | nu
     mutationFn: () => tasksService.deleteLink(linkId!),
     onSuccess: () => { invalidate(); toast.success('Đã xóa tài liệu.'); onDone(); },
     onError: (e) => setError(errMsg(e, 'Không thể xóa tài liệu.')),
+  });
+  return (
+    <>
+      {error && <p role="alert" className="mt-2 text-small text-danger-700">{error}</p>}
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="secondary" disabled={delM.isPending} onClick={onDone}>Hủy</Button>
+        <Button variant="danger" isLoading={delM.isPending} onClick={() => { setError(''); delM.mutate(); }}>Xóa</Button>
+      </div>
+    </>
+  );
+}
+
+function DeleteFileConfirm({ fileId, invalidate, onDone }: { fileId: string | null; invalidate: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [error, setError] = useState('');
+  const delM = useMutation({
+    mutationFn: () => filesService.deleteFile(fileId!),
+    onSuccess: () => { invalidate(); toast.success('Đã xóa tệp.'); onDone(); },
+    onError: (e) => setError(errMsg(e, 'Không xóa được tệp.')),
   });
   return (
     <>

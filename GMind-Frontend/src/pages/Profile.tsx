@@ -12,11 +12,12 @@ import { useToast } from '../components/ui/Toast';
 import { authService, type PendingEmailChangeDto } from '../services/auth';
 import { getSessionSnapshot, subscribeSession, updateSessionUser, type SessionRecord } from '../services/session';
 import { qk } from '../services/query-keys';
-import { accountError, isSafeAvatarUrl } from '../utils/account-form';
+import { accountError } from '../utils/account-form';
+import { prepareAvatar } from '../utils/avatar-image';
 import { formatDateTime } from '../utils/presentation';
 import { errMsg } from '../components/workspace/utils';
 
-type Errors = { displayName?: string; avatarUrl?: string };
+type Errors = { displayName?: string };
 type EmailErrors = { newEmail?: string; currentPassword?: string; form?: string };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -129,12 +130,17 @@ function ProfileForm({ session }: { session: SessionRecord }) {
   const uid = session.user.id;
   const [me, setMe] = useState(session.user);
   const [name, setName] = useState(me.displayName);
-  const [url, setUrl] = useState(me.avatarUrl ?? '');
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
   const [emailDialog, setEmailDialog] = useState<null | { initial: string }>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarPreview, setAvatarPreview] = useState<{ blob: Blob; url: string } | null>(null);
+  const [avatarError, setAvatarError] = useState('');
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [confirmRemoveAvatar, setConfirmRemoveAvatar] = useState(false);
+  const [removeAvatarBusy, setRemoveAvatarBusy] = useState(false);
   const busyRef = useRef(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -150,7 +156,8 @@ function ProfileForm({ session }: { session: SessionRecord }) {
     if (!fresh) return;
     setMe(fresh);
     setName(prev => prev === me.displayName ? fresh.displayName : prev);
-    if (fresh.email !== session.user.email || fresh.displayName !== session.user.displayName) {
+    if (fresh.email !== session.user.email || fresh.displayName !== session.user.displayName
+      || (fresh.avatarUrl ?? null) !== (session.user.avatarUrl ?? null)) {
       updateSessionUser(fresh, session.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once per fetched user object
@@ -162,37 +169,90 @@ function ProfileForm({ session }: { session: SessionRecord }) {
   });
   const pending = pendingQ.data ?? null;
 
-  const dirty = name !== me.displayName || url !== (me.avatarUrl ?? '');
+  const dirty = name !== me.displayName;
 
   const edit = (field: keyof Errors, value: string) => {
-    (field === 'displayName' ? setName : setUrl)(value);
+    setName(value);
     setErrors(prev => ({ ...prev, [field]: undefined }));
     setError(''); setOk('');
   };
 
   const save = async () => {
     if (busyRef.current || !current() || !dirty) return;
-    const trimmed = name.trim(), trimmedUrl = url.trim();
+    const trimmed = name.trim();
     const invalid: Errors = {};
     if (!trimmed) invalid.displayName = 'Nhập tên hiển thị của bạn.';
     else if (trimmed.length > 100) invalid.displayName = 'Tên hiển thị tối đa 100 ký tự.';
-    if (trimmedUrl && !isSafeAvatarUrl(trimmedUrl)) invalid.avatarUrl = 'Nhập URL ảnh http(s) hợp lệ, không chứa tài khoản/mật khẩu, tối đa 500 ký tự.';
     setErrors(invalid);
     if (Object.keys(invalid).length) {
-      document.getElementById(invalid.displayName ? 'displayName' : 'avatarUrl')?.focus();
+      document.getElementById('displayName')?.focus();
       return;
     }
     busyRef.current = true; setBusy(true); setError(''); setOk('');
     try {
-      const saved = await authService.updateProfile(trimmed, trimmedUrl || null);
+      const saved = await authService.updateProfile(trimmed, me.avatarUrl ?? null);
       if (!current()) return;
-      setMe(saved); setName(saved.displayName); setUrl(saved.avatarUrl ?? '');
+      setMe(saved); setName(saved.displayName);
       setOk('Đã lưu hồ sơ.');
     } catch (e) {
       if (current()) setError(accountError(e, 'Chưa lưu được hồ sơ. Thông tin bạn nhập vẫn được giữ; hãy thử lại.'));
     } finally {
       busyRef.current = false;
       if (current()) setBusy(false);
+    }
+  };
+
+  const closeAvatarDialog = () => {
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview.url);
+    setAvatarPreview(null); setAvatarError('');
+  };
+
+  const onPickAvatar = async (file: File | undefined) => {
+    if (!file) return;
+    setAvatarError('');
+    try {
+      const blob = await prepareAvatar(file);
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview.url);
+      setAvatarPreview({ blob, url: URL.createObjectURL(blob) });
+    } catch (e) {
+      setAvatarError(e instanceof Error ? e.message : 'Không đọc được ảnh này. Hãy chọn ảnh PNG, JPEG hoặc WebP khác.');
+      setAvatarPreview(null);
+    }
+  };
+
+  const saveAvatar = async () => {
+    if (!avatarPreview || avatarBusy || !current()) return;
+    setAvatarBusy(true); setAvatarError('');
+    try {
+      const saved = await authService.uploadAvatar(avatarPreview.blob);
+      if (!current()) return;
+      updateSessionUser(saved, session.id);
+      setMe(saved);
+      queryClient.setQueryData(qk.me(uid), saved);
+      closeAvatarDialog();
+      toast.success('Đã cập nhật ảnh đại diện.');
+    } catch (e) {
+      if (current()) setAvatarError(errMsg(e, 'Không lưu được ảnh đại diện. Vui lòng thử lại.'));
+    } finally {
+      if (current()) setAvatarBusy(false);
+    }
+  };
+
+  const removeAvatar = async () => {
+    if (removeAvatarBusy || !current()) return;
+    setRemoveAvatarBusy(true);
+    try {
+      const saved = await authService.removeAvatar();
+      if (!current()) return;
+      updateSessionUser(saved, session.id);
+      setMe(saved);
+      queryClient.setQueryData(qk.me(uid), saved);
+      setConfirmRemoveAvatar(false);
+      toast.success('Đã xóa ảnh đại diện.');
+    } catch (e) {
+      if (current()) toast.error(errMsg(e, 'Không xóa được ảnh đại diện.'));
+    } finally {
+      if (current()) setRemoveAvatarBusy(false);
     }
   };
 
@@ -222,9 +282,16 @@ function ProfileForm({ session }: { session: SessionRecord }) {
             <h3 className="break-words text-lg font-semibold text-ink [overflow-wrap:anywhere]">{me.displayName}</h3>
             <p className="mt-1 break-words text-sm text-ink-secondary [overflow-wrap:anywhere]">{me.email}</p>
           </div>
-          <Button variant="secondary" size="sm" className="shrink-0" onClick={() => setEmailDialog({ initial: '' })}>
-            Đổi email
-          </Button>
+          <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
+            <Button variant="secondary" size="sm" onClick={() => setEmailDialog({ initial: '' })}>Đổi email</Button>
+            <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>Đổi ảnh</Button>
+            {me.avatarUrl && (
+              <Button variant="secondary" size="sm" className="text-danger-700" onClick={() => setConfirmRemoveAvatar(true)}>Xóa ảnh</Button>
+            )}
+          </div>
+          <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+            aria-hidden="true" tabIndex={-1}
+            onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void onPickAvatar(f); }} />
         </div>
         <form noValidate aria-busy={busy} className="space-y-5 p-5 sm:p-6" onSubmit={e => { e.preventDefault(); void save(); }}>
           {error && <p role="alert" className="rounded-xl bg-danger-50 px-4 py-2 text-sm text-danger-700">{error}</p>}
@@ -233,14 +300,10 @@ function ProfileForm({ session }: { session: SessionRecord }) {
             <Input id="displayName" name="displayName" autoComplete="name" label="Tên hiển thị" required
               value={name} onChange={e => edit('displayName', e.target.value)} maxLength={100} error={errors.displayName}
               hint="Tên hiển thị với các thành viên trong nhóm. Tối đa 100 ký tự." />
-            <Input id="avatarUrl" name="avatarUrl" type="url" autoComplete="url" label="URL ảnh đại diện (tuỳ chọn)"
-              value={url} onChange={e => edit('avatarUrl', e.target.value)} maxLength={500} error={errors.avatarUrl}
-              placeholder="https://example.com/anh-cua-ban.jpg"
-              hint="Dùng đường dẫn ảnh http(s), tối đa 500 ký tự; xoá đường dẫn để dùng chữ viết tắt. GMind chưa hỗ trợ tải ảnh lên." />
           </fieldset>
           <div className="flex justify-end gap-2 border-t border-line pt-4">
             <Button type="button" variant="secondary" disabled={!dirty || busy}
-              onClick={() => { setName(me.displayName); setUrl(me.avatarUrl ?? ''); setErrors({}); setError(''); setOk(''); }}>Hủy</Button>
+              onClick={() => { setName(me.displayName); setErrors({}); setError(''); setOk(''); }}>Hủy</Button>
             <Button type="submit" disabled={!dirty} isLoading={busy}>Lưu thay đổi</Button>
           </div>
         </form>
@@ -256,6 +319,33 @@ function ProfileForm({ session }: { session: SessionRecord }) {
         currentEmail={me.email}
         onClose={() => setEmailDialog(null)}
         onRequested={onRequested} />}
+
+      <ConfirmationDialog open={!!avatarPreview || !!avatarError} title="Ảnh đại diện mới"
+        busy={avatarBusy} onClose={closeAvatarDialog}>
+        <div className="flex flex-col items-center gap-4">
+          {avatarPreview ? (
+            <img src={avatarPreview.url} alt="Xem trước ảnh đại diện mới"
+              className="h-32 w-32 rounded-full object-cover" />
+          ) : (
+            <p className="text-small text-ink-muted">Chưa có ảnh nào được chọn.</p>
+          )}
+          {avatarError && <p role="alert" className="text-small text-danger-700 [overflow-wrap:anywhere]">{avatarError}</p>}
+          <div className="flex flex-wrap justify-end gap-2 self-stretch">
+            <Button variant="secondary" disabled={avatarBusy} onClick={closeAvatarDialog}>Hủy</Button>
+            <Button variant="secondary" disabled={avatarBusy} onClick={() => fileInputRef.current?.click()}>Chọn ảnh khác</Button>
+            <Button isLoading={avatarBusy} disabled={!avatarPreview} onClick={() => void saveAvatar()}>Lưu ảnh</Button>
+          </div>
+        </div>
+      </ConfirmationDialog>
+
+      <ConfirmationDialog open={confirmRemoveAvatar} title="Xóa ảnh đại diện"
+        busy={removeAvatarBusy} onClose={() => setConfirmRemoveAvatar(false)}>
+        <p>Xóa ảnh đại diện? Mọi người sẽ thấy chữ viết tắt tên bạn.</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="secondary" disabled={removeAvatarBusy} onClick={() => setConfirmRemoveAvatar(false)}>Hủy</Button>
+          <Button variant="danger" isLoading={removeAvatarBusy} onClick={() => void removeAvatar()}>Xóa ảnh</Button>
+        </div>
+      </ConfirmationDialog>
     </>
   );
 }

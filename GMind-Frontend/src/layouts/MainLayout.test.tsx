@@ -15,7 +15,7 @@ const SESSION: AuthResult = {
   user: { id: 'u1', displayName: 'A', email: 'a@x' },
 };
 
-const events = { subscribeNotification: () => () => {}, subscribeChanged: () => () => {}, subscribeSessionRevoked: () => () => {} };
+const events = { subscribeNotification: () => () => {}, subscribeChanged: () => () => {}, subscribeSessionRevoked: () => () => {}, subscribeDiscussion: () => () => {} };
 
 function mount(status: RealtimeStatus) {
   const tree = (

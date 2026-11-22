@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ReactNode } from 'react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,6 +9,14 @@ import { ToastProvider } from '../components/ui/Toast';
 import { projectsService, projectsManage, projectLinks, type ProjectDto } from '../services/projects';
 import { tasksService, type TaskSummaryDto, type LinkDto, type TaskPermissionsDto } from '../services/tasks';
 import { groupsService, type GroupDetailDto } from '../services/groups';
+import { filesService } from '../services/files';
+import { discussionService } from '../services/discussion';
+import { saveSession } from '../services/session';
+
+const LocProbe = () => {
+  const loc = useLocation();
+  return <div data-testid="loc">{loc.pathname}{loc.search}</div>;
+};
 
 let currentUid = 'u-l';
 
@@ -47,6 +55,7 @@ const setup = (role = 'Leader', tasks = [task('a'), task('b', { status: 'InProgr
   vi.spyOn(tasksService, 'list').mockResolvedValue(tasks);
   vi.spyOn(groupsService, 'get').mockResolvedValue(group(role));
   vi.spyOn(projectLinks, 'links').mockResolvedValue([]);
+  vi.spyOn(filesService, 'listProjectFiles').mockResolvedValue([]);
   const contrib = vi.spyOn(projectsService, 'contributions').mockResolvedValue({
     projectId: 'p1', totalCredited: 14, totalPlanned: 20, isLeader: role === 'Leader',
     members: [
@@ -64,6 +73,7 @@ const renderAt = (entry = '/projects/p1') => {
     <QueryClientProvider client={client}>
       <ToastProvider>
         <MemoryRouter initialEntries={[entry]}>
+          <LocProbe />
           <Routes>
             <Route path="/projects/:id" element={<ProjectDetail />} />
             <Route path="/groups/:id" element={<div>GROUP_PAGE</div>} />
@@ -74,7 +84,9 @@ const renderAt = (entry = '/projects/p1') => {
   );
 };
 
-// jsdom lacks dialog.showModal/close
+// jsdom lacks dialog.showModal/close and element scrolling APIs
+if (!Element.prototype.scrollTo) Element.prototype.scrollTo = function () {} as never;
+if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = function () {};
 if (typeof HTMLDialogElement !== 'undefined') {
   (HTMLDialogElement.prototype).showModal ??= function () { this.setAttribute('open', ''); };
   (HTMLDialogElement.prototype).close ??= function () { this.removeAttribute('open'); };
@@ -292,11 +304,12 @@ describe('ProjectDetail M2 — project links', () => {
     setup('Leader');
     vi.spyOn(projectLinks, 'links').mockResolvedValue([link()]);
     const add = vi.spyOn(projectLinks, 'addLink').mockResolvedValue(link({ id: 'l2' }));
-    renderAt();
+    renderAt('/projects/p1?tab=files');
     expect(await screen.findByText('Spec')).toBeTruthy();
     expect(screen.getByText(/docs\.example\.com · Leader/)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Thêm liên kết'), { target: { value: 'https://figma.example.com' } });
-    fireEvent.submit(screen.getByLabelText('Thêm liên kết').closest('form')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm liên kết' }));
+    fireEvent.change(await screen.findByLabelText('Liên kết'), { target: { value: 'https://figma.example.com' } });
+    fireEvent.submit(screen.getByLabelText('Liên kết').closest('form')!);
     await waitFor(() => expect(add).toHaveBeenCalledWith('p1', 'https://figma.example.com', undefined));
     expect(await screen.findByText('Đã thêm tài liệu.')).toBeTruthy();
   });
@@ -304,10 +317,11 @@ describe('ProjectDetail M2 — project links', () => {
   it('rejects non-http urls without posting', async () => {
     setup('Leader');
     const add = vi.spyOn(projectLinks, 'addLink');
-    renderAt();
+    renderAt('/projects/p1?tab=files');
     await screen.findByRole('heading', { name: 'Web App' });
-    fireEvent.change(screen.getByLabelText('Thêm liên kết'), { target: { value: 'javascript:alert(1)' } });
-    fireEvent.submit(screen.getByLabelText('Thêm liên kết').closest('form')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm liên kết' }));
+    fireEvent.change(await screen.findByLabelText('Liên kết'), { target: { value: 'javascript:alert(1)' } });
+    fireEvent.submit(screen.getByLabelText('Liên kết').closest('form')!);
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(add).not.toHaveBeenCalled();
   });
@@ -316,7 +330,7 @@ describe('ProjectDetail M2 — project links', () => {
     setup('Leader');
     vi.spyOn(projectLinks, 'links').mockResolvedValue([link({ canDelete: true })]);
     const del = vi.spyOn(tasksService, 'deleteLink').mockResolvedValue({} as never);
-    renderAt();
+    renderAt('/projects/p1?tab=files');
     await screen.findByText('Spec');
     fireEvent.click(screen.getByRole('button', { name: 'Xóa tài liệu Spec' }));
     const dialog = await screen.findByRole('dialog');
@@ -328,7 +342,7 @@ describe('ProjectDetail M2 — project links', () => {
   it('link without canDelete shows no delete button', async () => {
     setup('Member');
     vi.spyOn(projectLinks, 'links').mockResolvedValue([link({ canDelete: false })]);
-    renderAt();
+    renderAt('/projects/p1?tab=files');
     await screen.findByText('Spec');
     expect(screen.queryByRole('button', { name: 'Xóa tài liệu Spec' })).toBeNull();
   });
@@ -509,5 +523,52 @@ describe('ProjectDetail M3 — Điểm đóng góp', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
     await screen.findByText('Đã duyệt 5 / dự kiến 5 điểm.');
     expect(c).toHaveBeenCalledTimes(3); // initial + auto-retry + manual retry
+  });
+});
+
+describe('ProjectDetail M6 — tabs', () => {
+  it('deep-links ?tab=discussion and selects the Thảo luận tab', async () => {
+    saveSession({ accessToken: 't', refreshToken: 'r', expiresAt: '2100-01-01',
+      user: { id: 'u-l', displayName: 'Leader', email: 'l@x.dev', avatarUrl: null } });
+    setup('Leader');
+    vi.spyOn(discussionService, 'page').mockResolvedValue({ items: [], nextCursor: null });
+    renderAt('/projects/p1?tab=discussion');
+    const tab = await screen.findByRole('tab', { name: 'Thảo luận' });
+    expect(tab.getAttribute('aria-selected')).toBe('true');
+    expect(await screen.findByText('Chưa có trao đổi nào. Gửi tin nhắn đầu tiên cho cả nhóm.')).toBeTruthy();
+  });
+
+  it('unknown tab value falls back to Công việc', async () => {
+    setup('Leader');
+    renderAt('/projects/p1?tab=bogus');
+    const tab = await screen.findByRole('tab', { name: 'Công việc' });
+    expect(tab.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('switching tabs updates the URL and keeps other query params', async () => {
+    setup('Leader');
+    renderAt('/projects/p1?view=board');
+    fireEvent.click(await screen.findByRole('tab', { name: /Tài liệu/ }));
+    expect(screen.getByRole('tab', { name: /Tài liệu/ }).getAttribute('aria-selected')).toBe('true');
+    const loc = screen.getByTestId('loc').textContent!;
+    expect(loc).toContain('view=board');
+    expect(loc).toContain('tab=files');
+  });
+
+  it('ArrowLeft/Right/Home/End move selection with roving focus', async () => {
+    setup('Leader');
+    renderAt('/projects/p1');
+    const tasks = await screen.findByRole('tab', { name: 'Công việc' });
+    tasks.focus();
+    fireEvent.keyDown(tasks, { key: 'ArrowRight' });
+    const discussion = screen.getByRole('tab', { name: 'Thảo luận' });
+    expect(discussion.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(discussion);
+    fireEvent.keyDown(discussion, { key: 'ArrowLeft' });
+    expect(screen.getByRole('tab', { name: 'Công việc' }).getAttribute('aria-selected')).toBe('true');
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Công việc' }), { key: 'End' });
+    expect(screen.getByRole('tab', { name: /Tài liệu/ }).getAttribute('aria-selected')).toBe('true');
+    fireEvent.keyDown(screen.getByRole('tab', { name: /Tài liệu/ }), { key: 'Home' });
+    expect(screen.getByRole('tab', { name: 'Công việc' }).getAttribute('aria-selected')).toBe('true');
   });
 });

@@ -39,4 +39,8 @@ export const qk = {
   sessions: (uid: string) => ['u', uid, 'sessions'] as const,
   notificationPreferences: (uid: string) => ['u', uid, 'notification-preferences'] as const,
   pendingEmailChange: (uid: string) => ['u', uid, 'email-change'] as const,
+  projectFiles: (uid: string, projectId: string) => ['u', uid, 'project', projectId, 'files'] as const,
+  taskFiles: (uid: string, taskId: string) => ['u', uid, 'task', taskId, 'files'] as const,
+  projectDiscussion: (uid: string, projectId: string) => ['u', uid, 'project', projectId, 'discussion'] as const,
+  fileBlob: (uid: string, fileId: string) => ['u', uid, 'file', fileId, 'blob'] as const,
 };

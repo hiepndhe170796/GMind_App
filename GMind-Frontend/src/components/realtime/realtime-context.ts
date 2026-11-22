@@ -1,10 +1,11 @@
 import { createContext, useContext } from 'react';
-import type { RealtimeChanged, RealtimeNotification, RealtimeSessionRevoked, RealtimeStatus } from '../../services/realtime';
+import type { RealtimeChanged, RealtimeDiscussion, RealtimeNotification, RealtimeSessionRevoked, RealtimeStatus } from '../../services/realtime';
 
 export interface RealtimeEvents {
   subscribeNotification(cb: (payload: RealtimeNotification) => void): () => void;
   subscribeChanged(cb: (payload: RealtimeChanged) => void): () => void;
   subscribeSessionRevoked(cb: (payload: RealtimeSessionRevoked) => void): () => void;
+  subscribeDiscussion(cb: (payload: RealtimeDiscussion) => void): () => void;
 }
 
 export interface RealtimeContextValue extends RealtimeEvents {

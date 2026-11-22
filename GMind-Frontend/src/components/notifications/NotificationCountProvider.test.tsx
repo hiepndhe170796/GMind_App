@@ -125,6 +125,7 @@ describe('realtime integration', () => {
       subscribeNotification: stableSubscribe,
       subscribeChanged: () => () => {},
       subscribeSessionRevoked: () => () => {},
+      subscribeDiscussion: () => () => {},
     };
     return <RealtimeContext.Provider value={value}>{node}</RealtimeContext.Provider>;
   }

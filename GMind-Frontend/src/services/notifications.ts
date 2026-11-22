@@ -54,7 +54,10 @@ export const notificationTarget = (n: NotificationDto): NotificationTarget | nul
   if (!GUID.test(id)) return null;
   switch (kind) {
     case 'Task': return { href: `/tasks/${id}`, label: 'Xem công việc' };
-    case 'Project': return { href: `/projects/${id}`, label: 'Xem dự án' };
+    case 'Project':
+      if (n.type === 'MentionedInDiscussion' || n.type === 'DiscussionReply')
+        return { href: `/projects/${id}?tab=discussion`, label: 'Mở thảo luận' };
+      return { href: `/projects/${id}`, label: 'Xem dự án' };
     case 'Group': return { href: `/groups/${id}`, label: 'Xem nhóm' };
     case 'MarketplaceRequest':
       return n.groupId && GUID.test(n.groupId) ? { href: `/groups/${n.groupId}/marketplace`, label: 'Xem Marketplace' } : null;
@@ -75,6 +78,7 @@ const TYPE_ICON: Record<string, IconName> = {
   HelperAdded: 'users', HelperEnded: 'users',
   GroupArchived: 'alert', GroupRestored: 'check',
   EmailChanged: 'check',
+  MentionedInDiscussion: 'chat', DiscussionReply: 'chat',
 };
 export const typeIcon = (type: string): IconName => Object.hasOwn(TYPE_ICON, type) ? TYPE_ICON[type] : 'bell';
 const TYPE_TONE: Record<string, string> = {
@@ -87,6 +91,7 @@ const TYPE_TONE: Record<string, string> = {
   HelperAdded: 'text-accent-700', HelperEnded: 'text-ink-muted',
   GroupArchived: 'text-warning-700', GroupRestored: 'text-success-700',
   EmailChanged: 'text-success-700',
+  MentionedInDiscussion: 'text-accent-700', DiscussionReply: 'text-accent-700',
 };
 export const typeTone = (type: string) => Object.hasOwn(TYPE_TONE, type) ? TYPE_TONE[type]
   : Object.hasOwn(TYPE_ICON, type) ? 'text-primary-600' : 'text-ink-muted';

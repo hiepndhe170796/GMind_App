@@ -9,7 +9,7 @@ import { clearSession, getSessionEndReason, getSessionSnapshot, saveSession, typ
 import type { RealtimeNotification } from '../../services/realtime';
 
 // Controllable fake hub connection.
-const subs: Record<string, Set<(p: never) => void>> = { notification: new Set(), changed: new Set(), 'session-revoked': new Set() };
+const subs: Record<string, Set<(p: never) => void>> = { notification: new Set(), changed: new Set(), 'session-revoked': new Set(), discussion: new Set() };
 let reconnectedCb: (() => void) | null = null;
 const fake = {
   status: 'connecting',
@@ -157,5 +157,44 @@ describe('RealtimeProvider', () => {
     expect(fake.stop).not.toHaveBeenCalled();
     unmount();
     expect(fake.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('discussion events coalesce 300 ms then invalidate each project discussion once', async () => {
+    const { invalidate } = mount();
+    act(() => {
+      emit('discussion', { projectId: 'p-1' });
+      emit('discussion', { projectId: 'p-1' });
+      emit('discussion', { projectId: 'p-2' });
+    });
+    await act(async () => { vi.advanceTimersByTime(400); });
+    const keys = vi.mocked(invalidate).mock.calls.map(c => (c[0] as { queryKey?: unknown[] })?.queryKey);
+    expect(keys).toContainEqual(['u', 'u-1', 'project', 'p-1', 'discussion']);
+    expect(keys).toContainEqual(['u', 'u-1', 'project', 'p-2', 'discussion']);
+    expect(keys.filter(k => Array.isArray(k) && k[4] === 'discussion' && k[3] === 'p-1')).toHaveLength(1);
+  });
+
+  it('suppresses discussion toasts on the open discussion tab with extra params, but still invalidates', async () => {
+    const pid = '11111111-1111-1111-1111-111111111111';
+    const { invalidate } = mount(`/projects/${pid}?view=board&tab=discussion`);
+    act(() => {
+      emit('notification', notice({
+        type: 'MentionedInDiscussion', relatedEntityType: 'Project', relatedEntityId: pid,
+        title: 'Đã nhắc đến bạn', body: 'An nhắc đến bạn trong thảo luận.',
+      }));
+    });
+    expect(invalidate).toHaveBeenCalled();
+    expect(screen.queryByText('Đã nhắc đến bạn')).toBeNull();
+  });
+
+  it('still toasts a discussion mention when a different tab is open', async () => {
+    const pid = '11111111-1111-1111-1111-111111111111';
+    mount(`/projects/${pid}?tab=files`);
+    act(() => {
+      emit('notification', notice({
+        type: 'MentionedInDiscussion', relatedEntityType: 'Project', relatedEntityId: pid,
+        title: 'Đã nhắc đến bạn', body: 'An nhắc đến bạn trong thảo luận.',
+      }));
+    });
+    expect(await screen.findByText('Đã nhắc đến bạn')).toBeTruthy();
   });
 });

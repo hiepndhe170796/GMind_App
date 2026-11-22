@@ -24,6 +24,14 @@ vi.mock('../components/notifications/useNotificationCount', () => ({
 vi.mock('../components/realtime/RealtimeProvider', () => ({
   RealtimeProvider: ({ children }: { children: ReactNode }) => children,
 }));
+vi.mock('../utils/avatar-image', () => ({
+  prepareAvatar: vi.fn(async () => new Blob(['x'], { type: 'image/webp' })),
+}));
+// jsdom lacks dialog.showModal/close
+(HTMLDialogElement.prototype as HTMLDialogElement & { showModal?: () => void }).showModal ??=
+  function (this: HTMLDialogElement) { this.setAttribute('open', ''); };
+(HTMLDialogElement.prototype as HTMLDialogElement & { close?: () => void }).close ??=
+  function (this: HTMLDialogElement) { this.removeAttribute('open'); };
 const RESULT: AuthResult = {
   accessToken: 'test-access', refreshToken: 'test-refresh', expiresAt: '2100-01-01',
   user: { id: 'account-a', displayName: 'Account A', email: 'a@test.dev', avatarUrl: null },
@@ -50,6 +58,8 @@ function passwords() {
   type('Xác nhận mật khẩu mới', 'NewTest123!');
 }
 beforeEach(() => {
+  URL.createObjectURL = vi.fn(() => 'blob:mock');
+  URL.revokeObjectURL = vi.fn();
   clearSession(); saveSession(RESULT);
   vi.spyOn(authService, 'validateSession').mockResolvedValue(RESULT.user);
   vi.spyOn(authService, 'listSessions').mockResolvedValue([]);
@@ -99,12 +109,54 @@ describe('Profile', () => {
     expect(screen.getByLabelText('Tên hiển thị').getAttribute('aria-invalid')).not.toBe('true');
   });
 
-  it.each(['ftp://example.com/a.png', 'https://u:p@example.com/a.png', 'javascript:alert(1)', `https://example.com/${'x'.repeat(500)}`])('rejects invalid avatar with associated error', async value => {
-    const patch = vi.spyOn(api, 'patch');
-    await ready(); type('URL ảnh đại diện (tuỳ chọn)', value); click('Lưu thay đổi');
-    const input = screen.getByLabelText('URL ảnh đại diện (tuỳ chọn)');
-    expect(input.getAttribute('aria-describedby')).toContain('avatarUrl-error');
-    expect(document.activeElement).toBe(input); expect(patch).not.toHaveBeenCalled();
+  it('does not render the avatar URL input', async () => {
+    await ready();
+    expect(screen.queryByLabelText('URL ảnh đại diện (tuỳ chọn)')).toBeNull();
+  });
+
+  it('uploads a prepared avatar from the preview dialog', async () => {
+    const { prepareAvatar } = await import('../utils/avatar-image');
+    const put = vi.spyOn(api, 'put')
+      .mockResolvedValue({ data: { data: { ...RESULT.user, avatarUrl: '/api/avatars/00000000-0000-0000-0000-000000000001' } } });
+    await ready();
+    click('Đổi ảnh');
+    const input = document.querySelector('input[type="file"]')!;
+    fireEvent.change(input, { target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
+    const dialog = await screen.findByRole('dialog');
+    expect(prepareAvatar).toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Lưu ảnh' }));
+    await screen.findByText('Đã cập nhật ảnh đại diện.');
+    expect(put).toHaveBeenCalledTimes(1);
+    expect((put.mock.calls[0][1] as FormData).get('file')).toBeTruthy();
+    expect(getSessionSnapshot()!.user.avatarUrl).toBe('/api/avatars/00000000-0000-0000-0000-000000000001');
+  });
+
+  it('prepare failure shows the dialog error', async () => {
+    const { prepareAvatar } = await import('../utils/avatar-image');
+    (prepareAvatar as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Không đọc được ảnh này. Hãy chọn ảnh PNG, JPEG hoặc WebP khác.'));
+    await ready();
+    click('Đổi ảnh');
+    fireEvent.change(document.querySelector('input[type="file"]')!,
+      { target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('alert').textContent).toContain('Không đọc được ảnh');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Hủy' }));
+  });
+
+  it('removes avatar after confirm and hides the action', async () => {
+    clearSession();
+    saveSession({ ...RESULT, user: { ...RESULT.user, avatarUrl: '/api/avatars/00000000-0000-0000-0000-000000000002' } });
+    vi.spyOn(authService, 'validateSession')
+      .mockResolvedValue({ ...RESULT.user, avatarUrl: '/api/avatars/00000000-0000-0000-0000-000000000002' });
+    const remove = vi.spyOn(api, 'delete').mockResolvedValue({ data: { data: RESULT.user } });
+    await ready();
+    click('Xóa ảnh');
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Mọi người sẽ thấy chữ viết tắt/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Xóa ảnh' }));
+    await screen.findByText('Đã xóa ảnh đại diện.');
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(getSessionSnapshot()!.user.avatarUrl).toBeNull();
   });
 
   it('retains failed draft without exposing server internals', async () => {
