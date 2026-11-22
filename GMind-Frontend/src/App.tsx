@@ -10,6 +10,7 @@ import NotFound from './pages/NotFound';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
 import JoinGroup from './pages/JoinGroup';
 import Dashboard from './pages/Dashboard';
 import GroupDetail from './pages/GroupDetail';
@@ -24,6 +25,7 @@ import Settings from './pages/Settings';
 import Notifications from './pages/Notifications';
 import Marketplace from './pages/Marketplace';
 import Calendar from './pages/Calendar';
+import DevMailbox from './pages/DevMailbox';
 
 /**
  * One QueryClient per app. Cached data is cleared whenever the signed-in user
@@ -58,6 +60,8 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        {import.meta.env.DEV && <Route path="/dev/mailbox" element={<DevMailbox />} />}
         <Route element={<ProtectedRoute />}>
           <Route path="/join-group" element={<JoinGroup />} />
           <Route path="/join/:code" element={<JoinGroup />} />

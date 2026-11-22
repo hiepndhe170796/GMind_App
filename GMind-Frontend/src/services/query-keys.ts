@@ -33,4 +33,10 @@ export const qk = {
     ['u', uid, 'group', groupId, 'swap-candidates', userId] as const,
   taskHelpers: (uid: string, taskId: string) => ['u', uid, 'task', taskId, 'helpers'] as const,
   helping: (uid: string) => ['u', uid, 'helping'] as const,
+  me: (uid: string) => ['u', uid, 'me'] as const,
+  notifications: (uid: string, unreadOnly: boolean) => ['u', uid, 'notifications', { unreadOnly }] as const,
+  notificationsAll: (uid: string) => ['u', uid, 'notifications'] as const,
+  sessions: (uid: string) => ['u', uid, 'sessions'] as const,
+  notificationPreferences: (uid: string) => ['u', uid, 'notification-preferences'] as const,
+  pendingEmailChange: (uid: string) => ['u', uid, 'email-change'] as const,
 };

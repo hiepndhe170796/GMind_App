@@ -8,9 +8,11 @@ export interface NotificationDto {
   isRead: boolean; createdAt: string; groupId?: string | null;
 }
 
+export interface NotificationPageDto { items: NotificationDto[]; nextCursor: string | null }
+
 export const notificationsService = {
-  async list(unreadOnly = false): Promise<NotificationDto[]> {
-    return (await api.get('/api/notifications', { params: { unreadOnly, take: 100 } })).data.data;
+  async page(unreadOnly = false, cursor: string | null = null, take = 20): Promise<NotificationPageDto> {
+    return (await api.get('/api/notifications/page', { params: { unreadOnly, take, cursor: cursor ?? undefined } })).data.data;
   },
   async unreadCount(): Promise<number> {
     return (await api.get('/api/notifications/unread-count')).data.data.count;
@@ -48,6 +50,7 @@ export const notificationTarget = (n: NotificationDto): NotificationTarget | nul
   if (n.type === 'MemberRemoved') return null; // informational only
   const kind = n.relatedEntityType ?? '', id = n.relatedEntityId ?? '';
   if (n.type === 'GroupArchived') return { href: '/groups', label: 'Xem nhóm đã lưu trữ' };
+  if (n.type === 'EmailChanged') return { href: '/profile', label: 'Xem hồ sơ' };
   if (!GUID.test(id)) return null;
   switch (kind) {
     case 'Task': return { href: `/tasks/${id}`, label: 'Xem công việc' };
@@ -71,6 +74,7 @@ const TYPE_ICON: Record<string, IconName> = {
   MarketplaceClaimed: 'link', MarketplaceOpenRequest: 'link',
   HelperAdded: 'users', HelperEnded: 'users',
   GroupArchived: 'alert', GroupRestored: 'check',
+  EmailChanged: 'check',
 };
 export const typeIcon = (type: string): IconName => Object.hasOwn(TYPE_ICON, type) ? TYPE_ICON[type] : 'bell';
 const TYPE_TONE: Record<string, string> = {
@@ -82,9 +86,10 @@ const TYPE_TONE: Record<string, string> = {
   MarketplaceOpenRequest: 'text-primary-600',
   HelperAdded: 'text-accent-700', HelperEnded: 'text-ink-muted',
   GroupArchived: 'text-warning-700', GroupRestored: 'text-success-700',
+  EmailChanged: 'text-success-700',
 };
 export const typeTone = (type: string) => Object.hasOwn(TYPE_TONE, type) ? TYPE_TONE[type]
-  : Object.hasOwn(TYPE_ICON, type) ? 'text-primary-600' : 'text-slate-600';
+  : Object.hasOwn(TYPE_ICON, type) ? 'text-primary-600' : 'text-ink-muted';
 
 export const groupByDay = (items: NotificationDto[], today: string): [string, NotificationDto[]][] => {
   const map = new Map<string, NotificationDto[]>();

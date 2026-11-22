@@ -3,9 +3,9 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth';
 import { getSessionSnapshot, subscribeSession, type UserInfo } from '../services/session';
-import { NotificationCountProvider } from '../components/notifications/NotificationCountProvider';
 import UserAvatar from '../components/account/UserAvatar';
 import { useNotificationCount } from '../components/notifications/useNotificationCount';
+import { useRealtimeStatus } from '../components/realtime/realtime-context';
 import Icon, { type IconName } from '../components/ui/Icon';
 import Logo from '../components/ui/Logo';
 import { formatHeaderDate } from '../utils/presentation';
@@ -86,6 +86,33 @@ const NavItems = ({ section, onNavigate, unread }: { section?: string; onNavigat
     })}
   </nav>
 );
+
+const PILL_DELAY_MS = 5000;
+
+/** Reconnect pill — mounted only after the hub has been down continuously for 5 s,
+ *  so brief blips never reach the DOM or screen readers. */
+const ReconnectPill = () => {
+  const status = useRealtimeStatus();
+  const down = status === 'reconnecting' || status === 'disconnected';
+  // Remount on every down-streak so a flap back to connected restarts the delay.
+  if (!down) return null;
+  return <DelayedPill />;
+};
+
+const DelayedPill = () => {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(true), PILL_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+  if (!visible) return null;
+  return (
+    <span role="status" className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-warning-50 px-3 text-caption font-semibold text-warning-700 motion-safe:animate-pill-in">
+      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-warning-500" />
+      Đang kết nối lại…
+    </span>
+  );
+};
 
 const MainLayoutShell = ({ children, contentWidth }: MainLayoutProps) => {
   const navigate = useNavigate();
@@ -171,6 +198,7 @@ const MainLayoutShell = ({ children, contentWidth }: MainLayoutProps) => {
             <h1 className="text-section font-semibold text-ink truncate">{title}</h1>
             <p className="hidden sm:block text-caption text-ink-muted tabular-nums">{today}</p>
           </div>
+          <ReconnectPill />
           <Link to="/notifications" aria-label={unread == null ? 'Thông báo, chưa cập nhật số chưa đọc' : `Thông báo, ${unread} chưa đọc${unreadError ? ', số liệu chưa làm mới' : ''}`}
             title={unreadError ? 'Chưa làm mới được số thông báo chưa đọc' : 'Mở thông báo'}
             className="relative p-2 rounded-lg text-ink-muted hover:bg-surface-subtle min-h-11 min-w-11 flex items-center justify-center">
@@ -205,9 +233,7 @@ const MainLayoutShell = ({ children, contentWidth }: MainLayoutProps) => {
 };
 
 const MainLayout = ({ children, contentWidth }: MainLayoutProps) => (
-  <NotificationCountProvider key={authService.currentUser()?.id ?? ''} userId={authService.currentUser()?.id ?? ''}>
-    <MainLayoutShell contentWidth={contentWidth}>{children}</MainLayoutShell>
-  </NotificationCountProvider>
+  <MainLayoutShell contentWidth={contentWidth}>{children}</MainLayoutShell>
 );
 
 export default MainLayout;

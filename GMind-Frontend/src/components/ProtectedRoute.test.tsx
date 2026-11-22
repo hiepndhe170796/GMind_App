@@ -9,6 +9,30 @@ import Login from '../pages/Login';
 import api from '../services/api';
 import { authService } from '../services/auth';
 import { clearSession, getSessionSnapshot, saveSession, type AuthResult, type UserInfo } from '../services/session';
+import type { ReactNode } from 'react';
+
+// Realtime/count side-effects are covered by their own suites; keep this guard test
+// network-free but track provider mounts so navigation never restarts them.
+const providerMounts = { realtime: 0, count: 0 };
+const providerUnmounts = { realtime: 0, count: 0 };
+vi.mock('./realtime/RealtimeProvider', async () => {
+  const React = await vi.importActual<typeof import('react')>('react');
+  return {
+    RealtimeProvider: ({ children }: { children: ReactNode }) => {
+      React.useEffect(() => { providerMounts.realtime += 1; return () => { providerUnmounts.realtime += 1; }; }, []);
+      return children;
+    },
+  };
+});
+vi.mock('./notifications/NotificationCountProvider', async () => {
+  const React = await vi.importActual<typeof import('react')>('react');
+  return {
+    NotificationCountProvider: ({ children }: { children: ReactNode }) => {
+      React.useEffect(() => { providerMounts.count += 1; return () => { providerUnmounts.count += 1; }; }, []);
+      return children;
+    },
+  };
+});
 
 const USER: UserInfo = { id: 'u1', displayName: 'U', email: 'u@x' };
 const session = (s: string): AuthResult => ({ accessToken: `AT-${s}`, refreshToken: `RT-${s}`, expiresAt: '2100-01-01', user: USER });
@@ -53,9 +77,11 @@ function renderGuard(initial: string, strict = false) {
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<div>PRIVATE_DASH</div>} />
           <Route path="/other" element={<div>PRIVATE_OTHER</div>} />
+          <Route path="/third" element={<div>PRIVATE_THIRD</div>} />
         </Route>
       </Routes>
       <Link to="/other">go-other</Link>
+      <Link to="/third">go-third</Link>
     </MemoryRouter>
   );
   return render(strict ? <StrictMode>{tree}</StrictMode> : tree);
@@ -72,6 +98,21 @@ afterEach(() => {
 });
 
 describe('ProtectedRoute', () => {
+  it('providers mount once and never unmount while navigating between paths', async () => {
+    saveSession(session('a'));
+    const validate = vi.spyOn(authService, 'validateSession').mockResolvedValue(USER);
+    renderGuard('/dashboard');
+    expect(await screen.findByText('PRIVATE_DASH')).toBeTruthy();
+    expect(providerMounts).toEqual({ realtime: 1, count: 1 });
+    fireEvent.click(screen.getByText('go-other'));
+    expect(await screen.findByText('PRIVATE_OTHER')).toBeTruthy();
+    fireEvent.click(screen.getByText('go-third'));
+    expect(await screen.findByText('PRIVATE_THIRD')).toBeTruthy();
+    expect(validate).toHaveBeenCalledTimes(3); // the per-path check still revalidates
+    expect(providerMounts).toEqual({ realtime: 1, count: 1 });
+    expect(providerUnmounts).toEqual({ realtime: 0, count: 0 });
+  });
+
   it('does not mount children before validation resolves', async () => {
     saveSession(session('a'));
     const d = deferred<UserInfo>();

@@ -10,7 +10,7 @@ import { safeReturnPath } from '../utils/return-path';
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as { from?: unknown; sessionExpired?: boolean; logoutWarning?: string; passwordReset?: boolean; passwordChanged?: boolean } | null;
+  const state = location.state as { from?: unknown; sessionExpired?: boolean; sessionRevoked?: boolean; logoutWarning?: string; passwordReset?: boolean; passwordChanged?: boolean } | null;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -46,6 +46,7 @@ export default function Login() {
     <LoginLayout>
       {state?.passwordReset && <p role="status" className="mb-4 text-sm font-medium text-success-700">Mật khẩu đã được đặt lại. Đăng nhập bằng mật khẩu mới.</p>}
       {state?.passwordChanged && <p role="status" className="mb-4 text-sm font-medium text-success-700">Đã đổi mật khẩu. Đăng nhập bằng mật khẩu mới.</p>}
+      {state?.sessionRevoked && <p role="alert" className="mb-4 text-sm text-warning-700">Phiên đăng nhập này đã được đăng xuất từ thiết bị khác.</p>}
       {state?.sessionExpired && <p role="alert" className="mb-4 text-sm text-warning-700">Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.</p>}
       {state?.logoutWarning && <p role="alert" className="mb-4 text-sm text-warning-700">{state.logoutWarning}</p>}
       <form onSubmit={submit} noValidate aria-busy={loading} className="space-y-5">

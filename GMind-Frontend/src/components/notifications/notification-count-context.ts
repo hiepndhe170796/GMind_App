@@ -6,5 +6,6 @@ export interface CountCtx {
   error: string;
   refresh(force?: boolean): Promise<void>;
   clear(): void;
+  setCount(next: number | null): void;
 }
 export const NotificationCountContext = createContext<CountCtx | null>(null);

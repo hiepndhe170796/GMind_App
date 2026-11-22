@@ -27,6 +27,20 @@ export function formatDateTime(value?: string | null): string {
     : new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
 }
 
+/** "vừa xong" / "5 phút trước" / "2 giờ trước" / "3 ngày trước" for a UTC ISO timestamp. */
+export function formatRelative(value?: string | null, now: number = Date.now()): string {
+  if (!value) return '';
+  const t = timestamp(value).getTime();
+  if (Number.isNaN(t)) return '';
+  const diff = Math.max(0, now - t);
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return 'vừa xong';
+  if (minutes < 60) return `${minutes} phút trước`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} giờ trước`;
+  return `${Math.floor(hours / 24)} ngày trước`;
+}
+
 /** Header date like "Thứ Sáu, 20 tháng 11, 2026" — built from parts so browsers that capitalize "Tháng" don't leak it. */
 export function formatHeaderDate(d: Date): string {
   const parts = new Intl.DateTimeFormat('vi-VN', {

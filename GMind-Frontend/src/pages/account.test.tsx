@@ -11,6 +11,9 @@ import UserAvatar from '../components/account/UserAvatar';
 import api from '../services/api';
 import { authService } from '../services/auth';
 import { clearSession, getSessionSnapshot, saveSession, type AuthResult } from '../services/session';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { createQueryClient } from '../services/query-client';
+import { ToastProvider } from '../components/ui/Toast';
 
 vi.mock('../components/notifications/NotificationCountProvider', () => ({
   NotificationCountProvider: ({ children }: { children: ReactNode }) => children,
@@ -18,18 +21,22 @@ vi.mock('../components/notifications/NotificationCountProvider', () => ({
 vi.mock('../components/notifications/useNotificationCount', () => ({
   useNotificationCount: () => ({ count: 0, error: null }),
 }));
+vi.mock('../components/realtime/RealtimeProvider', () => ({
+  RealtimeProvider: ({ children }: { children: ReactNode }) => children,
+}));
 const RESULT: AuthResult = {
   accessToken: 'test-access', refreshToken: 'test-refresh', expiresAt: '2100-01-01',
   user: { id: 'account-a', displayName: 'Account A', email: 'a@test.dev', avatarUrl: null },
 };
 function mount(path = '/profile') {
-  render(<MemoryRouter initialEntries={[path]}><Routes>
+  render(<QueryClientProvider client={createQueryClient()}><ToastProvider>
+    <MemoryRouter initialEntries={[path]}><Routes>
     <Route path="/login" element={<Login />} />
     <Route element={<ProtectedRoute />}>
       <Route path="/profile" element={<Profile />} />
       <Route path="/settings" element={<Settings />} />
     </Route>
-  </Routes></MemoryRouter>);
+  </Routes></MemoryRouter></ToastProvider></QueryClientProvider>);
 }
 const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 const click = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
@@ -45,6 +52,12 @@ function passwords() {
 beforeEach(() => {
   clearSession(); saveSession(RESULT);
   vi.spyOn(authService, 'validateSession').mockResolvedValue(RESULT.user);
+  vi.spyOn(authService, 'listSessions').mockResolvedValue([]);
+  vi.spyOn(authService, 'getNotificationPreferences').mockResolvedValue({
+    reminder3Days: true, reminder1Day: true, reminder3Hours: false, overdueAlert: true,
+  });
+  vi.spyOn(authService, 'updateNotificationPreferences').mockImplementation(async p => p);
+  vi.spyOn(authService, 'getPendingEmailChange').mockResolvedValue(null);
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); clearSession(); localStorage.clear(); });
 

@@ -5,6 +5,8 @@ import Card from './ui/Card';
 import Button from './ui/Button';
 import { authService } from '../services/auth';
 import { getSessionEndReason, getSessionSnapshot, subscribeSession } from '../services/session';
+import { RealtimeProvider } from './realtime/RealtimeProvider';
+import { NotificationCountProvider } from './notifications/NotificationCountProvider';
 
 type Check = { key: ValidationScope; status: 'ready' } | { key: ValidationScope; status: 'error'; message: string };
 
@@ -39,36 +41,48 @@ export default function ProtectedRoute() {
   const currentCheck = check?.key === key ? check : null;
 
   if (!session) {
-    const state = getSessionEndReason() === 'passwordChanged'
+    const reason = getSessionEndReason();
+    const state = reason === 'passwordChanged'
       ? { passwordChanged: true }
-      : { from: location.pathname + location.search + location.hash, sessionExpired: true };
+      : reason === 'revoked'
+        ? { sessionRevoked: true }
+        : { from: location.pathname + location.search + location.hash, sessionExpired: true };
     return <Navigate to="/login" replace state={state} />;
   }
-  if (currentCheck?.status === 'error') {
-    return (
-      <AuthLayout>
-        <Card variant="elevated">
-          <p role="alert" className="text-sm text-danger-600 mb-4">{currentCheck.message}</p>
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setAttempt(a => a + 1)}>Thử lại</Button>
-            <Button variant="ghost" size="sm" onClick={() => {
-              void authService.logout().then((result) => {
-                if (getSessionSnapshot()) return;
-                navigate('/login', {
-                  replace: true,
-                  state: result.serverRevoked ? undefined : { logoutWarning: 'Đã đăng xuất trên trình duyệt này. Chưa thể xác nhận thu hồi phiên trên máy chủ; vui lòng kiểm tra kết nối.' },
-                });
+
+  const body = currentCheck?.status === 'error' ? (
+    <AuthLayout>
+      <Card variant="elevated">
+        <p role="alert" className="text-sm text-danger-600 mb-4">{currentCheck.message}</p>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setAttempt(a => a + 1)}>Thử lại</Button>
+          <Button variant="ghost" size="sm" onClick={() => {
+            void authService.logout().then((result) => {
+              if (getSessionSnapshot()) return;
+              navigate('/login', {
+                replace: true,
+                state: result.serverRevoked ? undefined : { logoutWarning: 'Đã đăng xuất trên trình duyệt này. Chưa thể xác nhận thu hồi phiên trên máy chủ; vui lòng kiểm tra kết nối.' },
               });
-            }}>Đăng xuất</Button>
-          </div>
-        </Card>
-      </AuthLayout>
-    );
-  }
-  if (currentCheck?.status === 'ready') return <Outlet key={session.id} />;
-  return (
+            });
+          }}>Đăng xuất</Button>
+        </div>
+      </Card>
+    </AuthLayout>
+  ) : currentCheck?.status === 'ready' ? (
+    <Outlet key={session.id} />
+  ) : (
     <AuthLayout>
       <p role="status" className="text-sm text-neutral-500">Đang kiểm tra phiên đăng nhập…</p>
     </AuthLayout>
+  );
+
+  // Providers wrap every post-session branch so navigation and the per-path check
+  // never restart the hub connection or re-poll the unread count.
+  return (
+    <RealtimeProvider key={session.id}>
+      <NotificationCountProvider key={session.user.id} userId={session.user.id}>
+        {body}
+      </NotificationCountProvider>
+    </RealtimeProvider>
   );
 }

@@ -113,6 +113,26 @@ api.interceptors.response.use(
   },
 );
 
+/**
+ * Access token for non-axios consumers (SignalR). Refreshes first when the
+ * stored expiry is under 60 s away; returns null once there is no session.
+ */
+export async function getFreshAccessToken(): Promise<string | null> {
+  const current = synchronizeSession();
+  if (!current) return null;
+  const expiry = Date.parse(current.expiresAt);
+  if (Number.isFinite(expiry) && expiry - Date.now() < 60_000) {
+    try {
+      await refreshSession(current);
+    } catch {
+      // Fall through: best effort — the caller retries via the reconnect policy.
+    }
+    const latest = synchronizeSession();
+    return latest && latest.id === current.id ? latest.accessToken : null;
+  }
+  return current.accessToken;
+}
+
 export interface LogoutResult { serverRevoked: boolean }
 
 export function waitForLogout(): Promise<void> {

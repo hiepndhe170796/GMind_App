@@ -2,14 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import Icon from './Icon';
 
 export type ToastTone = 'success' | 'error' | 'info';
-export interface ToastOptions { title?: string }
+export interface ToastAction { label: string; onAction: () => void }
+export interface ToastOptions { title?: string; action?: ToastAction }
 export interface ToastApi {
   success(message: string, options?: ToastOptions): void;
   error(message: string, options?: ToastOptions): void;
   info(message: string, options?: ToastOptions): void;
 }
 
-interface ToastItem { id: number; tone: ToastTone; title?: string; message: string }
+interface ToastItem { id: number; tone: ToastTone; title?: string; message: string; action?: ToastAction }
 
 const ToastContext = createContext<ToastApi | null>(null);
 const MAX_VISIBLE = 3;
@@ -63,6 +64,15 @@ function ToastCard({ toast, onClose }: { toast: ToastItem; onClose: (id: number)
       <div className="min-w-0 flex-1">
         {toast.title && <p className="text-small font-semibold text-ink">{toast.title}</p>}
         <p className="text-small text-ink-secondary">{toast.message}</p>
+        {toast.action && (
+          <button
+            type="button"
+            onClick={() => { toast.action!.onAction(); onClose(toast.id); }}
+            className="mt-1.5 min-h-9 rounded-lg px-2 -ml-2 text-small font-semibold text-primary-700 hover:bg-primary-50"
+          >
+            {toast.action.label}
+          </button>
+        )}
       </div>
       <button
         type="button"
@@ -89,14 +99,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts(list => list.filter(t => t.id !== id));
   }, []);
 
-  const push = useCallback((tone: ToastTone, message: string, title?: string) => {
-    setToasts(list => [...list.slice(-(MAX_VISIBLE - 1)), { id: nextId.current++, tone, title, message }]);
+  const push = useCallback((tone: ToastTone, message: string, options?: ToastOptions) => {
+    setToasts(list => [...list.slice(-(MAX_VISIBLE - 1)), { id: nextId.current++, tone, title: options?.title, message, action: options?.action }]);
   }, []);
 
   const api = useMemo<ToastApi>(() => ({
-    success: (message, options) => push('success', message, options?.title),
-    error: (message, options) => push('error', message, options?.title),
-    info: (message, options) => push('info', message, options?.title),
+    success: (message, options) => push('success', message, options),
+    error: (message, options) => push('error', message, options),
+    info: (message, options) => push('info', message, options),
   }), [push]);
 
   return (

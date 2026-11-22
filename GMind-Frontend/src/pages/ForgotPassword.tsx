@@ -40,10 +40,11 @@ export default function ForgotPassword() {
           <div>
             <p role="status" className="text-sm font-medium text-success-700">Nếu địa chỉ này có tài khoản, hướng dẫn đặt lại mật khẩu đã được gửi.</p>
             {import.meta.env.DEV && (
-              <details className="mt-4 text-sm text-slate-600">
-                <summary className="cursor-pointer">Hộp thư trên máy local</summary>
-                <p className="mt-2">Nhấn Windows + R, mở %LOCALAPPDATA%\GMind\Mailbox và mở thư mới nhất để lấy liên kết đặt lại mật khẩu. Đây là hộp thư phát triển trên máy này, không phải email thật.</p>
-              </details>
+              <p className="mt-4 text-sm text-ink-secondary">
+                Môi trường phát triển:{' '}
+                <Link to="/dev/mailbox" className="font-medium text-primary-700 hover:underline">mở hộp thư dev</Link>
+                {' '}để lấy liên kết đặt lại mật khẩu.
+              </p>
             )}
             <Button type="button" variant="secondary" className="mt-5" onClick={() => { setSent(false); setEmail(''); setError(''); setFieldErrors({}); }}>
               Dùng email khác

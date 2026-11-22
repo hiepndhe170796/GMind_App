@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { notificationsService } from '../../services/notifications';
+import { RealtimeContext } from '../realtime/realtime-context';
 import { NotificationCountContext } from './notification-count-context';
 const FAIL = (e: unknown) => (e as { status?: number; message?: string });
 
 export function NotificationCountProvider({ userId, children }: { userId: string; children: ReactNode }) {
+  const realtime = useContext(RealtimeContext); // null outside ProtectedRoute (tests)
   const [count, setCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,6 +43,12 @@ export function NotificationCountProvider({ userId, children }: { userId: string
     setCount(null); setError(''); setLoading(false);
   }, []);
 
+  // subscribeNotification is stable (memoised events object); status lives in a ref
+  // so status changes never re-run this effect, bump version, or refetch.
+  const subscribeNotification = realtime?.subscribeNotification;
+  const statusRef = useRef(realtime?.status);
+  useEffect(() => { statusRef.current = realtime?.status; });
+
   useEffect(() => {
     mounted.current = true;
     const v = version;
@@ -48,14 +56,32 @@ export function NotificationCountProvider({ userId, children }: { userId: string
     const onFocus = () => { if (document.visibilityState === 'visible') void refresh(); };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onFocus);
-    const tick = setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 60_000);
+    // Polling is the reconnect fallback: only while realtime is not connected.
+    const tick = setInterval(() => {
+      if (document.visibilityState === 'visible' && statusRef.current !== 'connected') void refresh();
+    }, 60_000);
+    const offNotification = subscribeNotification?.(payload => {
+      if (mounted.current) setCount(payload.unreadCount);
+    });
     return () => {
       mounted.current = false; v.current++; inflight.current = null;
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onFocus);
       clearInterval(tick);
+      offNotification?.();
     };
-  }, [userId, refresh]);
+  }, [userId, refresh, subscribeNotification]);
 
-  return <NotificationCountContext.Provider value={{ count, loading, error, refresh, clear }}>{children}</NotificationCountContext.Provider>;
+  // The hub does not replay events missed while it was down — refetch once when it
+  // recovers from reconnecting/disconnected. The initial connecting → connected
+  // does not count.
+  const status = realtime?.status;
+  const prevStatusRef = useRef(status);
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = status;
+    if (status === 'connected' && (prev === 'reconnecting' || prev === 'disconnected')) void refresh();
+  }, [status, refresh]);
+
+  return <NotificationCountContext.Provider value={{ count, loading, error, refresh, clear, setCount }}>{children}</NotificationCountContext.Provider>;
 }

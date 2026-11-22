@@ -80,7 +80,7 @@ describe('typeIcon — real enum names only', () => {
   });
   it('unknown type -> neutral bell, tone neutral', () => {
     expect(typeIcon('InventedType')).toBe('bell');
-    expect(typeTone('InventedType')).toBe('text-slate-600');
+    expect(typeTone('InventedType')).toBe('text-ink-muted');
   });
 });
 

@@ -37,10 +37,12 @@ export default {
       keyframes: {
         'dialog-in': { from: { opacity: '0', transform: 'translateY(6px) scale(.98)' }, to: { opacity: '1', transform: 'none' } },
         'drawer-in': { from: { transform: 'translateX(-100%)' }, to: { transform: 'none' } },
+        'pill-in': { from: { opacity: '0' }, to: { opacity: '1' } },
       },
       animation: {
         'dialog-in': 'dialog-in 180ms cubic-bezier(0.16,1,0.3,1)',
         'drawer-in': 'drawer-in 220ms cubic-bezier(0.16,1,0.3,1)',
+        'pill-in': 'pill-in 150ms ease',
       },
     },
   },
