@@ -61,6 +61,12 @@ public class M4Tests
         public Task<int> GetUnreadCountAsync(Guid userId, CancellationToken ct = default) => Task.FromResult(0);
         public Task MarkReadAsync(Guid userId, Guid notificationId, CancellationToken ct = default) => Task.CompletedTask;
         public Task<int> MarkAllReadAsync(Guid userId, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<NotificationPageDto> GetPageAsync(Guid userId, bool unreadOnly, string? cursor, int take, CancellationToken ct = default)
+            => Task.FromResult(new NotificationPageDto(new List<NotificationDto>(), null));
+        public Task<NotificationPreferenceDto> GetPreferencesAsync(Guid userId, CancellationToken ct = default)
+            => Task.FromResult(new NotificationPreferenceDto(true, true, true, true));
+        public Task<NotificationPreferenceDto> UpdatePreferencesAsync(Guid userId, bool a, bool b, bool c, bool d, CancellationToken ct = default)
+            => Task.FromResult(new NotificationPreferenceDto(a, b, c, d));
     }
 
     private static GroupService Grp(ApplicationDbContext db, FakeNotif n) => new(db, new ResourceAccess(db), n);

@@ -18,6 +18,12 @@ public class NotificationsController : ControllerBase
     public async Task<IActionResult> List([FromQuery] bool unreadOnly = false, [FromQuery] int take = 50, CancellationToken ct = default)
         => Ok(await _notifications.GetMyAsync(User.GetUserId(), unreadOnly, take, ct));
 
+    /// <summary>Trang thông báo với con trỏ ổn định (mới nhất trước, 20 mỗi lần).</summary>
+    [HttpGet("page")]
+    public async Task<IActionResult> Page([FromQuery] bool unreadOnly = false, [FromQuery] string? cursor = null,
+        [FromQuery] int take = 20, CancellationToken ct = default)
+        => Ok(await _notifications.GetPageAsync(User.GetUserId(), unreadOnly, cursor, take, ct));
+
     [HttpGet("unread-count")]
     public async Task<IActionResult> UnreadCount(CancellationToken ct)
         => Ok(new { count = await _notifications.GetUnreadCountAsync(User.GetUserId(), ct) });

@@ -101,6 +101,9 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<GMind.API.Realtime.RealtimeHub>("/hubs/realtime",
+    options => options.CloseOnAuthenticationExpiration = true);
+if (app.Environment.IsDevelopment()) app.MapDevMailbox();
 
 app.MapHealthChecks("/api/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
 app.MapHealthChecks("/api/health/ready", new HealthCheckOptions { Predicate = registration => registration.Tags.Contains("ready") }).AllowAnonymous();

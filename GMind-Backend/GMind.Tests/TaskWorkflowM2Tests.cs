@@ -69,6 +69,12 @@ public class TaskWorkflowM2Tests
         public Task<int> GetUnreadCountAsync(Guid u, CancellationToken ct = default) => Task.FromResult(0);
         public Task MarkReadAsync(Guid u, Guid n, CancellationToken ct = default) => Task.CompletedTask;
         public Task<int> MarkAllReadAsync(Guid u, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<NotificationPageDto> GetPageAsync(Guid userId, bool unreadOnly, string? cursor, int take, CancellationToken ct = default)
+            => Task.FromResult(new NotificationPageDto(new List<NotificationDto>(), null));
+        public Task<NotificationPreferenceDto> GetPreferencesAsync(Guid userId, CancellationToken ct = default)
+            => Task.FromResult(new NotificationPreferenceDto(true, true, true, true));
+        public Task<NotificationPreferenceDto> UpdatePreferencesAsync(Guid userId, bool a, bool b, bool c, bool d, CancellationToken ct = default)
+            => Task.FromResult(new NotificationPreferenceDto(a, b, c, d));
     }
 
     // ── A3 progress ──
@@ -131,7 +137,7 @@ public class TaskWorkflowM2Tests
         // leader notified with note excerpt
         var n = f.Notifications.Sent.Last();
         Assert.Equal(f.Leader.Id, n.Recipient);
-        Assert.Contains($"Task '{t.Title}' đã được nộp để duyệt: done, please review", n.Body);
+        Assert.Contains($"Công việc '{t.Title}' đã được nộp để duyệt: done, please review", n.Body);
 
         // request changes → resubmit bumps version; review records the latest version
         await f.Tasks.ChangeStatusAsync(f.Leader.Id, t.Id, TaskStatus.ChangesRequested, "fix it");

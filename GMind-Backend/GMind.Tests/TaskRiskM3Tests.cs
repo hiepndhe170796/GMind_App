@@ -60,6 +60,12 @@ public class TaskRiskM3Tests
         public Task<int> GetUnreadCountAsync(Guid userId, CancellationToken ct = default) => Task.FromResult(0);
         public Task MarkReadAsync(Guid userId, Guid notificationId, CancellationToken ct = default) => Task.CompletedTask;
         public Task<int> MarkAllReadAsync(Guid userId, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<Application.Services.Notifications.NotificationPageDto> GetPageAsync(Guid userId, bool unreadOnly, string? cursor, int take, CancellationToken ct = default)
+            => Task.FromResult(new Application.Services.Notifications.NotificationPageDto(new List<Application.Services.Notifications.NotificationDto>(), null));
+        public Task<Application.Services.Notifications.NotificationPreferenceDto> GetPreferencesAsync(Guid userId, CancellationToken ct = default)
+            => Task.FromResult(new Application.Services.Notifications.NotificationPreferenceDto(true, true, true, true));
+        public Task<Application.Services.Notifications.NotificationPreferenceDto> UpdatePreferencesAsync(Guid userId, bool a, bool b, bool c, bool d, CancellationToken ct = default)
+            => Task.FromResult(new Application.Services.Notifications.NotificationPreferenceDto(a, b, c, d));
     }
 
     // ── A2: TaskRisk evaluator ──

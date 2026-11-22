@@ -28,6 +28,25 @@ public static class ReminderProcessor
             .Select(r => r.DeduplicationKey)
             .ToHashSetAsync(ct);
 
+        // NOT-04: one batched query of per-user reminder toggles; absent row = all windows on.
+        var assigneeIds = candidates.Select(t => t.AssigneeUserId!.Value).Distinct().ToList();
+        var prefs = (await db.NotificationPreferences
+                .Where(p => assigneeIds.Contains(p.UserId))
+                .ToListAsync(ct))
+            .ToDictionary(p => p.UserId);
+        bool WindowEnabled(Guid userId, ReminderType type)
+        {
+            if (!prefs.TryGetValue(userId, out var p)) return true;
+            return type switch
+            {
+                ReminderType.ThreeDaysBefore => p.Reminder3Days,
+                ReminderType.OneDayBefore => p.Reminder1Day,
+                ReminderType.ThreeHoursBefore => p.Reminder3Hours,
+                ReminderType.Overdue => p.OverdueAlert,
+                _ => true
+            };
+        }
+
         foreach (var task in candidates)
         {
             var due = task.DeadlineAt!.Value;
@@ -41,6 +60,7 @@ public static class ReminderProcessor
             foreach (var (type, from, to) in windows)
             {
                 if (nowUtc < from || nowUtc >= to) continue;
+                if (!WindowEnabled(task.AssigneeUserId!.Value, type)) continue;
                 var dedupKey = $"{task.Id}:{task.AssigneeUserId}:{type}:{due.Ticks}";
                 if (existingKeys.Contains(dedupKey)) continue;
 
@@ -51,10 +71,10 @@ public static class ReminderProcessor
                     RecipientUserId = task.AssigneeUserId!.Value,
                     GroupId = task.Project.GroupId,
                     Type = type == ReminderType.Overdue ? NotificationType.OverdueAlert : NotificationType.DeadlineReminder,
-                    Title = type == ReminderType.Overdue ? "Task quá hạn" : "Task sắp đến hạn",
+                    Title = type == ReminderType.Overdue ? "Công việc quá hạn" : "Công việc sắp đến hạn",
                     Body = type == ReminderType.Overdue
-                        ? $"Task '{task.Title}' đã quá hạn ({vn})"
-                        : $"Task '{task.Title}' sẽ đến hạn lúc {vn}",
+                        ? $"Công việc '{task.Title}' đã quá hạn ({vn})"
+                        : $"Công việc '{task.Title}' sẽ đến hạn lúc {vn}",
                     RelatedEntityType = "Task",
                     RelatedEntityId = task.Id
                 });

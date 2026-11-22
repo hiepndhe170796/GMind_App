@@ -1,4 +1,6 @@
+using System.Text.Json;
 using GMind.API.Common;
+using GMind.Application.Common;
 using GMind.Application.Common.Exceptions;
 using GMind.Application.Services.Auth;
 using GMind.Domain.Enums;
@@ -103,20 +105,24 @@ public class AuthServiceTests : IDisposable
 
 public class PasswordResetDeliveryTests : IDisposable
 {
-    private sealed class RecordingDelivery : IPasswordResetDelivery
+    internal sealed class RecordingSender : IEmailSender
     {
         public bool IsAvailable { get; set; } = true;
-        public string? Email; public string? Token; public DateTime ExpiresAt;
-        public Task SendAsync(string email, string token, DateTime expiresAtUtc, CancellationToken ct = default)
+        public List<EmailMessage> Sent { get; } = new();
+        public string? Email => Sent.LastOrDefault()?.To;
+        public string? Token => Sent.LastOrDefault()?.Links.FirstOrDefault() is { } link
+            ? Uri.UnescapeDataString(link.Url.Split("#token=")[1])
+            : null;
+        public Task SendAsync(EmailMessage message, CancellationToken ct = default)
         {
-            Email = email; Token = token; ExpiresAt = expiresAtUtc;
+            Sent.Add(message);
             return Task.CompletedTask;
         }
     }
 
     private readonly ApplicationDbContext _db;
     private readonly AuthService _service;
-    private readonly RecordingDelivery _delivery = new();
+    private readonly RecordingSender _delivery = new();
 
     public PasswordResetDeliveryTests()
     {
@@ -128,10 +134,11 @@ public class PasswordResetDeliveryTests : IDisposable
             {
                 ["Jwt:Secret"] = "test-secret-key-minimum-32-chars-long!",
                 ["Jwt:Issuer"] = "GMind", ["Jwt:Audience"] = "GMind",
-                ["Jwt:ExpiryMinutes"] = "60", ["Jwt:RefreshTokenExpiryDays"] = "7"
+                ["Jwt:ExpiryMinutes"] = "60", ["Jwt:RefreshTokenExpiryDays"] = "7",
+                ["Auth:FrontendUrl"] = "http://localhost:5173"
             }).Build();
         _service = new AuthService(_db, new PasswordHasher(), new TokenService(config), config,
-            NullLogger<AuthService>.Instance, _delivery);
+            NullLogger<AuthService>.Instance, emailSender: _delivery);
     }
 
     public void Dispose() => _db.Dispose();
@@ -179,7 +186,7 @@ public class PasswordResetDeliveryTests : IDisposable
         var user = await _db.Users.FirstAsync(u => u.Email == "u3@test.dev");
         Assert.Equal(version + 1, user.AuthVersion);
         Assert.Null(user.PasswordResetToken);
-        Assert.Null(user.RefreshToken);
+        Assert.True(await _db.UserSessions.AllAsync(s => s.RevokedAt != null));
         await Assert.ThrowsAsync<UnauthorizedException>(() => _service.RefreshTokenAsync(login.RefreshToken));
         await Assert.ThrowsAsync<UnauthorizedException>(() => _service.LoginAsync("u3@test.dev", "Password123!"));
         var reLogin = await _service.LoginAsync("u3@test.dev", "NewPass123!");
@@ -236,7 +243,7 @@ public class PasswordResetDeliveryTests : IDisposable
     }
 }
 
-public class DevelopmentPasswordResetDeliveryTests : IDisposable
+public class DevelopmentMailboxTests : IDisposable
 {
     private sealed class FakeEnv(string name) : IHostEnvironment
     {
@@ -254,7 +261,7 @@ public class DevelopmentPasswordResetDeliveryTests : IDisposable
     }
 
     [Fact]
-    public async Task Development_WritesHtmlMail_WithFragmentLink()
+    public async Task Development_WritesHtmlAndJson_Atomically()
     {
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -262,16 +269,25 @@ public class DevelopmentPasswordResetDeliveryTests : IDisposable
                 ["Auth:LocalMailboxPath"] = _mailbox,
                 ["Auth:FrontendUrl"] = "http://localhost:5173"
             }).Build();
-        var delivery = new DevelopmentPasswordResetDelivery(new FakeEnv("Development"), config);
-        Assert.True(delivery.IsAvailable);
+        var sender = new DevelopmentMailbox(new FakeEnv("Development"), config);
+        Assert.True(sender.IsAvailable);
 
-        await delivery.SendAsync("u+<&>@test.dev", "tok+/=", new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
-        var file = Assert.Single(Directory.GetFiles(_mailbox, "*.html"));
-        var html = await File.ReadAllTextAsync(file);
-        Assert.Contains("u+&lt;&amp;&gt;@test.dev", html);
-        Assert.DoesNotContain("u+<&>@test.dev", html);
-        Assert.Contains("/reset-password#token=tok%2B%2F%3D", html);
-        Assert.Contains("2026-01-02 03:04", html);
+        var link = "http://localhost:5173/reset-password#token=tok%2B%2F%3D";
+        var html = "<html><body><p>escaped u+&lt;&amp;&gt;@test.dev</p>"
+            + $"<a href=\"{link}\">Đặt lại mật khẩu</a></body></html>";
+        await sender.SendAsync(new EmailMessage("u@test.dev", "GMind — Đặt lại mật khẩu", html,
+            [new EmailLink("Đặt lại mật khẩu", link)]));
+
+        var htmlFile = Assert.Single(Directory.GetFiles(_mailbox, "*.html"));
+        Assert.Equal(html, await File.ReadAllTextAsync(htmlFile));
+        var jsonFile = Assert.Single(Directory.GetFiles(_mailbox, "*.json"));
+        Assert.Empty(Directory.GetFiles(_mailbox, "*.tmp"));
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(jsonFile));
+        var meta = doc.RootElement;
+        Assert.Equal(Path.GetFileNameWithoutExtension(htmlFile), meta.GetProperty("id").GetString());
+        Assert.Equal("u@test.dev", meta.GetProperty("to").GetString());
+        Assert.Equal("GMind — Đặt lại mật khẩu", meta.GetProperty("subject").GetString());
+        Assert.Equal(link, meta.GetProperty("links")[0].GetProperty("url").GetString());
     }
 
     [Fact]
@@ -279,10 +295,10 @@ public class DevelopmentPasswordResetDeliveryTests : IDisposable
     {
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Auth:LocalMailboxPath"] = _mailbox }).Build();
-        var delivery = new DevelopmentPasswordResetDelivery(new FakeEnv("Production"), config);
-        Assert.False(delivery.IsAvailable);
+        var sender = new DevelopmentMailbox(new FakeEnv("Production"), config);
+        Assert.False(sender.IsAvailable);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            delivery.SendAsync("u@test.dev", "tok", DateTime.UtcNow));
+            sender.SendAsync(new EmailMessage("u@test.dev", "s", "h", [])));
         Assert.False(Directory.Exists(_mailbox));
     }
 }

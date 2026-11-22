@@ -59,7 +59,7 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Logout(CancellationToken ct)
     {
-        await _authService.LogoutAsync(User.GetUserId(), ct);
+        await _authService.LogoutAsync(User.GetUserId(), User.GetSessionId(), ct);
         return Ok(new { message = "Logged out" });
     }
 
@@ -85,4 +85,23 @@ public class AuthController : ControllerBase
         await _authService.ResetPasswordAsync(request.Token, request.NewPassword, ct);
         return Ok(new { message = "Password has been reset" });
     }
+
+    /// <summary>Xác minh email mới bằng token từ thư (anonymous).</summary>
+    [EnableRateLimiting("auth-recovery")]
+    [HttpPost("verify-email-change")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> VerifyEmailChange([FromBody] VerifyEmailChangeRequest request, CancellationToken ct)
+    {
+        var email = await _authService.VerifyEmailChangeAsync(request.Token, ct);
+        return Ok(new { email });
+    }
+}
+
+public class VerifyEmailChangeRequest
+{
+    [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Thiếu mã xác minh.")]
+    public string Token { get; set; } = string.Empty;
 }

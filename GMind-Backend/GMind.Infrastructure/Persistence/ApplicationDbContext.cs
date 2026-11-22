@@ -30,6 +30,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<GroupSettings> GroupSettings { get; set; }
     public DbSet<ContributionCredit> ContributionCredits { get; set; }
     public DbSet<TaskHelper> TaskHelpers { get; set; }
+    public DbSet<UserSession> UserSessions { get; set; }
+    public DbSet<EmailChangeRequest> EmailChangeRequests { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,8 +42,30 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         {
             entity.HasIndex(e => e.Email).IsUnique();
             entity.Property(u => u.AuthVersion).HasDefaultValue(0).IsConcurrencyToken();
-            entity.Property(u => u.RefreshToken).IsConcurrencyToken();
             entity.Property(u => u.PasswordResetToken).IsConcurrencyToken();
+        });
+
+        // UserSession: one row per login; the refresh hash is the rotation concurrency token.
+        modelBuilder.Entity<UserSession>(entity =>
+        {
+            entity.HasIndex(s => s.RefreshTokenHash).IsUnique();
+            entity.HasIndex(s => new { s.UserId, s.RevokedAt });
+            entity.Property(s => s.RefreshTokenHash).IsConcurrencyToken();
+            entity.HasOne(s => s.User)
+                .WithMany()
+                .HasForeignKey(s => s.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // EmailChangeRequest
+        modelBuilder.Entity<EmailChangeRequest>(entity =>
+        {
+            entity.HasIndex(r => r.TokenHash).IsUnique();
+            entity.HasIndex(r => new { r.UserId, r.ConsumedAt, r.CancelledAt });
+            entity.HasOne(r => r.User)
+                .WithMany()
+                .HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Group -> creator

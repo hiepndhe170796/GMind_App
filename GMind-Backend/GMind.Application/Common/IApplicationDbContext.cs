@@ -24,6 +24,8 @@ public interface IApplicationDbContext
     DbSet<GroupSettings> GroupSettings { get; }
     DbSet<ContributionCredit> ContributionCredits { get; }
     DbSet<TaskHelper> TaskHelpers { get; }
+    DbSet<UserSession> UserSessions { get; }
+    DbSet<EmailChangeRequest> EmailChangeRequests { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

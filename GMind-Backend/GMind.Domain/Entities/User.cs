@@ -29,11 +29,6 @@ public class User
     public int AuthVersion { get; set; }
 
     [MaxLength(256)]
-    public string? RefreshToken { get; set; }
-
-    public DateTime? RefreshTokenExpiryTime { get; set; }
-
-    [MaxLength(256)]
     public string? PasswordResetToken { get; set; }
 
     public DateTime? PasswordResetTokenExpiry { get; set; }

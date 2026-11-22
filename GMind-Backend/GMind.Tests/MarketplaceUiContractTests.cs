@@ -48,12 +48,8 @@ public class MarketplaceUiContractTests
     private static HttpClient ClientFor(WebApplicationFactory<Program> f, User u)
     {
         var c = f.CreateClient();
-        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Jwt:Secret"] = Secret, ["Jwt:Issuer"] = "GMindTests",
-            ["Jwt:Audience"] = "GMindTests", ["Jwt:ExpiryMinutes"] = "60"
-        }).Build();
-        c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", new TokenService(config).GenerateAccessToken(u));
+        var token = TestSessionTokens.Mint(f.Services, TestSessionTokens.JwtConfig(Secret), u);
+        c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return c;
     }
 

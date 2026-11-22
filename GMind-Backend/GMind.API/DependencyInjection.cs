@@ -23,7 +23,11 @@ public static class DependencyInjection
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
         services.AddHttpContextAccessor();
-        services.AddSingleton<GMind.Application.Services.Auth.IPasswordResetDelivery, Common.DevelopmentPasswordResetDelivery>();
+        services.AddSingleton<GMind.Application.Common.IEmailSender, Common.DevelopmentMailbox>();
+        services.AddScoped<GMind.Application.Common.IClientInfo, Common.HttpClientInfo>();
+        services.AddSignalR();
+        services.AddSingleton<GMind.Application.Common.IRealtimeSessions, Realtime.RealtimeSessions>();
+        services.AddHostedService<Realtime.RealtimeDispatcher>();
 
         var config = TypeAdapterConfig.GlobalSettings;
         config.Scan(Assembly.GetExecutingAssembly());

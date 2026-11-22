@@ -98,7 +98,7 @@ public class TaskService : ITaskService
 
         if (assigneeUserId != null && assigneeUserId != userId)
             await _notifications.NotifyAsync(assigneeUserId.Value, project.GroupId, NotificationType.TaskAssigned,
-                "Task mới được giao", $"Bạn được giao công việc '{task.Title}'", "Task", task.Id, ct);
+                "Công việc mới được giao", $"Bạn được giao công việc '{task.Title}'", "Task", task.Id, ct);
 
         return await GetDetailDtoAsync(userId, task.Id, ct);
     }
@@ -251,7 +251,7 @@ public class TaskService : ITaskService
 
         if (assigneeUserId != null && assigneeUserId != userId)
             await _notifications.NotifyAsync(assigneeUserId.Value, task.Project.GroupId, NotificationType.TaskAssigned,
-                "Task mới được giao", $"Bạn được giao công việc '{task.Title}'", "Task", task.Id, ct);
+                "Công việc mới được giao", $"Bạn được giao công việc '{task.Title}'", "Task", task.Id, ct);
 
         return await GetDetailDtoAsync(userId, taskId, ct);
     }
@@ -365,17 +365,17 @@ public class TaskService : ITaskService
                 .Select(m => m.UserId).ToListAsync(ct);
             foreach (var leaderId in leaders)
                 await _notifications.NotifyAsync(leaderId, task.Project.GroupId, NotificationType.TaskSubmitted,
-                    "Task chờ duyệt", $"Task '{task.Title}' đã được nộp để duyệt{(excerpt != null ? $": {excerpt}" : "")}", "Task", task.Id, ct);
+                    "Công việc chờ duyệt", $"Công việc '{task.Title}' đã được nộp để duyệt{(excerpt != null ? $": {excerpt}" : "")}", "Task", task.Id, ct);
         }
         else if (newStatus == TaskStatus.Completed && task.AssigneeUserId != null)
         {
             await _notifications.NotifyAsync(task.AssigneeUserId.Value, task.Project.GroupId, NotificationType.TaskApproved,
-                "Task được duyệt", $"Task '{task.Title}' đã được duyệt", "Task", task.Id, ct);
+                "Công việc được duyệt", $"Công việc '{task.Title}' đã được duyệt", "Task", task.Id, ct);
         }
         else if (!isSubtask && newStatus == TaskStatus.ChangesRequested && task.AssigneeUserId != null)
         {
             await _notifications.NotifyAsync(task.AssigneeUserId.Value, task.Project.GroupId, NotificationType.TaskChangesRequested,
-                "Task cần sửa lại", $"Task '{task.Title}' bị trả về: {reviewComment}", "Task", task.Id, ct);
+                "Công việc cần sửa lại", $"Công việc '{task.Title}' bị trả về: {reviewComment}", "Task", task.Id, ct);
         }
 
         return await GetDetailDtoAsync(userId, taskId, ct);

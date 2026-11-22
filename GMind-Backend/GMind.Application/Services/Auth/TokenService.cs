@@ -13,6 +13,7 @@ namespace GMind.Application.Services.Auth;
 public class TokenService : ITokenService
 {
     public const string AuthVersionClaim = "auth_version";
+    public const string SessionIdClaim = "sid";
 
     private readonly IConfiguration _configuration;
 
@@ -21,7 +22,7 @@ public class TokenService : ITokenService
         _configuration = configuration;
     }
 
-    public string GenerateAccessToken(User user)
+    public string GenerateAccessToken(User user, Guid? sessionId = null)
     {
         var secret = _configuration["Jwt:Secret"]
             ?? throw new InvalidOperationException("JWT Secret is not configured");
@@ -33,6 +34,8 @@ public class TokenService : ITokenService
             new(ClaimTypes.Name, user.DisplayName),
             new(AuthVersionClaim, user.AuthVersion.ToString(CultureInfo.InvariantCulture))
         };
+        if (sessionId is Guid sid)
+            claims.Add(new Claim(SessionIdClaim, sid.ToString()));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

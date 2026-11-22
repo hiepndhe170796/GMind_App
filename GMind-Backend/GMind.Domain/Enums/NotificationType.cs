@@ -27,5 +27,6 @@ public enum NotificationType
     HelperAdded = 23,
     HelperEnded = 24,
     GroupArchived = 25,
-    GroupRestored = 26
+    GroupRestored = 26,
+    EmailChanged = 27
 }

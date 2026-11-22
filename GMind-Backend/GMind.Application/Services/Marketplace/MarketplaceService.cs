@@ -429,13 +429,13 @@ public class MarketplaceService : IMarketplaceService
         {
             case MarketplaceRequestType.Transfer:
                 await _notifications.NotifyAsync(req.TargetUserId!.Value, req.GroupId, NotificationType.TaskAssigned,
-                    "Task mới được giao", $"Công việc '{task.Title}' được chuyển giao cho bạn.", "Task", task.Id, ct);
+                    "Công việc mới được giao", $"Công việc '{task.Title}' được chuyển giao cho bạn.", "Task", task.Id, ct);
                 break;
             case MarketplaceRequestType.Swap:
                 await _notifications.NotifyAsync(req.TargetUserId!.Value, req.GroupId, NotificationType.TaskAssigned,
-                    "Task mới được giao", $"Công việc '{task.Title}' được hoán đổi cho bạn.", "Task", task.Id, ct);
+                    "Công việc mới được giao", $"Công việc '{task.Title}' được hoán đổi cho bạn.", "Task", task.Id, ct);
                 await _notifications.NotifyAsync(req.RequestedByUserId, req.GroupId, NotificationType.TaskAssigned,
-                    "Task mới được giao", $"Công việc '{other!.Title}' được hoán đổi cho bạn.", "Task", other.Id, ct);
+                    "Công việc mới được giao", $"Công việc '{other!.Title}' được hoán đổi cho bạn.", "Task", other.Id, ct);
                 break;
             case MarketplaceRequestType.NeedHelp:
                 await _notifications.NotifyAsync(req.TargetUserId!.Value, req.GroupId, NotificationType.HelperAdded,

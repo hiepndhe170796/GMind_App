@@ -63,7 +63,7 @@ public class TaskAuthorizationTests
                 ["Jwt:Audience"] = "GMindTests",
                 ["Jwt:ExpiryMinutes"] = "60"
             }).Build();
-            var token = new TokenService(config).GenerateAccessToken(user);
+            var token = TestSessionTokens.Mint(Factory.Services, config, user);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             return client;
         }

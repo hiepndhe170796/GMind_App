@@ -11,7 +11,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructureSqlServer(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<ApplicationDbContext>(options =>
+        services.AddSingleton<RealtimeOutbox>();
+        services.AddSingleton<RealtimeChangeInterceptor>();
+
+        services.AddDbContext<ApplicationDbContext>((sp, options) =>
             options.UseSqlServer(
                 configuration.GetConnectionString("DefaultConnection"),
                 sqlOptions => sqlOptions.EnableRetryOnFailure(
@@ -19,7 +22,7 @@ public static class DependencyInjection
                     maxRetryDelay: TimeSpan.FromSeconds(30),
                     errorNumbersToAdd: null
                 )
-            )
+            ).AddInterceptors(sp.GetRequiredService<RealtimeChangeInterceptor>())
         );
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
