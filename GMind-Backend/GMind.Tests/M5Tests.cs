@@ -59,6 +59,9 @@ public class M5Tests
         var f = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment(env);
+            // Host-level settings are visible during Program.cs top-level statements
+            // (StartupConfigurationValidator); ConfigureAppConfiguration merges later.
+            builder.UseSetting("Jwt:Secret", Secret);
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Jwt:Issuer"] = "GMindTests", ["Jwt:Audience"] = "GMindTests", ["Jwt:Secret"] = Secret,

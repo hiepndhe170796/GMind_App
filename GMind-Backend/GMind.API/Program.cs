@@ -10,6 +10,8 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+StartupConfigurationValidator.Validate(builder.Configuration, builder.Environment);
+
 builder.Services.AddPresentation();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructureSqlServer(builder.Configuration);
@@ -105,6 +107,7 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 app.UseExceptionHandler();
+app.UseMiddleware<SecurityHeadersMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
@@ -117,7 +120,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("Frontend");
-if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
