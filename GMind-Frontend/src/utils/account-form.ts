@@ -1,4 +1,6 @@
 export function isSafeAvatarUrl(value: string): boolean {
+  // Managed avatar path returned by the API (anonymous GET /api/avatars/{guid}).
+  if (/^\/api\/avatars\/[0-9a-f-]{36}$/i.test(value)) return true;
   const unsafeCharacter = Array.from(value).some(char => {
     const code = char.charCodeAt(0);
     return code <= 32 || (code >= 127 && code <= 159);

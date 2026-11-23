@@ -47,6 +47,25 @@ public class TasksController : ControllerBase
     public async Task<IActionResult> ChangeStatus(Guid id, [FromBody] StatusRequest req, CancellationToken ct)
         => Ok(await _tasks.ChangeStatusAsync(User.GetUserId(), id, req.Status, req.Comment, ct));
 
+    [HttpPost("tasks/{id:guid}/remind")]
+    public async Task<IActionResult> Remind(Guid id, CancellationToken ct)
+    {
+        await _tasks.RemindAsync(User.GetUserId(), id, ct);
+        return Ok(new { message = "Reminder sent" });
+    }
+
+    [HttpPatch("tasks/{id:guid}/progress")]
+    public async Task<IActionResult> Progress(Guid id, [FromBody] ProgressRequest req, CancellationToken ct)
+        => Ok(await _tasks.UpdateProgressAsync(User.GetUserId(), id, req.ProgressPercent, ct));
+
+    [HttpGet("tasks/{id:guid}/subtasks")]
+    public async Task<IActionResult> Subtasks(Guid id, CancellationToken ct)
+        => Ok(await _tasks.ListSubtasksAsync(User.GetUserId(), id, ct));
+
+    [HttpGet("tasks/{id:guid}/submissions")]
+    public async Task<IActionResult> Submissions(Guid id, CancellationToken ct)
+        => Ok(await _detail.ListSubmissionsAsync(User.GetUserId(), id, ct));
+
     [HttpGet("tasks/{id:guid}/comments")]
     public async Task<IActionResult> Comments(Guid id, CancellationToken ct)
         => Ok(await _detail.ListCommentsAsync(User.GetUserId(), id, ct));
@@ -81,6 +100,17 @@ public class TasksController : ControllerBase
         return Ok(new { message = "Link deleted" });
     }
 
+    [HttpGet("tasks/{id:guid}/helpers")]
+    public async Task<IActionResult> Helpers(Guid id, CancellationToken ct)
+        => Ok(await _tasks.ListHelpersAsync(User.GetUserId(), id, ct));
+
+    [HttpPost("tasks/{id:guid}/helpers/{helperRowId:guid}/end")]
+    public async Task<IActionResult> EndHelper(Guid id, Guid helperRowId, CancellationToken ct)
+    {
+        await _tasks.EndHelperAsync(User.GetUserId(), id, helperRowId, ct);
+        return Ok(new { message = "Helper ended" });
+    }
+
     [HttpGet("tasks/{id:guid}/reviews")]
     public async Task<IActionResult> Reviews(Guid id, CancellationToken ct)
         => Ok(await _detail.ListReviewsAsync(User.GetUserId(), id, ct));
@@ -95,9 +125,9 @@ public class TasksController : ControllerBase
 
 public class TaskRequest
 {
-    [Required, MaxLength(200)]
+    [Required(ErrorMessage = "Vui lòng nhập tiêu đề công việc."), MaxLength(200, ErrorMessage = "Tiêu đề tối đa 200 ký tự.")]
     public string Title { get; set; } = string.Empty;
-    [MaxLength(2000)]
+    [MaxLength(2000, ErrorMessage = "Mô tả tối đa 2000 ký tự.")]
     public string? Description { get; set; }
     public Guid? AssigneeUserId { get; set; }
     public Guid? ParentTaskId { get; set; }
@@ -114,27 +144,33 @@ public class AssignRequest
 
 public class StatusRequest
 {
-    [Required]
+    [Required(ErrorMessage = "Vui lòng chọn trạng thái.")]
     public GMind.Domain.Enums.TaskStatus Status { get; set; }
 
-    [MaxLength(2000)]
+    [MaxLength(2000, ErrorMessage = "Nhận xét tối đa 2000 ký tự.")]
     public string? Comment { get; set; }
+}
+
+public class ProgressRequest
+{
+    [Range(0, 100, ErrorMessage = "Tiến độ phải từ 0 đến 100.")]
+    public int ProgressPercent { get; set; }
 }
 
 public class CommentRequest
 {
-    [Required, MaxLength(2000)]
+    [Required(ErrorMessage = "Vui lòng nhập nội dung bình luận."), MaxLength(2000, ErrorMessage = "Bình luận tối đa 2000 ký tự.")]
     public string Body { get; set; } = string.Empty;
 }
 
 public class LinkRequest
 {
-    [Required, MaxLength(2000), Url]
+    [Required(ErrorMessage = "Vui lòng nhập liên kết."), MaxLength(2000, ErrorMessage = "Liên kết tối đa 2000 ký tự."), Url(ErrorMessage = "Liên kết không hợp lệ.")]
     public string Url { get; set; } = string.Empty;
 
-    [MaxLength(500)]
+    [MaxLength(500, ErrorMessage = "Tên hiển thị tối đa 500 ký tự.")]
     public string? DisplayName { get; set; }
 
-    [MaxLength(50)]
+    [MaxLength(50, ErrorMessage = "Loại liên kết tối đa 50 ký tự.")]
     public string? Type { get; set; }
 }

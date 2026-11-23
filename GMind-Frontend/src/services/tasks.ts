@@ -1,14 +1,25 @@
 import api from './api';
 
+export interface TaskPermissionsDto {
+  canEdit: boolean; canAssign: boolean; canDelete: boolean;
+  canUpdateProgress: boolean; canAddSubtask: boolean; allowedTransitions: string[];
+  canRemind?: boolean;
+  // M4 additive
+  isHelper?: boolean; canComment?: boolean; canAddLink?: boolean; remindedRecently?: boolean;
+}
+
 export interface TaskSummaryDto {
   id: string; projectId: string; parentTaskId?: string | null; title: string;
   assigneeUserId?: string | null; assigneeName?: string | null; status: string; priority: string;
-  deadlineAt?: string | null; canViewDetails: boolean;
+  deadlineAt?: string | null; canViewDetails: boolean; canReview?: boolean;
+  parentTitle?: string | null; subtaskCount?: number; subtasksCompleted?: number;
+  progressPercent?: number | null; updatedAt?: string | null; points?: number | null;
+  permissions?: TaskPermissionsDto | null;
 }
 export interface TaskDetailDto extends TaskSummaryDto {
   canViewDetails: true; description?: string | null; estimateHours?: number | null; points?: number | null;
   progressPercent: number; createdByUserId: string; createdAt: string;
-  submittedAt?: string | null; completedAt?: string | null;
+  submittedAt?: string | null; completedAt?: string | null; createdByName?: string | null;
 }
 export type TaskDto = TaskSummaryDto | TaskDetailDto;
 export function hasTaskDetails(task: TaskDto): task is TaskDetailDto {
@@ -37,6 +48,18 @@ export const tasksService = {
   async changeStatus(id: string, status: number, comment?: string): Promise<TaskDetailDto> {
     return (await api.post(`/api/tasks/${id}/status`, { status, comment })).data.data;
   },
+  async updateProgress(id: string, progressPercent: number): Promise<TaskDetailDto> {
+    return (await api.patch(`/api/tasks/${id}/progress`, { progressPercent })).data.data;
+  },
+  async remind(id: string) {
+    return (await api.post(`/api/tasks/${id}/remind`)).data;
+  },
+  async subtasks(id: string): Promise<TaskSummaryDto[]> {
+    return (await api.get(`/api/tasks/${id}/subtasks`)).data.data;
+  },
+  async submissions(id: string): Promise<SubmissionDto[]> {
+    return (await api.get(`/api/tasks/${id}/submissions`)).data.data;
+  },
   async get(id: string): Promise<TaskDto> {
     return (await api.get(`/api/tasks/${id}`)).data.data;
   },
@@ -45,6 +68,9 @@ export const tasksService = {
   },
   async addComment(taskId: string, body: string): Promise<CommentDto> {
     return (await api.post(`/api/tasks/${taskId}/comments`, { body })).data.data;
+  },
+  async updateComment(commentId: string, body: string): Promise<CommentDto> {
+    return (await api.patch(`/api/comments/${commentId}`, { body })).data.data;
   },
   async deleteComment(commentId: string) {
     return (await api.delete(`/api/comments/${commentId}`)).data;
@@ -55,14 +81,30 @@ export const tasksService = {
   async addLink(taskId: string, url: string, displayName?: string): Promise<LinkDto> {
     return (await api.post(`/api/tasks/${taskId}/links`, { url, displayName })).data.data;
   },
+  async deleteLink(linkId: string) {
+    return (await api.delete(`/api/links/${linkId}`)).data;
+  },
   async reviews(taskId: string): Promise<ReviewDto[]> {
     return (await api.get(`/api/tasks/${taskId}/reviews`)).data.data;
   },
   async remove(id: string) {
     return (await api.delete(`/api/tasks/${id}`)).data;
   },
+  async listHelpers(taskId: string): Promise<import('./groups').TaskHelperDto[]> {
+    return (await api.get(`/api/tasks/${taskId}/helpers`)).data.data;
+  },
+  async endHelper(taskId: string, helperRowId: string) {
+    return (await api.post(`/api/tasks/${taskId}/helpers/${helperRowId}/end`, {})).data;
+  },
 };
 
-export interface CommentDto { id: string; taskId: string; authorUserId: string; authorName: string; body: string; createdAt: string; isMine: boolean }
-export interface LinkDto { id: string; taskId: string; url: string; displayName?: string; type?: string; createdAt: string }
+export interface CommentDto {
+  id: string; taskId: string; authorUserId: string; authorName: string; body: string; createdAt: string; isMine: boolean;
+  updatedAt?: string | null; canEdit?: boolean; canDelete?: boolean;
+}
+export interface LinkDto {
+  id: string; taskId?: string | null; url: string; displayName?: string | null; type?: string | null; createdAt: string;
+  projectId?: string | null; createdByName?: string | null; createdByUserId?: string | null; canDelete?: boolean;
+}
 export interface ReviewDto { id: string; reviewerName: string; decision: string; comment?: string; submissionVersion: number; createdAt: string }
+export interface SubmissionDto { id: string; version: number; submittedByName: string; note?: string | null; createdAt: string }

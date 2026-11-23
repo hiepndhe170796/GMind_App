@@ -67,13 +67,53 @@ describe('typeIcon — real enum names only', () => {
   const ALL = ['TaskAssigned', 'TaskUpdated', 'TaskSubmitted', 'TaskApproved', 'TaskChangesRequested',
     'MarketplaceRequestCreated', 'MarketplaceRequestApproved', 'MarketplaceRequestRejected',
     'DeadlineReminder', 'OverdueAlert', 'MemberInvited', 'MemberJoined', 'MemberRemoved',
-    'StaleTaskWarning', 'CommentAdded'];
-  it('all 15 enum types map to a supported IconName (never undefined)', () => {
+    'StaleTaskWarning', 'CommentAdded', 'AtRiskWarning', 'LeaderReminder'];
+  it('all 17 enum types map to a supported IconName (never undefined)', () => {
     const VALID = ['tasks','check','link','calendar','bell','users'];
     for (const t of ALL) expect(VALID).toContain(typeIcon(t));
   });
+  it('AtRiskWarning -> calendar icon + warning tone; LeaderReminder -> bell + accent tone', () => {
+    expect(typeIcon('AtRiskWarning')).toBe('calendar');
+    expect(typeTone('AtRiskWarning')).toBe('text-warning-700');
+    expect(typeIcon('LeaderReminder')).toBe('bell');
+    expect(typeTone('LeaderReminder')).toBe('text-accent-700');
+  });
   it('unknown type -> neutral bell, tone neutral', () => {
     expect(typeIcon('InventedType')).toBe('bell');
-    expect(typeTone('InventedType')).toBe('text-slate-600');
+    expect(typeTone('InventedType')).toBe('text-ink-muted');
+  });
+});
+
+describe('M4 notification types 18–26', () => {
+  const G = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+  it('marketplace types map to icon + tone + marketplace target', () => {
+    const t = (type: string) => notificationTarget(N({ type, relatedEntityType: 'MarketplaceRequest', relatedEntityId: G, groupId: G }));
+    expect(t('MarketplaceResponseNeeded')!.href).toBe(`/groups/${G}/marketplace`);
+    expect(typeIcon('MarketplaceResponseNeeded')).toBe('link');
+    expect(typeTone('MarketplaceResponseNeeded')).toBe('text-accent-700');
+    expect(typeIcon('MarketplaceRecipientAccepted')).toBe('check');
+    expect(typeTone('MarketplaceRecipientAccepted')).toBe('text-success-700');
+    expect(typeTone('MarketplaceRecipientDeclined')).toBe('text-ink-muted');
+    expect(typeTone('MarketplaceClaimed')).toBe('text-accent-700');
+    expect(typeTone('MarketplaceOpenRequest')).toBe('text-primary-600');
+    expect(t('MarketplaceOpenRequest')!.href).toBe(`/groups/${G}/marketplace`);
+  });
+  it('helper types link to the task', () => {
+    const t = notificationTarget(N({ type: 'HelperAdded', relatedEntityType: 'Task', relatedEntityId: G }));
+    expect(t).toEqual({ href: `/tasks/${G}`, label: 'Xem công việc' });
+    expect(typeIcon('HelperAdded')).toBe('users');
+    expect(typeTone('HelperAdded')).toBe('text-accent-700');
+    expect(typeIcon('HelperEnded')).toBe('users');
+    expect(typeTone('HelperEnded')).toBe('text-ink-muted');
+    expect(notificationTarget(N({ type: 'HelperEnded', relatedEntityType: 'Task', relatedEntityId: G }))!.href).toBe(`/tasks/${G}`);
+  });
+  it('GroupArchived links to /groups; GroupRestored links to the group', () => {
+    expect(notificationTarget(N({ type: 'GroupArchived', relatedEntityType: 'Group', relatedEntityId: G })))
+      .toEqual({ href: '/groups', label: 'Xem nhóm đã lưu trữ' });
+    expect(typeIcon('GroupArchived')).toBe('alert');
+    expect(typeTone('GroupArchived')).toBe('text-warning-700');
+    expect(notificationTarget(N({ type: 'GroupRestored', relatedEntityType: 'Group', relatedEntityId: G }))!.href).toBe(`/groups/${G}`);
+    expect(typeIcon('GroupRestored')).toBe('check');
+    expect(typeTone('GroupRestored')).toBe('text-success-700');
   });
 });

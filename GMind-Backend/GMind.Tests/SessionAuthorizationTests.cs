@@ -162,7 +162,7 @@ public class SessionAuthorizationTests
         => Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
     [Fact]
-    public async Task Logout_RevokesAccessAndRefreshToken_AndBumpsAuthVersion()
+    public async Task Logout_RevokesAccessAndRefreshToken_EndsOnlyCurrentSession()
     {
         await using var f = await SeedAsync();
         var (access, refresh) = await f.LoginAsync();
@@ -172,7 +172,8 @@ public class SessionAuthorizationTests
         Assert.Equal(HttpStatusCode.Unauthorized, (await f.Client(access).GetAsync("/api/me")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized,
             (await f.Client().PostAsJsonAsync("/api/auth/refresh", new { refreshToken = refresh })).StatusCode);
-        Assert.Equal(1, await f.AuthVersionAsync());
+        // M5: logout ends only the current session — no AuthVersion bump.
+        Assert.Equal(0, await f.AuthVersionAsync());
 
         var (access2, _) = await f.LoginAsync();
         Assert.Equal(HttpStatusCode.OK, (await f.Client(access2).GetAsync("/api/me")).StatusCode);
@@ -328,7 +329,7 @@ public class SessionAuthorizationTests
         var (refreshResponse, logoutResponse) = (await refreshTask, await logoutTask);
 
         Assert.Equal(HttpStatusCode.OK, logoutResponse.StatusCode);
-        Assert.Equal(1, await f.AuthVersionAsync());
+        Assert.Equal(0, await f.AuthVersionAsync());
         Assert.Equal(HttpStatusCode.Unauthorized, (await f.Client(access).GetAsync("/api/me")).StatusCode);
 
         if (refreshResponse.StatusCode == HttpStatusCode.OK)

@@ -20,9 +20,12 @@ public class Group
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool IsArchived { get; set; } = false;
+    public DateTime? ArchivedAt { get; set; }
+    public Guid? ArchivedByUserId { get; set; }
 
     // Navigation properties
     public User CreatedBy { get; set; } = null!;
+    public User? ArchivedBy { get; set; }
     public ICollection<GroupMember> Members { get; set; } = new List<GroupMember>();
     public ICollection<Project> Projects { get; set; } = new List<Project>();
     public ICollection<GroupInvite> Invites { get; set; } = new List<GroupInvite>();

@@ -26,9 +26,11 @@ public class GlobalExceptionHandler : IExceptionHandler
             ForbiddenException => (StatusCodes.Status403Forbidden, exception.Message),
             ConflictException => (StatusCodes.Status409Conflict, exception.Message),
             BadRequestException => (StatusCodes.Status400BadRequest, exception.Message),
-            DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "The resource changed. Reload and try again"),
-            FluentValidation.ValidationException => (StatusCodes.Status400BadRequest, "Validation failed"),
-            _ => (StatusCodes.Status500InternalServerError, "An error occurred processing your request")
+            BadHttpRequestException { StatusCode: StatusCodes.Status413RequestEntityTooLarge } =>
+                (StatusCodes.Status413RequestEntityTooLarge, "Tệp vượt quá giới hạn dung lượng cho phép."),
+            DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "Dữ liệu đã thay đổi. Hãy tải lại và thử lại."),
+            FluentValidation.ValidationException => (StatusCodes.Status400BadRequest, "Dữ liệu không hợp lệ."),
+            _ => (StatusCodes.Status500InternalServerError, "Đã có lỗi xảy ra. Vui lòng thử lại sau.")
         };
 
         if (statusCode >= 500)

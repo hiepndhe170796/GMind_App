@@ -43,7 +43,8 @@ public class NotificationAuthorizationTests
                     ["Jwt:Secret"] = Secret, ["Jwt:Issuer"] = "GMindTests",
                     ["Jwt:Audience"] = "GMindTests", ["Jwt:ExpiryMinutes"] = "60"
                 }).Build();
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", new TokenService(config).GenerateAccessToken(user));
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+                TestSessionTokens.Mint(Factory.Services, config, user));
             }
             return client;
         }

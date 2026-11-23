@@ -51,6 +51,7 @@ public class Task
     public User CreatedBy { get; set; } = null!;
     public ICollection<TaskComment> Comments { get; set; } = new List<TaskComment>();
     public ICollection<TaskReview> Reviews { get; set; } = new List<TaskReview>();
+    public ICollection<TaskSubmission> Submissions { get; set; } = new List<TaskSubmission>();
     public ICollection<TaskLink> Links { get; set; } = new List<TaskLink>();
     public ICollection<MarketplaceRequest> MarketplaceRequests { get; set; } = new List<MarketplaceRequest>();
     public ICollection<ReminderDelivery> ReminderDeliveries { get; set; } = new List<ReminderDelivery>();

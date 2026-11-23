@@ -8,9 +8,11 @@ export interface NotificationDto {
   isRead: boolean; createdAt: string; groupId?: string | null;
 }
 
+export interface NotificationPageDto { items: NotificationDto[]; nextCursor: string | null }
+
 export const notificationsService = {
-  async list(unreadOnly = false): Promise<NotificationDto[]> {
-    return (await api.get('/api/notifications', { params: { unreadOnly, take: 100 } })).data.data;
+  async page(unreadOnly = false, cursor: string | null = null, take = 20): Promise<NotificationPageDto> {
+    return (await api.get('/api/notifications/page', { params: { unreadOnly, take, cursor: cursor ?? undefined } })).data.data;
   },
   async unreadCount(): Promise<number> {
     return (await api.get('/api/notifications/unread-count')).data.data.count;
@@ -47,10 +49,15 @@ export interface NotificationTarget { href: string; label: string; }
 export const notificationTarget = (n: NotificationDto): NotificationTarget | null => {
   if (n.type === 'MemberRemoved') return null; // informational only
   const kind = n.relatedEntityType ?? '', id = n.relatedEntityId ?? '';
+  if (n.type === 'GroupArchived') return { href: '/groups', label: 'Xem nhóm đã lưu trữ' };
+  if (n.type === 'EmailChanged') return { href: '/profile', label: 'Xem hồ sơ' };
   if (!GUID.test(id)) return null;
   switch (kind) {
     case 'Task': return { href: `/tasks/${id}`, label: 'Xem công việc' };
-    case 'Project': return { href: `/projects/${id}`, label: 'Xem dự án' };
+    case 'Project':
+      if (n.type === 'MentionedInDiscussion' || n.type === 'DiscussionReply')
+        return { href: `/projects/${id}?tab=discussion`, label: 'Mở thảo luận' };
+      return { href: `/projects/${id}`, label: 'Xem dự án' };
     case 'Group': return { href: `/groups/${id}`, label: 'Xem nhóm' };
     case 'MarketplaceRequest':
       return n.groupId && GUID.test(n.groupId) ? { href: `/groups/${n.groupId}/marketplace`, label: 'Xem Marketplace' } : null;
@@ -63,16 +70,31 @@ const TYPE_ICON: Record<string, IconName> = {
   TaskApproved: 'check', TaskChangesRequested: 'tasks',
   MarketplaceRequestCreated: 'link', MarketplaceRequestApproved: 'check', MarketplaceRequestRejected: 'link',
   DeadlineReminder: 'calendar', OverdueAlert: 'bell', StaleTaskWarning: 'bell',
+  AtRiskWarning: 'calendar', LeaderReminder: 'bell',
   MemberInvited: 'users', MemberJoined: 'users', MemberRemoved: 'users',
   CommentAdded: 'bell',
+  MarketplaceResponseNeeded: 'link', MarketplaceRecipientAccepted: 'check', MarketplaceRecipientDeclined: 'link',
+  MarketplaceClaimed: 'link', MarketplaceOpenRequest: 'link',
+  HelperAdded: 'users', HelperEnded: 'users',
+  GroupArchived: 'alert', GroupRestored: 'check',
+  EmailChanged: 'check',
+  MentionedInDiscussion: 'chat', DiscussionReply: 'chat',
 };
 export const typeIcon = (type: string): IconName => Object.hasOwn(TYPE_ICON, type) ? TYPE_ICON[type] : 'bell';
 const TYPE_TONE: Record<string, string> = {
   TaskApproved: 'text-success-700', TaskChangesRequested: 'text-warning-700', MarketplaceRequestApproved: 'text-success-700',
   MarketplaceRequestRejected: 'text-danger-700', OverdueAlert: 'text-danger-700', StaleTaskWarning: 'text-warning-700',
+  AtRiskWarning: 'text-warning-700', LeaderReminder: 'text-accent-700',
+  MarketplaceResponseNeeded: 'text-accent-700', MarketplaceRecipientAccepted: 'text-success-700',
+  MarketplaceRecipientDeclined: 'text-ink-muted', MarketplaceClaimed: 'text-accent-700',
+  MarketplaceOpenRequest: 'text-primary-600',
+  HelperAdded: 'text-accent-700', HelperEnded: 'text-ink-muted',
+  GroupArchived: 'text-warning-700', GroupRestored: 'text-success-700',
+  EmailChanged: 'text-success-700',
+  MentionedInDiscussion: 'text-accent-700', DiscussionReply: 'text-accent-700',
 };
 export const typeTone = (type: string) => Object.hasOwn(TYPE_TONE, type) ? TYPE_TONE[type]
-  : Object.hasOwn(TYPE_ICON, type) ? 'text-primary-600' : 'text-slate-600';
+  : Object.hasOwn(TYPE_ICON, type) ? 'text-primary-600' : 'text-ink-muted';
 
 export const groupByDay = (items: NotificationDto[], today: string): [string, NotificationDto[]][] => {
   const map = new Map<string, NotificationDto[]>();

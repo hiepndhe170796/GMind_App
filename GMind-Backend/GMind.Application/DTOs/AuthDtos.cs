@@ -7,3 +7,16 @@ public record AuthResult(
     string RefreshToken,
     DateTime ExpiresAt,
     UserDto User);
+
+public record SessionDto(
+    Guid Id,
+    string DeviceLabel,
+    string Browser,
+    string Os,
+    string? IpAddress,
+    DateTime CreatedAt,
+    DateTime LastSeenAt,
+    DateTime ExpiresAt,
+    bool IsCurrent);
+
+public record EmailChangePendingDto(string PendingEmail, DateTime ExpiresAt);

@@ -3,6 +3,8 @@ using FluentValidation;
 using GMind.Application.Common;
 using GMind.Application.Services.Auth;
 using GMind.Application.Services.Dashboard;
+using GMind.Application.Services.Discussion;
+using GMind.Application.Services.Files;
 using GMind.Application.Services.Groups;
 using GMind.Application.Services.Marketplace;
 using GMind.Application.Services.Notifications;
@@ -34,6 +36,8 @@ public static class DependencyInjection
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IMarketplaceService, MarketplaceService>();
+        services.AddScoped<IFileService, FileService>();
+        services.AddScoped<IDiscussionService, DiscussionService>();
 
         return services;
     }

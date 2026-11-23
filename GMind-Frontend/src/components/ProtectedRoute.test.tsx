@@ -9,6 +9,34 @@ import Login from '../pages/Login';
 import api from '../services/api';
 import { authService } from '../services/auth';
 import { clearSession, getSessionSnapshot, saveSession, type AuthResult, type UserInfo } from '../services/session';
+import type { ReactNode } from 'react';
+
+// Realtime/count side-effects are covered by their own suites; keep this guard test
+// network-free but track provider mounts so navigation never restarts them.
+const providerMounts = { realtime: 0, count: 0 };
+const providerUnmounts = { realtime: 0, count: 0 };
+vi.mock('./realtime/RealtimeProvider', async () => {
+  const React = await vi.importActual<typeof import('react')>('react');
+  return {
+    RealtimeProvider: ({ children }: { children: ReactNode }) => {
+      React.useEffect(() => { providerMounts.realtime += 1; return () => { providerUnmounts.realtime += 1; }; }, []);
+      return children;
+    },
+  };
+});
+vi.mock('./notifications/NotificationCountProvider', async () => {
+  const React = await vi.importActual<typeof import('react')>('react');
+  const ctx = await vi.importActual<typeof import('./notifications/notification-count-context')>('./notifications/notification-count-context');
+  const value = { count: null, loading: false, error: '', refresh: () => Promise.resolve(), clear: () => {}, setCount: () => {} };
+  return {
+    NotificationCountProvider: ({ children }: { children: ReactNode }) => {
+      React.useEffect(() => { providerMounts.count += 1; return () => { providerUnmounts.count += 1; }; }, []);
+      return React.createElement(ctx.NotificationCountContext.Provider, { value }, children);
+    },
+  };
+});
+
+vi.mock('../routes/lazy-pages', () => ({ prefetchProtectedPages: vi.fn() }));
 
 const USER: UserInfo = { id: 'u1', displayName: 'U', email: 'u@x' };
 const session = (s: string): AuthResult => ({ accessToken: `AT-${s}`, refreshToken: `RT-${s}`, expiresAt: '2100-01-01', user: USER });
@@ -53,9 +81,11 @@ function renderGuard(initial: string, strict = false) {
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<div>PRIVATE_DASH</div>} />
           <Route path="/other" element={<div>PRIVATE_OTHER</div>} />
+          <Route path="/third" element={<div>PRIVATE_THIRD</div>} />
         </Route>
       </Routes>
       <Link to="/other">go-other</Link>
+      <Link to="/third">go-third</Link>
     </MemoryRouter>
   );
   return render(strict ? <StrictMode>{tree}</StrictMode> : tree);
@@ -72,13 +102,28 @@ afterEach(() => {
 });
 
 describe('ProtectedRoute', () => {
+  it('providers mount once and never unmount while navigating between paths', async () => {
+    saveSession(session('a'));
+    const validate = vi.spyOn(authService, 'validateSession').mockResolvedValue(USER);
+    renderGuard('/dashboard');
+    expect(await screen.findByText('PRIVATE_DASH')).toBeTruthy();
+    expect(providerMounts).toEqual({ realtime: 1, count: 1 });
+    fireEvent.click(screen.getByText('go-other'));
+    expect(await screen.findByText('PRIVATE_OTHER')).toBeTruthy();
+    fireEvent.click(screen.getByText('go-third'));
+    expect(await screen.findByText('PRIVATE_THIRD')).toBeTruthy();
+    expect(validate).toHaveBeenCalledTimes(3); // the per-path check still revalidates
+    expect(providerMounts).toEqual({ realtime: 1, count: 1 });
+    expect(providerUnmounts).toEqual({ realtime: 0, count: 0 });
+  });
+
   it('does not mount children before validation resolves', async () => {
     saveSession(session('a'));
     const d = deferred<UserInfo>();
     vi.spyOn(authService, 'validateSession').mockReturnValue(d.promise);
     renderGuard('/dashboard');
     expect(screen.queryByText('PRIVATE_DASH')).toBeNull();
-    expect(screen.getByRole('status')).toBeTruthy();
+    expect(screen.getByText('Đang kiểm tra phiên đăng nhập…')).toBeTruthy();
     await act(async () => { d.resolve(USER); await d.promise; });
     expect(screen.getByText('PRIVATE_DASH')).toBeTruthy();
   });
@@ -91,16 +136,16 @@ describe('ProtectedRoute', () => {
     expect(state.sessionExpired).toBe(true);
   });
 
-  it('waits again on route switch', async () => {
+  it('after first validation a route switch renders immediately and revalidates in the background', async () => {
     saveSession(session('a'));
-    const d1 = deferred<UserInfo>(); const d2 = deferred<UserInfo>();
-    vi.spyOn(authService, 'validateSession')
-      .mockReturnValueOnce(d1.promise).mockReturnValueOnce(d2.promise);
+    const d2 = deferred<UserInfo>();
+    const validate = vi.spyOn(authService, 'validateSession')
+      .mockResolvedValueOnce(USER).mockReturnValueOnce(d2.promise);
     renderGuard('/dashboard');
-    await act(async () => { d1.resolve(USER); await d1.promise; });
-    expect(screen.getByText('PRIVATE_DASH')).toBeTruthy();
+    expect(await screen.findByText('PRIVATE_DASH')).toBeTruthy();
     fireEvent.click(screen.getByText('go-other'));
-    expect(screen.queryByText('PRIVATE_OTHER')).toBeNull();
+    expect(await screen.findByText('PRIVATE_OTHER')).toBeTruthy(); // rendered while revalidation is pending
+    expect(validate).toHaveBeenCalledTimes(2);
     await act(async () => { d2.resolve(USER); await d2.promise; });
     expect(screen.getByText('PRIVATE_OTHER')).toBeTruthy();
   });
@@ -128,18 +173,86 @@ describe('ProtectedRoute', () => {
     expect(await screen.findByText('PRIVATE_DASH')).toBeTruthy();
   });
 
-  it('late validation resolve after navigation does not flash private content', async () => {
+  it('first validation resolving after a navigation shows the current path, never the old one', async () => {
     saveSession(session('a'));
-    const d1 = deferred<UserInfo>(); const d2 = deferred<UserInfo>();
-    vi.spyOn(authService, 'validateSession')
-      .mockReturnValueOnce(d1.promise).mockReturnValueOnce(d2.promise);
+    const d1 = deferred<UserInfo>();
+    vi.spyOn(authService, 'validateSession').mockReturnValue(d1.promise);
     renderGuard('/dashboard');
     fireEvent.click(screen.getByText('go-other'));
     await act(async () => { d1.resolve(USER); await d1.promise; });
     expect(screen.queryByText('PRIVATE_DASH')).toBeNull();
+    expect(await screen.findByText('PRIVATE_OTHER')).toBeTruthy();
+  });
+
+  it('a background revalidation rejecting 503 keeps the page mounted', async () => {
+    saveSession(session('a'));
+    vi.spyOn(authService, 'validateSession')
+      .mockResolvedValueOnce(USER)
+      .mockRejectedValue({ status: 503, message: 'down' });
+    renderGuard('/dashboard');
+    expect(await screen.findByText('PRIVATE_DASH')).toBeTruthy();
+    fireEvent.click(screen.getByText('go-other'));
+    expect(await screen.findByText('PRIVATE_OTHER')).toBeTruthy();
+    await act(async () => { await new Promise(r => setTimeout(r, 10)); });
+    expect(screen.getByText('PRIVATE_OTHER')).toBeTruthy(); // still mounted, no error card
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(getSessionSnapshot()?.accessToken).toBe('AT-a');
+  });
+
+  it('a background revalidation that clears the session lands on login', async () => {
+    saveSession(session('a'));
+    vi.spyOn(authService, 'validateSession')
+      .mockResolvedValueOnce(USER)
+      .mockImplementation(() => { clearSession(); return Promise.reject({ status: 401 }); });
+    renderGuard('/dashboard');
+    expect(await screen.findByText('PRIVATE_DASH')).toBeTruthy();
+    fireEvent.click(screen.getByText('go-other'));
+    expect(await screen.findByText('LOGIN_PAGE')).toBeTruthy();
     expect(screen.queryByText('PRIVATE_OTHER')).toBeNull();
-    await act(async () => { d2.resolve(USER); await d2.promise; });
-    expect(screen.getByText('PRIVATE_OTHER')).toBeTruthy();
+  });
+
+  it('a different session id gates again: skeleton shown, private child unmounted', async () => {
+    saveSession(session('a'));
+    const d = deferred<UserInfo>();
+    const validate = vi.spyOn(authService, 'validateSession')
+      .mockResolvedValueOnce(USER).mockReturnValueOnce(d.promise);
+    renderGuard('/dashboard');
+    expect(await screen.findByText('PRIVATE_DASH')).toBeTruthy();
+    act(() => { saveSession(session('b')); });
+    expect(await screen.findByText('Đang kiểm tra phiên đăng nhập…')).toBeTruthy();
+    expect(screen.queryByText('PRIVATE_DASH')).toBeNull();
+    await act(async () => { d.resolve(USER); await d.promise; });
+    expect(await screen.findByText('PRIVATE_DASH')).toBeTruthy();
+    expect(validate).toHaveBeenCalledTimes(2);
+  });
+
+  it('route error boundary shows reload UI when a child throws, and resets on navigation', async () => {
+    saveSession(session('a'));
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(USER);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    function Boom(): ReactNode {
+      throw new Error('Failed to fetch dynamically imported module');
+    }
+    render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<div>PRIVATE_DASH</div>} />
+            <Route path="/boom" element={<Boom />} />
+            <Route path="/other" element={<div>PRIVATE_OTHER</div>} />
+          </Route>
+        </Routes>
+        <Link to="/boom">go-boom</Link>
+        <Link to="/other">go-other</Link>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('PRIVATE_DASH')).toBeTruthy();
+    fireEvent.click(screen.getByText('go-boom'));
+    expect(await screen.findByText(/Không tải được trang/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Tải lại trang' })).toBeTruthy();
+    fireEvent.click(screen.getByText('go-other'));
+    expect(await screen.findByText('PRIVATE_OTHER')).toBeTruthy();
+    expect(errSpy).toHaveBeenCalled();
   });
 
   it('real validateSession performs exactly one /api/me and refreshes stored user', async () => {
@@ -310,13 +423,12 @@ describe('Protected filter navigation scopes', () => {
     },
   );
 
-  it('revalidates resource paths and never reuses a previous ready scope during A -> B -> A', async () => {
+  it('A -> B -> A: each pathname change revalidates in the background while content stays mounted', async () => {
     saveSession(session('resource-scope'));
-    const first = deferred<UserInfo>(), other = deferred<UserInfo>(), latest = deferred<UserInfo>();
+    const pending = deferred<UserInfo>();
     const validate = vi.spyOn(authService, 'validateSession')
-      .mockReturnValueOnce(first.promise)
-      .mockReturnValueOnce(other.promise)
-      .mockReturnValueOnce(latest.promise);
+      .mockResolvedValueOnce(USER)
+      .mockReturnValue(pending.promise);
     render(
       <MemoryRouter initialEntries={['/projects/a']}>
         <Routes>
@@ -329,17 +441,13 @@ describe('Protected filter navigation scopes', () => {
         <Link to="/projects/a">resource-a</Link>
       </MemoryRouter>,
     );
-    await act(async () => { first.resolve(USER); await first.promise; });
-    expect(screen.getByText('RESOURCE_A')).toBeTruthy();
+    expect(await screen.findByText('RESOURCE_A')).toBeTruthy();
     fireEvent.click(screen.getByRole('link', { name: 'resource-b' }));
-    expect(screen.queryByText('RESOURCE_A')).toBeNull();
-    expect(screen.queryByText('RESOURCE_B')).toBeNull();
+    expect(await screen.findByText('RESOURCE_B')).toBeTruthy(); // immediate, revalidation in-flight
     fireEvent.click(screen.getByRole('link', { name: 'resource-a' }));
-    expect(screen.queryByText('RESOURCE_A')).toBeNull();
+    expect(await screen.findByText('RESOURCE_A')).toBeTruthy();
     expect(validate).toHaveBeenCalledTimes(3);
-    await act(async () => { latest.resolve(USER); await latest.promise; });
-    expect(screen.getByText('RESOURCE_A')).toBeTruthy();
-    await act(async () => { other.resolve(USER); await other.promise; });
+    await act(async () => { pending.resolve(USER); await pending.promise; });
     expect(screen.getByText('RESOURCE_A')).toBeTruthy();
     expect(screen.queryByText('RESOURCE_B')).toBeNull();
   });

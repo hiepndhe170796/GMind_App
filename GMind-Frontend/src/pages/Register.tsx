@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import RegisterLayout from '../layouts/RegisterLayout';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import { authService } from '../services/auth';
 import { validateAuthFields, focusAuthError, authErrorMessage, type AuthFieldErrors } from '../utils/auth-form';
+import { safeReturnPath } from '../utils/return-path';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 export default function Register() {
+  useDocumentTitle('Đăng ký');
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = safeReturnPath((location.state as { from?: unknown } | null)?.from) ?? '/join-group';
   const [form, setForm] = useState({ displayName: '', email: '', password: '', confirmPassword: '' });
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
   const [error, setError] = useState('');
@@ -37,7 +42,7 @@ export default function Register() {
       try {
         const result = await authService.login(form.email.trim(), form.password);
         authService.saveSession(result);
-        navigate('/join-group', { replace: true });
+        navigate(returnTo, { replace: true });
       } catch (err: unknown) {
         setError(authErrorMessage(err, 'Đăng nhập thất bại. Tài khoản đã tạo — thử đăng nhập lại hoặc dùng trang đăng nhập.'));
       } finally { setLoading(false); }
@@ -52,7 +57,7 @@ export default function Register() {
       setRegistered(true);
       const result = await authService.login(form.email.trim(), form.password);
       authService.saveSession(result);
-      navigate('/join-group', { replace: true });
+      navigate(returnTo, { replace: true });
     } catch (err: unknown) {
       const failure = err as { status?: number; message?: string };
       if (failure?.status === 409) {
@@ -82,7 +87,7 @@ export default function Register() {
           </div>
         </fieldset>
         {error && <p role="alert" className="text-sm text-danger-700">{error}</p>}
-        <Button type="submit" className="auth-submit w-full" isLoading={loading}>{registered ? 'Thử đăng nhập lại' : 'Tạo tài khoản'}</Button>
+        <Button type="submit" size="lg" className="w-full" isLoading={loading}>{registered ? 'Thử đăng nhập lại' : 'Tạo tài khoản'}</Button>
       </form>
     </RegisterLayout>
   );

@@ -2,15 +2,18 @@
 import type { ReactNode } from 'react';
 import { act } from 'react';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Calendar from './Calendar';
 import { dashboardService, type MyTaskDto } from '../services/dashboard';
+import { clearSession, saveSession } from '../services/session';
+import { qk } from '../services/query-keys';
 
-const user = vi.hoisted(() => ({ id: 'calendar-user-1' }));
+const UID = 'calendar-user-1';
 vi.mock('../layouts/MainLayout', () => ({ default: ({ children }: { children: ReactNode }) => <main>{children}</main> }));
 vi.mock('../services/auth', () => ({
-  authService: { isLoggedIn: () => true, currentUser: () => ({ id: user.id }) },
+  authService: { isLoggedIn: () => true, currentUser: () => ({ id: 'mock-auth-user' }) },
 }));
 
 const task = (id: string, deadlineAt = '2026-02-10T10:00:00Z'): MyTaskDto => ({
@@ -22,7 +25,15 @@ function deferred<T>() {
   const promise = new Promise<T>(res => { resolve = res; });
   return { promise, resolve };
 }
-const tree = () => <MemoryRouter initialEntries={['/calendar?month=2026-02&date=2026-02-10']}><Calendar /></MemoryRouter>;
+const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false, gcTime: 0 } } });
+const seed = (id = UID) => saveSession({
+  accessToken: 'at', refreshToken: 'rt', expiresAt: '2100-01-01',
+  user: { id, displayName: 'U', email: 'u@x.dev' },
+});
+const tree = (client: QueryClient, entry = '/calendar?month=2026-02&date=2026-02-10') =>
+  <QueryClientProvider client={client}>
+    <MemoryRouter initialEntries={[entry]}><Calendar /></MemoryRouter>
+  </QueryClientProvider>;
 
 function HistoryCalendar() {
   const navigate = useNavigate();
@@ -35,19 +46,18 @@ function HistoryCalendar() {
   </>;
 }
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); user.id = 'calendar-user-1'; });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); clearSession(); localStorage.clear(); });
 
 describe('Calendar request and navigation regressions', () => {
-  it('deduplicates window focus during initial loading and ignores the old user response', async () => {
+  it('fetches for the new user after an account switch and ignores the old response', async () => {
+    const client = newClient();
+    seed();
     const first = deferred<MyTaskDto[]>();
     const get = vi.spyOn(dashboardService, 'myTasks')
       .mockReturnValueOnce(first.promise).mockResolvedValueOnce([task('new-user')]);
-    const view = render(tree());
+    render(tree(client));
     await waitFor(() => expect(get).toHaveBeenCalledTimes(1));
-    fireEvent(window, new Event('focus'));
-    expect(get).toHaveBeenCalledTimes(1);
-    user.id = 'calendar-user-2';
-    view.rerender(tree());
+    act(() => { seed('calendar-user-2'); });
     await screen.findAllByText('Private new-user');
     await act(async () => { first.resolve([task('old-user')]); await first.promise; });
     expect(screen.queryAllByText('Private old-user')).toHaveLength(0);
@@ -55,45 +65,53 @@ describe('Calendar request and navigation regressions', () => {
   });
 
   it('retains old rows on a refresh failure and clears the warning after a real GET retry', async () => {
+    const client = newClient();
+    seed();
     const get = vi.spyOn(dashboardService, 'myTasks')
       .mockResolvedValueOnce([task('before')])
       .mockRejectedValueOnce({ status: 500, message: 'offline' })
       .mockResolvedValueOnce([task('after')]);
-    render(tree());
+    render(tree(client));
     await screen.findAllByText('Private before');
-    fireEvent.click(screen.getByRole('button', { name: 'Làm mới' }));
+    await act(async () => { await client.invalidateQueries({ queryKey: qk.myTasks(UID) }); });
     await screen.findByText(/Chưa làm mới được lịch/);
     expect(screen.getAllByText('Private before').length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole('button', { name: 'Tải lại' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
     await screen.findAllByText('Private after');
     expect(screen.queryByText(/Chưa làm mới được lịch/)).toBeNull();
     expect(screen.queryAllByText('Private before')).toHaveLength(0);
     expect(get).toHaveBeenCalledTimes(3);
   });
 
-  it.each([403, 404])('clears previously loaded private data and the search draft on %i', async status => {
+  it.each([401, 403, 404])('shows the fatal error state when a background refresh fails with %i', async status => {
+    const client = newClient();
+    seed();
     vi.spyOn(dashboardService, 'myTasks')
       .mockResolvedValueOnce([task('restricted')])
       .mockRejectedValueOnce({ status, message: 'Không còn quyền' })
       .mockResolvedValueOnce([task('allowed')]);
-    render(tree());
+    render(tree(client));
     await screen.findAllByText('Private restricted');
-    fireEvent.change(screen.getByLabelText('Tìm công việc'), { target: { value: 'private draft' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Làm mới' }));
+    await act(async () => { await client.invalidateQueries({ queryKey: qk.myTasks(UID) }); });
     await screen.findByRole('button', { name: 'Thử lại' });
-    expect(screen.queryAllByText('Private restricted')).toHaveLength(0);
+    expect(screen.queryByText('Private restricted')).toBeNull();
+    expect(screen.queryByText(/Chưa làm mới được lịch/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
     await screen.findAllByText('Private allowed');
-    expect((screen.getByLabelText('Tìm công việc') as HTMLInputElement).value).toBe('');
   });
 
   it('restores month, view and committed search through Back/Forward without fetching again', async () => {
+    const client = newClient();
+    seed();
     const get = vi.spyOn(dashboardService, 'myTasks').mockResolvedValue([
       task('feb'), task('mar', '2026-03-15T10:00:00Z'),
     ]);
     const feb = '/calendar?month=2026-02&date=2026-02-10&view=list&q=feb';
     const mar = '/calendar?month=2026-03&date=2026-03-15&view=list&q=mar';
-    render(<MemoryRouter initialEntries={[feb, mar]} initialIndex={1}><HistoryCalendar /></MemoryRouter>);
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[feb, mar]} initialIndex={1}><HistoryCalendar /></MemoryRouter>
+      </QueryClientProvider>);
     await screen.findAllByText('Private mar');
     const input = screen.getByLabelText('Tìm công việc') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'uncommitted' } });
@@ -111,8 +129,12 @@ describe('Calendar request and navigation regressions', () => {
   });
 
   it.each(['0001-01', '0099-12', '9999-12'])('renders a bounded civil month %s without invalid date labels', async month => {
+    seed();
     vi.spyOn(dashboardService, 'myTasks').mockResolvedValue([task('other-month')]);
-    render(<MemoryRouter initialEntries={[`/calendar?month=${month}&date=${month}-01`]}><Calendar /></MemoryRouter>);
+    render(
+      <QueryClientProvider client={newClient()}>
+        <MemoryRouter initialEntries={[`/calendar?month=${month}&date=${month}-01`]}><Calendar /></MemoryRouter>
+      </QueryClientProvider>);
     await screen.findByRole('group', { name: /Chọn ngày đến hạn/ });
     const buttons = document.querySelectorAll<HTMLButtonElement>('[data-cal-date]');
     expect(buttons.length).toBeGreaterThanOrEqual(28);

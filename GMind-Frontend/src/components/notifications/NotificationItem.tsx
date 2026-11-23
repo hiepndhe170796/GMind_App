@@ -30,14 +30,14 @@ export default function NotificationItem({ item, busy, onRead, navState }: {
   }, [expanded, item.id]);
   return (
     <li data-notification-id={item.id} data-read={item.isRead} className="notification-row">
-      <span className={`notification-icon ${item.isRead ? 'bg-slate-100 text-slate-600' : `bg-white ${typeTone(item.type)}`}`}>
+      <span className={`notification-icon ${item.isRead ? 'bg-surface-subtle text-ink-muted' : `bg-white ${typeTone(item.type)}`}`}>
         <Icon name={typeIcon(item.type)} size={18} />
       </span>
       <div className="min-w-0">
-        <h4 tabIndex={-1} className={`notification-title ${item.isRead ? 'font-medium text-slate-800' : 'font-semibold text-slate-950'}`}>
+        <h4 tabIndex={-1} className={`notification-title ${item.isRead ? 'font-medium text-ink-secondary' : 'font-semibold text-ink'}`}>
           {item.title || 'Thông báo'}
         </h4>
-        {item.body && <p ref={bodyRef} id={bodyId} className={`mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-600 [overflow-wrap:anywhere] ${!expanded ? 'line-clamp-3' : ''}`}>{item.body}</p>}
+        {item.body && <p ref={bodyRef} id={bodyId} className={`mt-1 whitespace-pre-line text-sm leading-relaxed text-ink-secondary [overflow-wrap:anywhere] ${!expanded ? 'line-clamp-3' : ''}`}>{item.body}</p>}
         {item.body && canExpand && (
           <button type="button" onClick={() => setExpanded(value => !value)} aria-expanded={expanded} aria-controls={bodyId}
             className="inline-flex min-h-11 items-center text-sm font-medium text-primary-700 hover:underline">
@@ -45,8 +45,8 @@ export default function NotificationItem({ item, busy, onRead, navState }: {
           </button>
         )}
         <div className="notification-meta">
-          <span className={`inline-flex items-center gap-1.5 ${item.isRead ? 'text-slate-600' : 'font-medium text-primary-700'}`}>
-            <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${item.isRead ? 'bg-slate-400' : 'bg-primary-600'}`} />
+          <span className={`inline-flex items-center gap-1.5 ${item.isRead ? 'text-ink-muted' : 'font-medium text-primary-700'}`}>
+            <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${item.isRead ? 'bg-line-strong' : 'bg-primary-600'}`} />
             {item.isRead ? 'Đã đọc' : 'Chưa đọc'}
           </span>
           <time dateTime={dateTime} aria-label={dateTime ? `${vnTime(item.createdAt)} (UTC+7)` : undefined}

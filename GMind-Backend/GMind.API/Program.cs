@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using GMind.API;
 using GMind.API.Common;
@@ -8,6 +9,8 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+StartupConfigurationValidator.Validate(builder.Configuration, builder.Environment);
 
 builder.Services.AddPresentation();
 builder.Services.AddApplication();
@@ -34,6 +37,59 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+// Per-client-IP fixed-window limits on auth endpoints; config-overridable via RateLimiting:*.
+var rl = builder.Configuration.GetSection("RateLimiting");
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+    options.OnRejected = async (ctx, _) =>
+    {
+        ctx.HttpContext.Response.StatusCode = 429;
+        await ctx.HttpContext.Response.WriteAsJsonAsync(new GMind.API.Models.ApiResponse<object>
+        {
+            Success = false,
+            Message = "Bạn thao tác quá nhiều lần. Vui lòng thử lại sau ít phút.",
+            Errors = null
+        });
+    };
+    options.AddPolicy("auth-login", httpContext => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rl.GetValue<int?>("LoginPermitLimit") ?? 10,
+            Window = TimeSpan.FromMinutes(rl.GetValue<double?>("LoginWindowMinutes") ?? 1),
+            QueueLimit = 0,
+        }));
+    options.AddPolicy("auth-recovery", httpContext => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rl.GetValue<int?>("RecoveryPermitLimit") ?? 5,
+            Window = TimeSpan.FromMinutes(rl.GetValue<double?>("RecoveryWindowMinutes") ?? 15),
+            QueueLimit = 0,
+        }));
+    // Per-user limits for uploads and discussion sends (user id claim, fallback client IP).
+    static string UserOrIp(HttpContext ctx)
+        => ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)
+           ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    options.AddPolicy("uploads", httpContext => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: UserOrIp(httpContext),
+        factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rl.GetValue<int?>("UploadPermitLimit") ?? 30,
+            Window = TimeSpan.FromMinutes(rl.GetValue<double?>("UploadWindowMinutes") ?? 1),
+            QueueLimit = 0,
+        }));
+    options.AddPolicy("chat-send", httpContext => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: UserOrIp(httpContext),
+        factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rl.GetValue<int?>("ChatSendPermitLimit") ?? 30,
+            Window = TimeSpan.FromMinutes(rl.GetValue<double?>("ChatSendWindowMinutes") ?? 1),
+            QueueLimit = 0,
+        }));
+});
+
 builder.Services.AddHealthChecks().AddCheck<DatabaseReadinessCheck>("database", tags: ["ready"]);
 
 builder.Services.AddCors(options =>
@@ -51,6 +107,7 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 app.UseExceptionHandler();
+app.UseMiddleware<SecurityHeadersMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
@@ -63,10 +120,18 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("Frontend");
-if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
+app.MapHub<GMind.API.Realtime.RealtimeHub>("/hubs/realtime",
+    options => options.CloseOnAuthenticationExpiration = true);
+if (app.Environment.IsDevelopment()) app.MapDevMailbox();
 
 app.MapHealthChecks("/api/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
 app.MapHealthChecks("/api/health/ready", new HealthCheckOptions { Predicate = registration => registration.Tags.Contains("ready") }).AllowAnonymous();

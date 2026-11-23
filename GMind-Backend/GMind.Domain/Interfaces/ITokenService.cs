@@ -4,7 +4,7 @@ namespace GMind.Domain.Interfaces;
 
 public interface ITokenService
 {
-    string GenerateAccessToken(User user);
+    string GenerateAccessToken(User user, Guid? sessionId = null);
     string GenerateRefreshToken();
     Guid? GetUserIdFromToken(string token);
 }

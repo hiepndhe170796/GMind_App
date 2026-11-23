@@ -65,7 +65,11 @@ Work incrementally. Do not attempt to implement the entire product in one enormo
 ## 8. Verified commands (A0)
 - Backend dev run: `dotnet run --project GMind-Backend/GMind.API --launch-profile http` (API at http://localhost:5194; HTTPS redirect is disabled in Development only).
 - Health: `GET /api/health/live`, `GET /api/health/ready` (200 only when SQL Server connects); via frontend proxy `http://localhost:5173/api/health/ready`.
-- Backend tests: `dotnet test GMind-Backend/GMind.Tests/GMind.Tests.csproj --filter FullyQualifiedName~<TestClass>`.
-- Frontend: `npm --prefix GMind-Frontend run dev|lint|build`; unit tests `npm --prefix GMind-Frontend run test -- --run <file>`.
+- Backend tests: `dotnet test GMind-Backend/GMind.Tests/GMind.Tests.csproj` (all); filter with `--filter FullyQualifiedName~<TestClass>`.
+- Frontend: `npm --prefix GMind-Frontend run dev|lint|build`; unit tests `npm --prefix GMind-Frontend run test -- --run <file>` (`src/**` only).
+- E2E: `npm --prefix GMind-Frontend run e2e` (Playwright, `e2e/`, Edge channel `msedge`; `PW_CHANNEL=chromium` switches to bundled Chromium). Playwright auto-starts API+Vite when not running and raises the login rate limit for its own API instance; a reused dev API still fits the 10/min budget (~5 auth calls/run after the 4-user pool exists). The suite creates `e2e-…@e2e.gmind.test` data in the dev DB and does not clean it up — never run against real data.
+- Startup config: the dev JWT secret lives only in `appsettings.Development.json`; outside Development the API refuses to start without `Jwt__Secret` (≥ 32 bytes) and other valid `Jwt:*` values (`StartupConfigurationValidator`).
 - Frontend project build: `dotnet build GMind-Frontend/GMind-Frontend.esproj` (JS SDK runs `npm run build` -> `dist/`).
 - Visual Studio configuration: open `GMind.slnx`, select startup profile `GMind - API + Frontend` (`GMind.slnLaunch`) for API (`http`) + Vite and http://localhost:5173. Project builds and proxy/login were verified; the actual GUI Run/F5 flow still needs confirmation.
+- Realtime hub: `/hubs/realtime` (Vite dev proxy forwards `/hubs` with `ws`); dev mailbox at `/dev/mailbox` backed by `GET /api/dev/mailbox` (Development and loopback only).
+- Session guard: `ProtectedRoute` gates only the first validation per session id; subsequent pathname changes render immediately and revalidate via `/api/me` in the background. Protected pages lazy-load via `src/routes/lazy-pages.ts` (prefetched after first validation; vendor chunk split via `codeSplitting.groups`).

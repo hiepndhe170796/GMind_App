@@ -2,8 +2,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
 import Notifications from './Notifications';
-import { notificationsService, type NotificationDto } from '../services/notifications';
+import { notificationsService, type NotificationDto, type NotificationPageDto } from '../services/notifications';
+import { NotificationCountProvider } from '../components/notifications/NotificationCountProvider';
+import { createQueryClient } from '../services/query-client';
 
 // jsdom has no ResizeObserver/geometry — stub RO and drive scroll/clientHeight per test.
 let roCb: (() => void) | null = null;
@@ -47,14 +50,19 @@ function Destination() {
   return <div data-testid="notification-destination">{JSON.stringify(state)}</div>;
 }
 function App({ entry = '/notifications' }: { entry?: string }) {
+  const client = createQueryClient();
   return (
-    <MemoryRouter initialEntries={[entry]}>
-      <Routes>
-        <Route path="/notifications" element={<Notifications />} />
-        <Route path="/tasks/:id" element={<Destination />} />
-      </Routes>
-      <Probe />
-    </MemoryRouter>
+    <QueryClientProvider client={client}>
+      <NotificationCountProvider userId={userId}>
+        <MemoryRouter initialEntries={[entry]}>
+          <Routes>
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/tasks/:id" element={<Destination />} />
+          </Routes>
+          <Probe />
+        </MemoryRouter>
+      </NotificationCountProvider>
+    </QueryClientProvider>
   );
 }
 function row(id = ID) {
@@ -74,7 +82,9 @@ beforeEach(() => {
   setHeights(0, 0);
   userId = 'notification-user';
   data = [notification(), notification({ id: OTHER, title: 'Thông báo đã xem', isRead: true, relatedEntityId: OTHER })];
-  vi.spyOn(notificationsService, 'list').mockImplementation(async unread => data.filter(n => !unread || !n.isRead));
+  vi.spyOn(notificationsService, 'page').mockImplementation(async unread => ({
+    items: data.filter(n => !unread || !n.isRead), nextCursor: null,
+  }));
   vi.spyOn(notificationsService, 'unreadCount').mockImplementation(async () => data.filter(n => !n.isRead).length);
   vi.spyOn(notificationsService, 'markRead').mockImplementation(async id => {
     data = data.map(n => n.id === id ? { ...n, isRead: true } : n);
@@ -123,7 +133,7 @@ describe('Notifications inbox', () => {
   });
 
   it('does not revert saved read state when the subsequent list refresh fails', async () => {
-    vi.mocked(notificationsService.list).mockResolvedValueOnce(data).mockRejectedValueOnce(fail());
+    vi.mocked(notificationsService.page).mockResolvedValueOnce({ items: data, nextCursor: null }).mockRejectedValueOnce(fail());
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: 'Đánh dấu đã đọc: Công việc được giao' }));
     await screen.findByText('Đã đánh dấu thông báo là đã đọc.');
@@ -132,7 +142,7 @@ describe('Notifications inbox', () => {
   });
 
   it('removes a saved read row locally from Unread even if the refill fails', async () => {
-    vi.mocked(notificationsService.list).mockResolvedValueOnce([data[0]]).mockRejectedValueOnce(fail());
+    vi.mocked(notificationsService.page).mockResolvedValueOnce({ items: [data[0]], nextCursor: null }).mockRejectedValueOnce(fail());
     render(<App entry="/notifications?unread=1" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Đánh dấu đã đọc: Công việc được giao' }));
     await screen.findByText('Đã đánh dấu thông báo là đã đọc.');
@@ -140,19 +150,21 @@ describe('Notifications inbox', () => {
     expect(screen.getByText('Không có thông báo chưa đọc')).toBeTruthy();
     expect(screen.getByText(/Không làm mới được danh sách/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Xem tất cả' }));
-    await waitFor(() => expect(notificationsService.list).toHaveBeenLastCalledWith(false));
+    await waitFor(() => expect(vi.mocked(notificationsService.page).mock.calls.at(-1)?.[0]).toBe(false));
   });
 
   it('keeps filter node/focus, preserves other query state and rejects a late prior-filter response', async () => {
-    const old = deferred<NotificationDto[]>();
-    vi.mocked(notificationsService.list).mockReturnValueOnce(old.promise).mockResolvedValueOnce([data[0]]);
+    const old = deferred<NotificationPageDto>();
+    vi.mocked(notificationsService.page)
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce({ items: [data[0]], nextCursor: null });
     render(<App entry="/notifications?source=bell" />);
-    await waitFor(() => expect(notificationsService.list).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(notificationsService.page).toHaveBeenCalledTimes(1));
     const filter = unreadFilter();
     filter.focus();
     fireEvent.click(filter);
     await screen.findByText('Công việc được giao');
-    await act(async () => { old.resolve([data[1]]); });
+    await act(async () => { old.resolve({ items: [data[1]], nextCursor: null }); });
     expect(screen.queryByText('Thông báo đã xem')).toBeNull();
     expect(unreadFilter()).toBe(filter);
     expect(document.activeElement).toBe(filter);
@@ -168,7 +180,6 @@ describe('Notifications inbox', () => {
     fireEvent.click(read);
     expect(notificationsService.markRead).toHaveBeenCalledTimes(1);
     expect((unreadFilter() as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: 'Làm mới' }) as HTMLButtonElement).disabled).toBe(true);
     data = data.map(n => ({ ...n, isRead: true }));
     await act(async () => { gate.resolve({}); });
   });
@@ -230,7 +241,7 @@ describe('Notifications inbox', () => {
   });
 
   it('does not confuse an initial list error with an empty inbox, and retries', async () => {
-    vi.mocked(notificationsService.list).mockRejectedValueOnce(fail());
+    vi.mocked(notificationsService.page).mockRejectedValueOnce(fail());
     render(<App />);
     await screen.findByText('Mạng tạm thời gián đoạn.');
     expect(screen.queryByText('Chưa có thông báo')).toBeNull();
@@ -257,29 +268,31 @@ describe('Notifications inbox', () => {
   });
 
   it('keeps a late prior-user list from exposing content after the account key changes', async () => {
-    const old = deferred<NotificationDto[]>();
-    vi.mocked(notificationsService.list).mockReturnValueOnce(old.promise).mockResolvedValueOnce([]);
+    const old = deferred<NotificationPageDto>();
+    vi.mocked(notificationsService.page)
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce({ items: [], nextCursor: null });
     const { rerender } = render(<App />);
-    await waitFor(() => expect(notificationsService.list).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(notificationsService.page).toHaveBeenCalledTimes(1));
     userId = 'another-user';
     rerender(<App />);
     await screen.findByText('Chưa có thông báo');
-    await act(async () => { old.resolve(data); });
+    await act(async () => { old.resolve({ items: data, nextCursor: null }); });
     expect(screen.queryByText('Công việc được giao')).toBeNull();
     expect(screen.queryByText('Thông báo đã xem')).toBeNull();
   });
 
   it('deduplicates focus and visibility refresh while the list is in flight', async () => {
-    const pending = deferred<NotificationDto[]>();
-    vi.mocked(notificationsService.list).mockReturnValueOnce(pending.promise);
+    const pending = deferred<NotificationPageDto>();
+    vi.mocked(notificationsService.page).mockReturnValueOnce(pending.promise);
     render(<App />);
-    await waitFor(() => expect(notificationsService.list).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(notificationsService.page).toHaveBeenCalledTimes(1));
     await act(async () => {
       window.dispatchEvent(new Event('focus'));
       document.dispatchEvent(new Event('visibilitychange'));
     });
-    expect(notificationsService.list).toHaveBeenCalledTimes(1);
-    await act(async () => { pending.resolve(data); });
+    expect(notificationsService.page).toHaveBeenCalledTimes(1);
+    await act(async () => { pending.resolve({ items: data, nextCursor: null }); });
     await screen.findByText('Công việc được giao');
   });
 
@@ -316,12 +329,19 @@ describe('Notifications inbox', () => {
     expect(await screen.findByRole('button', { name: 'Xem thêm' })).toBeTruthy();
   });
 
-  it('discloses the cap without inventing a load-more action', async () => {
-    data = Array.from({ length: 100 }, (_, index) => notification({ id: `id-${index}`, title: `Thông báo ${index}` }));
+  it('pages older notifications with Tải thêm and discloses the end', async () => {
+    const older = notification({ id: '33333333-3333-3333-3333-333333333333', title: 'Thông báo cũ hơn' });
+    vi.mocked(notificationsService.page).mockImplementation(async (_unread, cursor) => cursor
+      ? { items: [older], nextCursor: null }
+      : { items: data, nextCursor: 'cursor-1' });
     render(<App />);
-    await screen.findByText(/Hiển thị tối đa 100 thông báo/);
-    expect(document.querySelectorAll('[data-notification-id]')).toHaveLength(100);
-    expect(screen.queryByRole('button', { name: /Tải thêm/ })).toBeNull();
+    await screen.findByText('Công việc được giao');
+    expect(screen.queryByText('Thông báo cũ hơn')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Tải thêm' }));
+    await screen.findByText('Thông báo cũ hơn');
+    expect(vi.mocked(notificationsService.page).mock.calls.at(-1)?.[1]).toBe('cursor-1');
+    expect(screen.getByText('Đã hiển thị toàn bộ thông báo.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Tải thêm' })).toBeNull();
   });
 
   it('opens the real supported task route with exact notification filter return state', async () => {

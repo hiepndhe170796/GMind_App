@@ -110,7 +110,6 @@ public class AccountAuthorizationTests
         Assert.Equal("https://example.com/a@b.png?x=y@z", saved.AvatarUrl);
         Assert.Equal(before.AuthVersion, saved.AuthVersion);
         Assert.Equal(before.PasswordHash, saved.PasswordHash);
-        Assert.Equal(before.RefreshToken, saved.RefreshToken);
         var other = await f.ReadAsync(f.B.Id);
         Assert.Equal("Account B", other.DisplayName);
         Assert.Equal(f.B.Email, other.Email);

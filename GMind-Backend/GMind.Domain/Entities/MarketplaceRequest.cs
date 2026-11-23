@@ -30,6 +30,15 @@ public class MarketplaceRequest
     [MaxLength(1000)]
     public string Reason { get; set; } = string.Empty;
 
+    [MaxLength(500)]
+    public string? HelpScope { get; set; }
+
+    [MaxLength(1000)]
+    public string? RecipientComment { get; set; }
+
+    public DateTime? RespondedAt { get; set; }
+    public DateTime? ClaimedAt { get; set; }
+
     public MarketplaceRequestStatus Status { get; set; } = MarketplaceRequestStatus.Pending;
 
     public Guid? ReviewerUserId { get; set; }

@@ -48,12 +48,8 @@ public class MarketplaceUiContractTests
     private static HttpClient ClientFor(WebApplicationFactory<Program> f, User u)
     {
         var c = f.CreateClient();
-        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Jwt:Secret"] = Secret, ["Jwt:Issuer"] = "GMindTests",
-            ["Jwt:Audience"] = "GMindTests", ["Jwt:ExpiryMinutes"] = "60"
-        }).Build();
-        c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", new TokenService(config).GenerateAccessToken(u));
+        var token = TestSessionTokens.Mint(f.Services, TestSessionTokens.JwtConfig(Secret), u);
+        c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return c;
     }
 
@@ -126,6 +122,9 @@ public class MarketplaceUiContractTests
         var id = (await DataAsync(create)).GetProperty("id").GetString();
         Assert.Equal(HttpStatusCode.Forbidden,
             (await memberClient.PostAsJsonAsync($"/api/marketplace-requests/{id}/approve", new { })).StatusCode);
+        // 3-party flow: the target must accept before a leader can approve.
+        Assert.Equal(HttpStatusCode.OK,
+            (await ClientFor(f, leader).PostAsJsonAsync($"/api/marketplace-requests/{id}/respond", new { accept = true })).StatusCode);
         var ok = await ClientFor(f, leader).PostAsJsonAsync($"/api/marketplace-requests/{id}/approve", new { comment = "ok" });
         Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
         await db.Entry(mine).ReloadAsync(); await db.Entry(other).ReloadAsync();
@@ -159,7 +158,7 @@ public class MarketplaceUiContractTests
         var (f, dbx, leader, member, g, p, mine, _) = await SeedAsync();
         var db = dbx.Db;
         await ClientFor(f, member).PostAsJsonAsync($"/api/groups/{g.Id}/marketplace-requests",
-            new { requestType = 1, taskId = mine.Id, reason = "help" });
+            new { requestType = 1, taskId = mine.Id, reason = "help", helpScope = "phần test" });
         Assert.Equal(HttpStatusCode.Forbidden,
             (await ClientFor(f, member).GetAsync($"/api/groups/{g.Id}/activity")).StatusCode);
         var list = await ClientFor(f, leader).GetAsync($"/api/groups/{g.Id}/activity");
@@ -196,6 +195,9 @@ public class MarketplaceUiContractTests
         var oc = ClientFor(f, outsider);
         Assert.Equal(HttpStatusCode.Forbidden, (await oc.GetAsync($"/api/groups/{g.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await oc.GetAsync($"/api/groups/{g.Id}/marketplace-requests")).StatusCode);
+        // 3-party flow: the target must accept before a leader can approve.
+        Assert.Equal(HttpStatusCode.OK,
+            (await ClientFor(f, leader).PostAsJsonAsync($"/api/marketplace-requests/{id}/respond", new { accept = true })).StatusCode);
         var ok = await ClientFor(f, leader).PostAsJsonAsync($"/api/marketplace-requests/{id}/approve", new { comment = "ok" });
         Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
         await db.Entry(mine).ReloadAsync(); await db.Entry(other).ReloadAsync();

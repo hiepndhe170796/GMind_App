@@ -10,7 +10,8 @@ const storage = (): Storage | null =>
 
 const listeners = new Set<() => void>();
 let snapshot: SessionRecord | null = readSnapshot();
-let sessionEndReason: 'passwordChanged' | null = null;
+export type SessionEndReason = 'passwordChanged' | 'revoked';
+let sessionEndReason: SessionEndReason | null = null;
 
 export const getSessionEndReason = () => sessionEndReason;
 
@@ -105,7 +106,7 @@ export function updateSessionUser(user: UserInfo, expectedId: string): void {
   notify();
 }
 
-export function clearSession(expectedId?: string, reason?: 'passwordChanged'): void {
+export function clearSession(expectedId?: string, reason?: SessionEndReason): void {
   const current = synchronizeSession();
   if (expectedId && current?.id !== expectedId) return;
   const store = storage();

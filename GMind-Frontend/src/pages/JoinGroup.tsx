@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Card from '../components/ui/Card';
-import '../components/workspace/workspace.css';
 import { Breadcrumb } from '../components/workspace/WorkspaceUI';
 import { errMsg } from '../components/workspace/utils';
 import { groupsService } from '../services/groups';
 
 export default function JoinGroup() {
   const navigate = useNavigate();
+  const { code: codeParam } = useParams<{ code?: string }>();
+  const invited = typeof codeParam === 'string' && codeParam.trim() !== '';
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(() => (codeParam ?? '').trim().toUpperCase());
   const [errors, setErrors] = useState<{ create?: string; join?: string; name?: string; description?: string; code?: string }>({});
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -22,7 +23,15 @@ export default function JoinGroup() {
   const nameRef = useRef<HTMLInputElement>(null);
   const descRef = useRef<HTMLTextAreaElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
+  const joinSubmitRef = useRef<HTMLButtonElement>(null);
   const busy = pending !== null;
+
+  // /join/:code → the invite is pre-filled; focus the submit button so keyboard
+  // users land on the action. Never auto-submit — the user must confirm.
+  useEffect(() => {
+    if (invited) joinSubmitRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const create = async () => {
     if (pendingRef.current) return;
@@ -67,41 +76,62 @@ export default function JoinGroup() {
 
   return (
     <MainLayout>
-      <div className="workspace-surface space-y-6">
-        <Breadcrumb items={[{ label: 'Nhóm của tôi', to: '/groups' }, { label: 'Tạo hoặc tham gia' }]} />
+      <div className="space-y-6">
+        <Breadcrumb items={[{ label: 'Nhóm của tôi', to: '/groups' }, { label: invited ? 'Tham gia bằng mã mời' : 'Tạo hoặc tham gia' }]} />
         <header>
-          <h2 className="text-2xl font-bold text-slate-900">Tạo hoặc tham gia nhóm</h2>
-          <p className="mt-2 text-base text-slate-600">Tạo nhóm mới để làm Trưởng nhóm, hoặc nhập mã mời để tham gia với vai trò Thành viên.</p>
+          <h2 className="text-title font-semibold text-ink">{invited ? 'Tham gia nhóm' : 'Tạo hoặc tham gia nhóm'}</h2>
+          <p className="mt-2 text-base text-ink-secondary">
+            {invited ? 'Bạn được mời tham gia một nhóm.' : 'Tạo nhóm mới để làm Trưởng nhóm, hoặc nhập mã mời để tham gia với vai trò Thành viên.'}
+          </p>
         </header>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card className="p-4 sm:p-6">
-            <h3 className="text-lg font-semibold text-slate-900">Tạo nhóm mới</h3>
-            <p className="mt-1 text-sm text-slate-600">Bạn sẽ là Trưởng nhóm và quản lý dự án, thành viên.</p>
-            <form noValidate className="mt-4 space-y-4" onSubmit={e => { e.preventDefault(); void create(); }}>
-              <Input id="create-name" ref={nameRef} label="Tên nhóm" maxLength={200} value={name} disabled={busy}
-                error={errors.name} onChange={e => { setName(e.target.value); if (errors.name) setErrors(x => ({ ...x, name: undefined })); }} />
-              <div>
-                <label htmlFor="create-desc" className="block text-sm font-medium text-slate-700 mb-1">Mô tả (tuỳ chọn)</label>
-                <textarea id="create-desc" ref={descRef} rows={3} maxLength={1000} value={description} disabled={busy}
-                  aria-invalid={!!errors.description} aria-describedby={errors.description ? 'create-desc-error' : undefined}
-                  onChange={e => { setDescription(e.target.value); if (errors.description) setErrors(x => ({ ...x, description: undefined })); }}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-base focus:outline-none focus:ring-2" />
-                {errors.description && <p id="create-desc-error" role="alert" className="mt-1 text-sm text-danger-700">{errors.description}</p>}
-              </div>
-              <Button type="submit" className="workspace-primary min-h-11" disabled={busy} isLoading={pending === 'create'}>Tạo nhóm</Button>
-            </form>
-          </Card>
-          <Card className="p-4 sm:p-6">
-            <h3 className="text-lg font-semibold text-slate-900">Tham gia bằng mã mời</h3>
-            <p className="mt-1 text-sm text-slate-600">Bạn sẽ tham gia với vai trò Thành viên.</p>
-            <form noValidate className="mt-4 space-y-4" onSubmit={e => { e.preventDefault(); void join(); }}>
-              <Input id="join-code" ref={codeRef} label="Mã mời" maxLength={8} value={code} disabled={busy}
-                placeholder="VD: AB12CD34" hint="8 ký tự chữ và số do Trưởng nhóm cung cấp." error={errors.code}
-                onChange={e => { setCode(e.target.value.toUpperCase()); if (errors.code) setErrors(x => ({ ...x, code: undefined })); }} />
-              <Button type="submit" variant="secondary" className="min-h-11" disabled={busy} isLoading={pending === 'join'}>Tham gia</Button>
-            </form>
-          </Card>
-        </div>
+        {(() => {
+          const createCard = (
+            <Card className="p-4 sm:p-6">
+              <h3 className="text-lg font-semibold text-ink">Tạo nhóm mới</h3>
+              <p className="mt-1 text-sm text-ink-secondary">Bạn sẽ là Trưởng nhóm và quản lý dự án, thành viên.</p>
+              <form noValidate className="mt-4 space-y-4" onSubmit={e => { e.preventDefault(); void create(); }}>
+                <Input id="create-name" ref={nameRef} label="Tên nhóm" maxLength={200} value={name} disabled={busy}
+                  error={errors.name} onChange={e => { setName(e.target.value); if (errors.name) setErrors(x => ({ ...x, name: undefined })); }} />
+                <div>
+                  <label htmlFor="create-desc" className="block text-sm font-medium text-ink-secondary mb-1">Mô tả (tuỳ chọn)</label>
+                  <textarea id="create-desc" ref={descRef} rows={3} maxLength={1000} value={description} disabled={busy}
+                    aria-invalid={!!errors.description} aria-describedby={errors.description ? 'create-desc-error' : undefined}
+                    onChange={e => { setDescription(e.target.value); if (errors.description) setErrors(x => ({ ...x, description: undefined })); }}
+                    className="w-full rounded-xl border border-line bg-surface px-4 py-2 text-base text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-primary-600" />
+                  {errors.description && <p id="create-desc-error" role="alert" className="mt-1 text-sm text-danger-700">{errors.description}</p>}
+                </div>
+                <Button type="submit" className="min-h-11" disabled={busy} isLoading={pending === 'create'}>Tạo nhóm</Button>
+              </form>
+            </Card>
+          );
+          const joinCard = (
+            <Card className="p-4 sm:p-6">
+              <h3 className="text-lg font-semibold text-ink">{invited ? 'Tham gia nhóm' : 'Tham gia bằng mã mời'}</h3>
+              <p className="mt-1 text-sm text-ink-secondary">
+                {invited ? 'Bạn được mời tham gia một nhóm.' : 'Bạn sẽ tham gia với vai trò Thành viên.'}
+              </p>
+              <form noValidate className="mt-4 space-y-4" onSubmit={e => { e.preventDefault(); void join(); }}>
+                <Input id="join-code" ref={codeRef} label="Mã mời" maxLength={8} value={code} disabled={busy}
+                  placeholder="VD: AB12CD34" hint="8 ký tự chữ và số do Trưởng nhóm cung cấp." error={errors.code}
+                  onChange={e => { setCode(e.target.value.toUpperCase()); if (errors.code) setErrors(x => ({ ...x, code: undefined })); }} />
+                <Button type="submit" ref={joinSubmitRef} variant={invited ? 'primary' : 'secondary'} className="min-h-11" disabled={busy} isLoading={pending === 'join'}>
+                  {invited ? 'Tham gia nhóm' : 'Tham gia'}
+                </Button>
+              </form>
+            </Card>
+          );
+          return invited ? (
+            <div className="space-y-4 max-w-xl">
+              {joinCard}
+              <details className="group">
+                <summary className="min-h-11 cursor-pointer text-sm font-medium text-ink-secondary hover:text-ink">Hoặc tạo nhóm mới</summary>
+                <div className="mt-3">{createCard}</div>
+              </details>
+            </div>
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-2">{createCard}{joinCard}</div>
+          );
+        })()}
       </div>
     </MainLayout>
   );

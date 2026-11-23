@@ -3,22 +3,88 @@
 @tailwind utilities;
 
 @layer base {
-  html { min-height: 100%; }
-  body {
-    @apply antialiased min-h-screen;
-    background-color: #f5f7fb;
-    color: #18253d;
-    font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  html {
+    min-height: 100%;
+    color-scheme: light;
+    scrollbar-color: theme('colors.line.strong') transparent;
   }
-  h1, h2, h3, h4 { @apply font-semibold tracking-tight; }
+  * { scrollbar-width: thin; }
+  body {
+    @apply bg-canvas text-ink font-sans antialiased min-h-screen;
+  }
+  h1, h2, h3, h4 {
+    @apply font-semibold tracking-tight;
+    text-wrap: balance;
+  }
   input, select, textarea, button { font: inherit; }
+  ::selection {
+    background-color: theme('colors.accent.100');
+    color: theme('colors.ink.DEFAULT');
+  }
+  input, textarea { caret-color: theme('colors.primary.600'); }
+  a { text-underline-offset: 3px; }
   :focus-visible {
-    outline: 2px solid #3679e5;
+    outline: 2px solid theme('colors.primary.500');
     outline-offset: 2px;
     border-radius: 6px;
+  }
+}
+
+@layer components {
+  .app-surface :is(input:not([type=checkbox],[type=radio],[type=file],[type=range],[type=color]), select, textarea) {
+    min-height: 2.75rem;
+    padding-inline: 0.75rem;
+    border: 1px solid theme('colors.line.strong');
+    border-radius: 10px;
+    background-color: theme('colors.white');
+    color: theme('colors.ink.DEFAULT');
+    font-size: 16px;
+  }
+  @media (min-width: 640px) {
+    .app-surface :is(input:not([type=checkbox],[type=radio],[type=file],[type=range],[type=color]), select, textarea) {
+      font-size: 0.9375rem;
+    }
+  }
+  .app-surface :is(input:not([type=checkbox],[type=radio],[type=file],[type=range],[type=color]), select, textarea)::placeholder {
+    color: theme('colors.ink.muted');
+  }
+  .app-surface textarea {
+    min-height: 6rem;
+    padding-block: 0.625rem;
+  }
+  .app-surface :is(input:not([type=checkbox],[type=radio],[type=file],[type=range],[type=color]), select, textarea):focus {
+    outline: none;
+    border-color: theme('colors.primary.600');
+    box-shadow: 0 0 0 1px theme('colors.primary.600'), 0 0 0 4px theme('colors.primary.100');
+  }
+  .app-surface :is(input:not([type=checkbox],[type=radio],[type=file],[type=range],[type=color]), select, textarea)[aria-invalid="true"] {
+    border-color: theme('colors.danger.600');
+  }
+  .app-surface :is(input:not([type=checkbox],[type=radio],[type=file],[type=range],[type=color]), select, textarea)[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 1px theme('colors.danger.600'), 0 0 0 4px theme('colors.danger.100');
+  }
+  .app-surface :is(input:not([type=checkbox],[type=radio],[type=file],[type=range],[type=color]), select, textarea):disabled {
+    background-color: theme('colors.surface.subtle');
+    color: theme('colors.ink.muted');
+    cursor: not-allowed;
   }
 }
 
 @layer utilities {
   .text-balance { text-wrap: balance; }
 }
+
+/* Toast lifts above the mobile sticky action bar while it is mounted (<lg only). */
+@media (max-width: 1023.98px) {
+  :root:has(.gm-sticky-bar) { --gm-toast-offset: 4.5rem; }
+}
+
+/* One authored motion on TaskDetail: the approve moment. */
+@keyframes gm-approve-pop {
+  0% { transform: scale(.4); opacity: 0; }
+  60% { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Discussion reply-jump flash (class toggled briefly, removed after ~1.2 s). */
+.msg-highlight { background-color: var(--color-primary-50, #eff6ff); }

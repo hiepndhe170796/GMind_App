@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout';
-import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import { authService } from '../services/auth';
 import { validateAuthFields, focusAuthError, authErrorMessage, type AuthFieldErrors } from '../utils/auth-form';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 export default function ForgotPassword() {
+  useDocumentTitle('Quên mật khẩu');
   const [email, setEmail] = useState('');
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
   const [error, setError] = useState('');
@@ -32,19 +33,20 @@ export default function ForgotPassword() {
 
   return (
     <AuthLayout>
-      <Card className="p-6 sm:p-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Quên mật khẩu</h1>
-          <p className="mt-2 text-base text-slate-600">Nhập email đã dùng để đăng ký GMind.</p>
+      <>
+        <div className="mb-8">
+          <h1 className="text-display font-bold text-ink">Quên mật khẩu</h1>
+          <p className="mt-2 text-body text-ink-secondary">Nhập email đã dùng để đăng ký GMind.</p>
         </div>
         {sent ? (
           <div>
             <p role="status" className="text-sm font-medium text-success-700">Nếu địa chỉ này có tài khoản, hướng dẫn đặt lại mật khẩu đã được gửi.</p>
             {import.meta.env.DEV && (
-              <details className="mt-4 text-sm text-slate-600">
-                <summary className="cursor-pointer">Hộp thư trên máy local</summary>
-                <p className="mt-2">Nhấn Windows + R, mở %LOCALAPPDATA%\GMind\Mailbox và mở thư mới nhất để lấy liên kết đặt lại mật khẩu. Đây là hộp thư phát triển trên máy này, không phải email thật.</p>
-              </details>
+              <p className="mt-4 text-sm text-ink-secondary">
+                Môi trường phát triển:{' '}
+                <Link to="/dev/mailbox" className="font-medium text-primary-700 hover:underline">mở hộp thư dev</Link>
+                {' '}để lấy liên kết đặt lại mật khẩu.
+              </p>
             )}
             <Button type="button" variant="secondary" className="mt-5" onClick={() => { setSent(false); setEmail(''); setError(''); setFieldErrors({}); }}>
               Dùng email khác
@@ -57,13 +59,13 @@ export default function ForgotPassword() {
               onChange={e => { setEmail(e.target.value); if (fieldErrors.email) setFieldErrors({}); if (error) setError(''); }}
               error={fieldErrors.email} />
             {error && <p role="alert" className="text-sm text-danger-700">{error}</p>}
-            <Button type="submit" className="auth-submit w-full" isLoading={loading}>Gửi hướng dẫn đặt lại</Button>
+            <Button type="submit" size="lg" className="w-full" isLoading={loading}>Gửi hướng dẫn đặt lại</Button>
           </form>
         )}
-        <div className="mt-6 border-t border-slate-200 pt-5 text-center text-sm text-slate-600">
-          <Link to="/login" className="text-primary-700 font-medium hover:underline">Về đăng nhập</Link>
+        <div className="mt-8 border-t border-line pt-6 text-center text-small text-ink-secondary">
+          <Link to="/login" className="inline-flex items-center max-sm:min-h-11 text-primary-700 font-medium hover:underline">Về đăng nhập</Link>
         </div>
-      </Card>
+      </>
     </AuthLayout>
   );
 }
