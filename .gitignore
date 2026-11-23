@@ -434,3 +434,7 @@ GMind-Frontend/.env
 GMind-Frontend/.env.local
 GMind-Frontend/.env.*.local
 GMind-Frontend/vite.config.local.timestamp-*
+GMind-Frontend/test-results/
+GMind-Frontend/playwright-report/
+GMind-Frontend/blob-report/
+GMind-Frontend/e2e/.auth/
