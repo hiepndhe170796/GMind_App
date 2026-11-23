@@ -19,13 +19,13 @@ Mục này ghi nhận các quyết định nghiệp vụ/kỹ thuật chưa đư
 3. **Leader duyệt tất cả review + marketplace** — theo permission matrix BA.
 4. **Stale task warning**: task `InProgress` không cập nhật > 3 ngày → báo Leader, dedup 1 lần/ngày/task. Ngưỡng 3 ngày là giả định; BA không định nghĩa "stale".
 5. **Invite code**: 8 ký tự, lưu SHA256 hash, hỗ trợ expires/maxUses/usedCount.
-6. **JWT secret trong `appsettings.json`** là dev placeholder; production phải override bằng environment variable/secret manager.
+6. **JWT secret:** từ M7, khóa dev chỉ nằm trong `appsettings.Development.json`; môi trường khác phải cấu hình `Jwt__Secret` (≥ 32 byte) qua environment variable/secret manager, nếu không API từ chối khởi động (xem M7 bên dưới).
 7. **Timezone**: DB lưu UTC; hiển thị `vi-VN` locale trên frontend. `TimeZone=Asia/Ho_Chi_Minh` trong config dành cho format hiển thị server-side nếu cần sau.
 
 ## Vấn đề kỹ thuật đã biết
 
-- `System.Security.Cryptography.Pkcs` 9.0.11 có NU1902/NU1903 warnings (transitive từ EF Core) — chờ upstream update.
-- .NET SDK đang dùng **11.0.100-rc.2 preview** — cân nhắc pin sang LTS (net8/net10) khi release chính thức.
+- `System.Security.Cryptography.Pkcs` đã được pin 9.0.21; quét `dotnet list package --vulnerable --include-transitive` (API + Tests) và `npm audit` sạch tại M7 (2026-11-23).
+- Dự án chạy .NET SDK 11.0.100 (bản chính thức), target `net11.0`. Các gói EF Core/JwtBearer vẫn ở 10.0.13; nâng cùng nhịp khi có bản 11 ổn định.
 - Thông báo nội bộ nhóm chỉ hiển thị/đánh dấu đã đọc khi người nhận còn là thành viên đang hoạt động của nhóm chưa lưu trữ. Ngoại lệ: thông báo MemberRemoved của chính người nhận vẫn hiển thị để biết quyền đã bị thu hồi. Đây là lựa chọn bảo thủ cho A1; không xóa lịch sử thông báo.
 
 ## Xác nhận sản phẩm khi khởi tạo PRODUCT.md — 01/11/2026
@@ -143,3 +143,13 @@ Giả định mặc định nếu NON-BLOCKING chưa được trả lời: dùng
 4. **Thảo luận dự án:** mọi thành viên đang hoạt động của nhóm đọc và gửi. Trả lời chỉ trỏ tới tin trong cùng dự án. @nhắc tên chỉ chọn được thành viên đang hoạt động; người được nhắc và người được trả lời nhận thông báo; không thông báo cho mọi tin nhắn. Tác giả sửa được tin của mình (hiện "đã sửa"); tác giả hoặc Trưởng nhóm xóa (hiện "Tin nhắn đã bị xóa", nội dung và tệp đính kèm bị xóa). Trưởng nhóm xóa tin của người khác được ghi nhật ký. Tối đa 4000 ký tự mỗi tin, 30 tin mỗi phút mỗi người.
 5. **Ảnh đại diện:** tải ảnh png/jpeg/webp; trình duyệt cắt vuông 256 px trước khi gửi (loại bỏ metadata như vị trí GPS). Ảnh được phục vụ qua địa chỉ khó đoán không cần đăng nhập (để thẻ ảnh hiển thị được ở mọi nơi), lưu cache lâu và đổi địa chỉ mỗi lần thay ảnh. Bỏ ô nhập URL ảnh; ảnh URL cũ vẫn hiển thị tới khi người dùng thay hoặc xóa.
 6. **Realtime thảo luận:** sự kiện riêng `discussion` chỉ mang mã dự án, gửi tới thành viên đang hoạt động của nhóm; trình duyệt tự tải lại qua API có phân quyền.
+
+## Stage 2 — M7 quyết định (giả định đã ghi nhận, chờ chủ sản phẩm xác nhận)
+
+1. **Cấu hình khi khởi động:** API kiểm tra cấu hình trước khi chạy và dừng với thông báo nêu rõ khóa cấu hình (không in giá trị) khi `Jwt:Secret` thiếu hoặc < 32 byte, thiếu `Jwt:Issuer`/`Jwt:Audience`, thời hạn token không phải số nguyên dương, hoặc — ngoài Development — khóa vẫn là khóa dev (`Change_Me`). Khóa dev chỉ còn trong `appsettings.Development.json`, nên `dotnet run --launch-profile http`, F5 và `dotnet ef` (mặc định Development) vẫn chạy không cần cấu hình thêm.
+2. **Header bảo mật:** mọi phản hồi API có `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` và `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` (bỏ CSP riêng cho `/swagger` để Swagger UI chạy ở Development). Ngoài Development bật HSTS và chuyển hướng HTTPS. Chưa xử lý reverse proxy (`X-Forwarded-For`): sau proxy, giới hạn tần suất theo IP sẽ tính theo IP của proxy — cần cấu hình Forwarded Headers khi triển khai.
+3. **Kiểm tra phiên khi chuyển trang:** trước M7, mỗi lần đổi đường dẫn đều chặn toàn màn hình cho tới khi `/api/me` trả về. Từ M7 chỉ lần kiểm tra đầu tiên của mỗi phiên chặn hiển thị; các lần chuyển trang sau hiển thị ngay và vẫn gọi `/api/me` ở nền. Lý do: máy chủ đã xác thực phiên (`sid`) ở mọi request, 401 → làm mới token → đăng xuất do lớp API xử lý, và thu hồi phiên được đẩy qua SignalR; việc chặn từng lần chuyển trang không thêm quyền kiểm soát nào mà gây nháy màn hình.
+4. **Tách bundle theo trang:** các trang sau đăng nhập tải theo route (lazy) và được tải trước khi trình duyệt rảnh sau lần xác thực đầu; trang đăng nhập/đăng ký/khôi phục tải ngay. Nếu tải một phần của ứng dụng thất bại (ví dụ vừa triển khai bản mới), trang hiện thông báo và nút "Tải lại trang" thay vì màn hình trắng.
+5. **Vùng chạm trên di động:** dưới 640 px mọi điều khiển đứng riêng (nút, liên kết đứng riêng, tab, mục menu, công tắc) có vùng chạm ≥ 44 px; trên desktop giữ cỡ `sm` 36 px theo `DESIGN.md`. Ngoại lệ: liên kết nằm trong câu, skip link khi chưa focus (khi focus ≥ 44 px), ô chọn/radio có nhãn ≥ 44 px bao quanh.
+6. **Lịch và Thông báo:** bỏ nút "Làm mới"; dữ liệu cập nhật qua realtime, khi quay lại tab và làm mới định kỳ khi mất kết nối. Lịch dùng chung bộ nhớ đệm với Việc của tôi. Lỗi 401/403/404 khi làm mới thì ẩn dữ liệu cũ (như khi mất quyền); lỗi khác giữ dữ liệu cũ kèm cảnh báo và nút "Thử lại".
+7. **Kiểm thử E2E:** Playwright nằm trong repo (`GMind-Frontend/e2e`), chạy với API + database local thật và trình duyệt Edge đã cài. Mỗi lần chạy tạo tài khoản và nhóm thử nghiệm mới (email `e2e-…@e2e.gmind.test`) trong database dev; dữ liệu này không tự xóa (không thực hiện thao tác xóa dữ liệu). Không chạy E2E trên database có dữ liệu thật.
