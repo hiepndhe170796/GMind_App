@@ -16,6 +16,7 @@ import { dashboardService } from '../services/dashboard';
 import { qk } from '../services/query-keys';
 import { useToast } from '../components/ui/Toast';
 import { useCurrentUserId } from '../hooks/use-current-user-id';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatDate, formatDateTime } from '../utils/presentation';
 
 const TYPE_LABEL: Record<string, string> = { NeedHelp: 'Cần hỗ trợ', Transfer: 'Chuyển giao', Swap: 'Hoán đổi' };
@@ -51,6 +52,7 @@ const stepState = (s: string): { step: number; label: string; ended?: boolean } 
 export default function Marketplace() {
   const { groupId } = useParams<{ groupId: string }>();
   const me = useCurrentUserId();
+  useDocumentTitle('Marketplace');
   return <MainLayout><MarketplaceWorkspace key={`${groupId ?? ''}:${me ?? ''}`} groupId={groupId ?? ''} userId={me} /></MainLayout>;
 }
 
@@ -211,7 +213,7 @@ function MarketplaceWorkspace({ groupId, userId }: { groupId: string; userId: st
               className="flex flex-nowrap gap-1 overflow-x-auto whitespace-nowrap rounded-xl border border-line bg-surface-subtle p-1 sm:flex-wrap">
               {TABS.map(t => (
                 <button key={t.id} type="button" onClick={() => changeTab(t.id)} aria-pressed={tab === t.id}
-                  className={`min-h-9 rounded-lg px-3 text-sm font-medium ${tab === t.id ? 'bg-surface text-ink shadow-sm' : 'text-ink-secondary hover:text-ink'}`}>
+                  className={`min-h-9 max-sm:min-h-11 rounded-lg px-3 text-sm font-medium ${tab === t.id ? 'bg-surface text-ink shadow-sm' : 'text-ink-secondary hover:text-ink'}`}>
                   {t.label} ({counts[t.id]})
                 </button>
               ))}
@@ -244,7 +246,7 @@ function MarketplaceWorkspace({ groupId, userId }: { groupId: string; userId: st
                 </div>
                 <div className="flex items-end">
                   {filterCount > 0 && (
-                    <button type="button" className="min-h-9 text-sm font-medium text-primary-700 hover:underline"
+                    <button type="button" className="min-h-9 max-sm:min-h-11 max-sm:-my-1 text-sm font-medium text-primary-700 hover:underline"
                       onClick={() => { setShow(PAGE); setParams(new URLSearchParams(tabParam ? { tab: tabParam } : {}), { replace: true }); }}>
                       Xóa bộ lọc
                     </button>
@@ -316,7 +318,7 @@ function RequestCard({ r, isLeader, onRespondAccept, onOpen, busy }: {
   const st = stepState(r.status);
   const doneStep = r.status === 'Approved' ? 3 : st.step - 1;
   return (
-    <Card className="p-4 sm:p-5">
+    <Card className="relative p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Badge variant="accent">{TYPE_LABEL[r.requestType] ?? r.requestType}</Badge>
@@ -325,9 +327,9 @@ function RequestCard({ r, isLeader, onRespondAccept, onOpen, busy }: {
         <span className="text-xs text-ink-muted">{formatDateTime(r.createdAt)}{r.reviewedAt ? ` · Duyệt ${formatDateTime(r.reviewedAt)}` : ''}</span>
       </div>
       <h3 className="mt-2 min-w-0 text-base font-semibold text-ink">
-        <Link to={`/tasks/${r.taskId}`} className="text-primary-700 hover:underline [overflow-wrap:anywhere]">{r.taskTitle}</Link>
+        <Link to={`/tasks/${r.taskId}`} className="text-primary-700 hover:underline [overflow-wrap:anywhere] after:absolute after:inset-0 after:content-['']">{r.taskTitle}</Link>
         {r.requestType === 'Swap' && r.relatedTaskTitle && (
-          <span className="text-ink-secondary"> ⇄ <Link to={`/tasks/${r.relatedTaskId}`} className="text-primary-700 hover:underline">{r.relatedTaskTitle}</Link></span>
+          <span className="text-ink-secondary"> ⇄ <Link to={`/tasks/${r.relatedTaskId}`} className="relative z-10 text-primary-700 hover:underline">{r.relatedTaskTitle}</Link></span>
         )}
       </h3>
       <p className="mt-0.5 text-sm text-ink-secondary">
@@ -361,17 +363,17 @@ function RequestCard({ r, isLeader, onRespondAccept, onOpen, busy }: {
       {r.recipientComment && <p className="mt-1.5 text-sm text-ink-secondary">Phản hồi của {r.targetName ?? 'người nhận'}: {r.recipientComment}</p>}
       {r.reviewComment && <p className="mt-1 text-sm text-ink-secondary">Trưởng nhóm: {r.reviewComment}</p>}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="relative z-10 mt-3 flex flex-wrap items-center gap-2">
         {r.canRespond && (
           <>
-            <Button size="sm" className="min-h-9" disabled={busy} onClick={onRespondAccept}>Đồng ý</Button>
-            <Button size="sm" variant="secondary" className="min-h-9" disabled={busy} onClick={() => onOpen('decline')}>Từ chối</Button>
+            <Button size="sm" className="min-h-9 max-sm:-my-1" disabled={busy} onClick={onRespondAccept}>Đồng ý</Button>
+            <Button size="sm" variant="secondary" className="min-h-9 max-sm:-my-1" disabled={busy} onClick={() => onOpen('decline')}>Từ chối</Button>
           </>
         )}
-        {r.canClaim && <Button size="sm" variant="secondary" className="min-h-9 border-accent-300 text-accent-700" disabled={busy} onClick={() => onOpen('claim')}>Nhận việc</Button>}
-        {r.canReview && <Button size="sm" className="min-h-9" disabled={busy} onClick={() => onOpen('approve')}>Duyệt</Button>}
-        {r.canReject && <Button size="sm" variant="danger" className="min-h-9" disabled={busy} onClick={() => onOpen('reject')}>Từ chối</Button>}
-        {r.canCancel && <Button size="sm" variant="secondary" className="min-h-9" disabled={busy} onClick={() => onOpen('cancel')}>Hủy yêu cầu</Button>}
+        {r.canClaim && <Button size="sm" variant="secondary" className="min-h-9 max-sm:-my-1 border-accent-300 text-accent-700" disabled={busy} onClick={() => onOpen('claim')}>Nhận việc</Button>}
+        {r.canReview && <Button size="sm" className="min-h-9 max-sm:-my-1" disabled={busy} onClick={() => onOpen('approve')}>Duyệt</Button>}
+        {r.canReject && <Button size="sm" variant="danger" className="min-h-9 max-sm:-my-1" disabled={busy} onClick={() => onOpen('reject')}>Từ chối</Button>}
+        {r.canCancel && <Button size="sm" variant="secondary" className="min-h-9 max-sm:-my-1" disabled={busy} onClick={() => onOpen('cancel')}>Hủy yêu cầu</Button>}
         {r.status === 'Pending' && isLeader && !r.canReview && (
           <span className="text-xs text-ink-muted">Cần Trưởng nhóm khác duyệt</span>
         )}

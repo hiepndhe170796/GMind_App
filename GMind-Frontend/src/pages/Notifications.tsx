@@ -61,10 +61,6 @@ function NotificationsWorkspace() {
             {count.error && count.count !== null && ' (chưa làm mới)'}
           </p>
         </div>
-        <Button variant="secondary" className="min-h-11 shrink-0" onClick={() => void inbox.refresh()}
-          aria-busy={inbox.refreshing} disabled={busy || inbox.refreshing || (inbox.items === null && !inbox.fatal)}>
-          {inbox.refreshing ? 'Đang làm mới' : 'Làm mới'}
-        </Button>
       </div>
       {count.error && (
         <div role="alert" className="mb-4 flex flex-wrap items-center gap-x-3 rounded-xl bg-warning-50 px-4 py-2 text-sm text-warning-700">
@@ -92,12 +88,18 @@ function NotificationsWorkspace() {
             Đánh dấu tất cả đã đọc
           </Button>
         </div>
-        {inbox.refreshError && <p role="alert" className="border-b border-warning-100 bg-warning-50 px-4 py-3 text-sm text-warning-700">Không làm mới được danh sách. Dữ liệu đang hiển thị có thể chưa cập nhật.</p>}
+        {inbox.refreshError && (
+          <div role="alert" className="flex flex-wrap items-center gap-x-3 border-b border-warning-100 bg-warning-50 px-4 py-3 text-sm text-warning-700">
+            Không làm mới được danh sách. Dữ liệu đang hiển thị có thể chưa cập nhật.
+            <button type="button" disabled={busy || inbox.refreshing} onClick={() => void inbox.refresh()}
+              className="min-h-11 font-semibold underline underline-offset-4">Thử lại</button>
+          </div>
+        )}
         <div id="notifications-list" ref={listRef} aria-busy={inbox.refreshing || (inbox.items === null && !inbox.fatal)}>
         {inbox.items === null && !inbox.fatal && (
           <div>
           <p role="status" className="sr-only">Đang tải thông báo</p>
-          <ul aria-hidden="true" className="divide-y divide-line-subtle">
+          <ul aria-hidden="true" className="divide-y divide-line">
             {[1, 2, 3].map(i => (
               <li key={i} className="flex gap-3 px-4 py-5 motion-safe:animate-pulse">
                 <span className="h-9 w-9 rounded-lg bg-surface-subtle" />
@@ -119,8 +121,8 @@ function NotificationsWorkspace() {
           <>
             {groups.map(([label, rows]) => (
               <section key={label} aria-label={label}>
-                <h3 className="border-b border-line-subtle bg-surface-subtle px-3 py-2.5 text-caption font-semibold text-ink-secondary sm:px-5">{label}</h3>
-                <ul className="divide-y divide-line-subtle">
+                <h3 className="border-b border-line bg-surface-subtle px-3 py-2.5 text-caption font-semibold text-ink-secondary sm:px-5">{label}</h3>
+                <ul className="divide-y divide-line">
                   {rows.map(n => (
                     <NotificationItem key={n.id} item={n} busy={busy} onRead={() => void read(n)} navState={navState} />
                   ))}

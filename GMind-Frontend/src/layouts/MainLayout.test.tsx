@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { ReactNode } from 'react';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -6,6 +7,7 @@ import MainLayout from './MainLayout';
 import { RealtimeContext, type RealtimeContextValue } from '../components/realtime/realtime-context';
 import type { RealtimeStatus } from '../services/realtime';
 import { clearSession, saveSession, type AuthResult } from '../services/session';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 vi.mock('../components/notifications/useNotificationCount', () => ({
   useNotificationCount: () => ({ count: 0, error: null, refresh: async () => {}, clear: () => {}, loading: false, setCount: () => {} }),
 }));
@@ -32,6 +34,11 @@ function mount(status: RealtimeStatus) {
 }
 
 const pill = () => screen.queryByText('Đang kết nối lại…');
+
+function EntityTitle({ name }: { name: string }) {
+  useDocumentTitle(name);
+  return <div>content</div>;
+}
 
 beforeEach(() => { clearSession(); saveSession(SESSION); vi.useFakeTimers({ shouldAdvanceTime: true }); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); clearSession(); localStorage.clear(); });
@@ -67,6 +74,19 @@ describe('header reconnect pill', () => {
     expect(pill()).toBeNull();
     act(() => { vi.advanceTimersByTime(2000); }); // full 5 s
     expect(pill()).toBeTruthy();
+  });
+
+  it('document.title: layout sets the route title and a page hook wins over it', () => {
+    const tree = (children: ReactNode, entry = '/dashboard') => (
+      <RealtimeContext.Provider value={{ status: 'connected', ...events } as RealtimeContextValue}>
+        <MemoryRouter initialEntries={[entry]}><MainLayout>{children}</MainLayout></MemoryRouter>
+      </RealtimeContext.Provider>
+    );
+    render(tree(<div>content</div>));
+    expect(document.title).toBe('Tổng quan · GMind');
+    cleanup();
+    render(tree(<EntityTitle name="Nhóm Alpha" />));
+    expect(document.title).toBe('Nhóm Alpha · GMind');
   });
 
   it('reduced motion still waits the full 5 s (JS timer, not CSS delay)', () => {

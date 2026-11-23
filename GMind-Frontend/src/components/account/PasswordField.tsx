@@ -15,7 +15,7 @@ export default function PasswordField({ id, label, value, onChange, error, hint,
         spellCheck={false} autoCapitalize="none" autoCorrect="off" />
       <button type="button" disabled={disabled} aria-pressed={show} aria-controls={id}
         aria-label={`${show ? 'Ẩn' : 'Hiện'} ${label.toLowerCase()}`} onClick={() => setShow(v => !v)}
-        className="absolute right-1 top-6 flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+        className="absolute right-1 top-6 flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-subtle disabled:opacity-50">
         <Icon name={show ? 'eye-off' : 'eye'} size={20} />
       </button>
     </div>

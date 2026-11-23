@@ -13,7 +13,7 @@ export default function Switch({ checked, onChange, label, description, disabled
   id?: string;
 }) {
   return (
-    <div className="flex items-center gap-3 min-h-11">
+    <div className="relative flex items-center gap-3 min-h-11">
       <button
         type="button"
         role="switch"
@@ -23,7 +23,8 @@ export default function Switch({ checked, onChange, label, description, disabled
         id={id}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-150 motion-reduce:transition-none
+        className={`inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-150 motion-reduce:transition-none
+          after:absolute after:inset-0 after:content-['']
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
           disabled:opacity-50 disabled:cursor-not-allowed ${checked ? 'bg-primary-600' : 'bg-ink-muted/40'}`}
       >

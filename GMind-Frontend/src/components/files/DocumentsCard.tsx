@@ -85,7 +85,7 @@ export default function DocumentsCard({ title, links, files, canAdd, uploadFn, o
                 <div className="min-w-0 flex-1">
                   {safe ? (
                     <a href={safe} target="_blank" rel="noopener noreferrer"
-                      className="block truncate text-small font-medium text-primary-700 hover:underline">
+                      className="block truncate max-sm:py-[13px] max-sm:-my-3 text-small font-medium text-primary-700 hover:underline">
                       {l.displayName || l.url}<span className="sr-only"> (mở tab mới)</span>
                     </a>
                   ) : <span className="block truncate text-small text-ink-muted">{l.displayName || l.url}</span>}

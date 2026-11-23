@@ -6,8 +6,10 @@ import Input from '../components/ui/Input';
 import { authService } from '../services/auth';
 import { validateAuthFields, focusAuthError, authErrorMessage, type AuthFieldErrors } from '../utils/auth-form';
 import { safeReturnPath } from '../utils/return-path';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 export default function Login() {
+  useDocumentTitle('Đăng nhập');
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { from?: unknown; sessionExpired?: boolean; sessionRevoked?: boolean; logoutWarning?: string; passwordReset?: boolean; passwordChanged?: boolean } | null;
@@ -57,7 +59,7 @@ export default function Login() {
             <Input id="password" label="Mật khẩu" type="password" name="password" autoComplete="current-password" required
               value={password} onChange={clearField('password', setPassword)} error={fieldErrors.password} />
             <p className="mt-2 text-right">
-              <Link to="/forgot-password" className="text-sm text-primary-700 font-medium hover:underline">Quên mật khẩu?</Link>
+              <Link to="/forgot-password" className="inline-flex items-center max-sm:min-h-11 text-sm text-primary-700 font-medium hover:underline">Quên mật khẩu?</Link>
             </p>
           </div>
         </fieldset>

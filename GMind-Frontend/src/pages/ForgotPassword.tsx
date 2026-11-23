@@ -5,8 +5,10 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import { authService } from '../services/auth';
 import { validateAuthFields, focusAuthError, authErrorMessage, type AuthFieldErrors } from '../utils/auth-form';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 export default function ForgotPassword() {
+  useDocumentTitle('Quên mật khẩu');
   const [email, setEmail] = useState('');
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
   const [error, setError] = useState('');
@@ -61,7 +63,7 @@ export default function ForgotPassword() {
           </form>
         )}
         <div className="mt-8 border-t border-line pt-6 text-center text-small text-ink-secondary">
-          <Link to="/login" className="text-primary-700 font-medium hover:underline">Về đăng nhập</Link>
+          <Link to="/login" className="inline-flex items-center max-sm:min-h-11 text-primary-700 font-medium hover:underline">Về đăng nhập</Link>
         </div>
       </>
     </AuthLayout>

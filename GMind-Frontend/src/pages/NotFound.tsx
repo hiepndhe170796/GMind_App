@@ -4,8 +4,10 @@ import AuthLayout from '../layouts/AuthLayout';
 import Illustration from '../components/ui/Illustration';
 import { buttonClasses } from '../components/ui/Button';
 import { authService } from '../services/auth';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 export default function NotFound() {
+  useDocumentTitle('Không tìm thấy trang');
   const loggedIn = authService.isLoggedIn();
   const content = (
     <div className="flex min-h-[60vh] items-center justify-center px-6">

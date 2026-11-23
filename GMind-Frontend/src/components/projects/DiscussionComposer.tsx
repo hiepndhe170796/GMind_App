@@ -133,7 +133,7 @@ export default function DiscussionComposer({ members, meId, replyTo, onClearRepl
             {replyTo.body && <span className="text-ink-muted"> · {excerpt(replyTo.body, 80)}</span>}
           </span>
           <button type="button" aria-label="Hủy trả lời" onClick={onClearReply}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-white">
+            className="flex h-9 w-9 max-sm:h-11 max-sm:w-11 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-white">
             <Icon name="close" size={14} />
           </button>
         </div>
@@ -146,7 +146,7 @@ export default function DiscussionComposer({ members, meId, replyTo, onClearRepl
               <span className="max-w-40 truncate" title={f.name}>{f.name}</span>
               <span className="shrink-0 text-caption tabular-nums text-ink-muted">{formatBytes(f.size)}</span>
               <button type="button" aria-label={`Bỏ tệp ${f.name}`} onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-ink-muted hover:bg-surface-subtle">
+                className="flex h-7 w-7 max-sm:h-11 max-sm:w-11 items-center justify-center rounded-md text-ink-muted hover:bg-surface-subtle">
                 <Icon name="close" size={12} />
               </button>
             </li>

@@ -3,7 +3,7 @@ import type { HTMLAttributes, ReactNode } from 'react';
 type Tone = 'neutral' | 'blue' | 'violet' | 'warning' | 'success' | 'danger';
 
 const tones: Record<Tone, string> = {
-  neutral: 'bg-slate-100 text-slate-700',
+  neutral: 'bg-line/60 text-ink-secondary',
   blue: 'bg-primary-50 text-primary-700',
   violet: 'bg-accent-50 text-accent-700',
   warning: 'bg-warning-50 text-warning-700',

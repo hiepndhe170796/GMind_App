@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth';
 import { getSessionSnapshot, subscribeSession, type UserInfo } from '../services/session';
@@ -169,6 +169,9 @@ const MainLayoutShell = ({ children, contentWidth }: MainLayoutProps) => {
   };
 
   const title = TITLES.find(([re]) => re.test(location.pathname))?.[1] ?? 'GMind';
+  useLayoutEffect(() => {
+    document.title = title === 'GMind' ? 'GMind' : `${title} · GMind`;
+  }, [title]);
   const [headerNow, setHeaderNow] = useState(() => Date.now());
   useEffect(() => {
     const update = () => setHeaderNow(Date.now());
@@ -180,7 +183,7 @@ const MainLayoutShell = ({ children, contentWidth }: MainLayoutProps) => {
 
   return (
     <div className="app-surface min-h-screen">
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-primary-700 focus:shadow-md">Đến nội dung chính</a>
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:inline-flex focus:min-h-11 focus:items-center focus:rounded-lg focus:bg-white focus:px-4 focus:text-primary-700 focus:shadow-md">Đến nội dung chính</a>
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-[264px] flex-col bg-white border-r border-line z-30">
         <Brand />
         <NavItems section={section} unread={unread} />

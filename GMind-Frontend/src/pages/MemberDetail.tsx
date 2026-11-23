@@ -12,6 +12,7 @@ import { Breadcrumb, EmptyState, ErrorState } from '../components/workspace/Work
 import MyTaskRow from '../components/tasks/MyTaskRow';
 import { useCurrentUserId } from '../hooks/use-current-user-id';
 import { useRemindTask } from '../hooks/use-remind-task';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { riskReason, type RiskReasonKind } from '../components/dashboard/leader-queue-model';
 import { qk } from '../services/query-keys';
 import { groupsService, type MemberOverviewTask } from '../services/groups';
@@ -56,6 +57,7 @@ export default function MemberDetail() {
 
   const data = overviewQ.data;
   const member = data?.member;
+  useDocumentTitle(member?.displayName);
   const topLevel = useMemo(() => (data?.tasks ?? []).filter(t => !t.parentTaskId), [data]);
   const watchlist = useMemo(() => {
     const rank = (t: MemberOverviewTask) => t.isOverdue ? 0 : t.isAtRisk ? 1 : 2;
@@ -140,11 +142,13 @@ export default function MemberDetail() {
                 <section aria-labelledby="ov-progress">
                   <Card className="p-4 sm:p-6">
                     <h3 id="ov-progress" className="text-lg font-semibold text-ink">Tiến độ công việc</h3>
-                    <StatusBar counts={{
+                    <div className="mt-3">
+                      <StatusBar counts={{
                       ToDo: data.summary.toDo, InProgress: data.summary.inProgress,
                       Submitted: data.summary.submitted, ChangesRequested: data.summary.changesRequested,
                       Completed: data.summary.completed,
                     }} />
+                    </div>
                     <p className="mt-2 text-small text-ink-secondary">
                       {data.summary.completed}/{data.summary.total} hoàn thành · {data.summary.completionPercent}%
                     </p>
@@ -163,7 +167,7 @@ export default function MemberDetail() {
                             <li key={t.id} className="flex flex-col gap-1.5 py-3 min-w-0 sm:flex-row sm:items-center sm:gap-3">
                               <span className="min-w-0 flex-1">
                                 <Link to={`/tasks/${t.id}`} state={NAV_STATE} title={t.title}
-                                  className="line-clamp-2 text-small font-medium text-ink hover:text-primary-700 [overflow-wrap:anywhere]">
+                                  className="inline-flex items-center max-sm:min-h-11 max-sm:-my-3 line-clamp-2 text-small font-medium text-ink hover:text-primary-700 [overflow-wrap:anywhere]">
                                   {t.title}
                                 </Link>
                                 <span className="mt-0.5 block text-caption text-ink-muted">{t.projectName} · {reason}</span>
@@ -174,7 +178,7 @@ export default function MemberDetail() {
                               <span className="flex shrink-0 items-center gap-2">
                                 {remindBtn(t)}
                                 <Link to={`/tasks/${t.id}`} state={NAV_STATE}
-                                  className="inline-flex min-h-9 items-center text-small font-medium text-primary-700 hover:underline">
+                                  className="inline-flex min-h-9 max-sm:min-h-11 max-sm:-my-1 items-center text-small font-medium text-primary-700 hover:underline">
                                   Mở công việc
                                 </Link>
                               </span>
@@ -197,7 +201,7 @@ export default function MemberDetail() {
                           return (
                             <button key={f.key} type="button" aria-pressed={statusFilter === f.key}
                               onClick={() => setStatusFilter(f.key)}
-                              className={`min-h-9 shrink-0 rounded-lg px-3 text-small font-medium ${statusFilter === f.key ? 'bg-primary-50 text-primary-700' : 'text-ink-secondary hover:bg-surface-subtle'}`}>
+                              className={`min-h-9 max-sm:min-h-11 shrink-0 rounded-lg px-3 text-small font-medium ${statusFilter === f.key ? 'bg-primary-50 text-primary-700' : 'text-ink-secondary hover:bg-surface-subtle'}`}>
                               {f.label} <span className="tabular-nums">({n})</span>
                             </button>
                           );
@@ -228,7 +232,7 @@ export default function MemberDetail() {
                           <li key={p.projectId} className="min-w-0">
                             <div className="flex items-baseline justify-between gap-2 min-w-0">
                               <Link to={`/projects/${p.projectId}`} state={NAV_STATE}
-                                className="truncate text-small font-medium text-ink hover:text-primary-700">{p.projectName}</Link>
+                                className="inline-flex items-center max-sm:min-h-11 max-sm:-my-3 truncate text-small font-medium text-ink hover:text-primary-700">{p.projectName}</Link>
                               <span className="shrink-0 text-small font-semibold tabular-nums text-accent-700">{p.memberPoints} điểm</span>
                             </div>
                             <div className="mt-1 flex items-center gap-2">

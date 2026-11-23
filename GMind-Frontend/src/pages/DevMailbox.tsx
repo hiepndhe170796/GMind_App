@@ -5,6 +5,7 @@ import Icon from '../components/ui/Icon';
 import { authService, type MailboxMetaDto } from '../services/auth';
 import { formatDateTime } from '../utils/presentation';
 import { errMsg } from '../components/workspace/utils';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 function MailItem({ mail }: { mail: MailboxMetaDto }) {
   const [open, setOpen] = useState(false);
@@ -23,7 +24,7 @@ function MailItem({ mail }: { mail: MailboxMetaDto }) {
           <div className="mt-2 flex flex-wrap gap-2">
             {mail.links.map((l, i) => (
               <a key={l.url} href={l.url}
-                className={`inline-flex min-h-8 items-center gap-1 rounded-lg px-3 py-1 text-sm font-medium ${
+                className={`inline-flex min-h-8 max-sm:min-h-11 items-center gap-1 rounded-lg px-3 py-1 text-sm font-medium ${
                   i === 0 ? 'bg-primary-600 text-white hover:bg-primary-700' : 'bg-primary-50 text-primary-700 hover:bg-primary-100'
                 }`}>
                 {l.label}
@@ -48,6 +49,7 @@ function MailItem({ mail }: { mail: MailboxMetaDto }) {
 }
 
 export default function DevMailbox() {
+  useDocumentTitle('Hộp thư dev');
   const listQ = useQuery({
     queryKey: ['dev-mailbox'],
     queryFn: () => authService.devMailbox(),

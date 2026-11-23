@@ -145,7 +145,7 @@ export default function MyTasks() {
               {(['Low', 'Medium', 'High', 'Urgent'] as const).map(p => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
             </select>
             {activeFilterCount > 0 && (
-              <button type="button" className="min-h-9 text-small font-medium text-primary-700 hover:underline"
+              <button type="button" className="min-h-9 max-sm:min-h-11 max-sm:-my-1 text-small font-medium text-primary-700 hover:underline"
                 onClick={() => updateFilters({ status: null, project: null, priority: null })}>Xóa lọc</button>
             )}
           </div>

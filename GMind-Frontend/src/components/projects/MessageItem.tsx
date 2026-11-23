@@ -64,7 +64,7 @@ function AttachmentRow({ file }: { file: FileDto }) {
       <span className="shrink-0 text-caption tabular-nums text-ink-muted">{formatBytes(file.sizeBytes)}</span>
       <button type="button" aria-label={`Tải xuống ${file.name}`}
         onClick={async () => { try { await filesService.downloadFile(file); } catch (e) { toast.error(errMsg(e, 'Không tải được tệp.')); } }}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-subtle hover:text-primary-700">
+        className="flex h-9 w-9 max-sm:h-11 max-sm:w-11 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-subtle hover:text-primary-700">
         <Icon name="download" size={15} />
       </button>
     </div>
@@ -145,7 +145,7 @@ export default function MessageItem({ msg, meId, runStart, editing, onReply, onE
           {!editing && (
             <span className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 max-md:opacity-100">
               <ActionMenu chevron={false} ariaLabel="Thao tác tin nhắn" label={<Icon name="more-horizontal" size={16} />}
-                triggerClassName="!min-h-9 !min-w-9 !px-0 rounded-lg text-ink-muted"
+                triggerClassName="!min-h-11 !min-w-11 sm:!min-h-9 sm:!min-w-9 !px-0 rounded-lg text-ink-muted"
                 items={[
                   { label: 'Trả lời', onSelect: () => onReply(msg) },
                   ...(msg.canEdit ? [{ label: 'Sửa', onSelect: () => onEdit(msg) }] : []),

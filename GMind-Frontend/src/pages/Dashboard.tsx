@@ -125,12 +125,12 @@ export default function Dashboard() {
           {queue && (
             <div role="group" aria-label="Lọc theo loại việc" className="-mx-1 flex flex-nowrap gap-1 overflow-x-auto whitespace-nowrap px-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
               <button type="button" aria-pressed={kindFilter === 'all'} onClick={() => pickKind('all')}
-                className={`min-h-9 shrink-0 rounded-lg px-3 text-small font-medium ${kindFilter === 'all' ? 'bg-primary-50 text-primary-700' : 'text-ink-secondary hover:bg-surface-subtle'}`}>
+                className={`min-h-9 max-sm:min-h-11 shrink-0 rounded-lg px-3 text-small font-medium ${kindFilter === 'all' ? 'bg-primary-50 text-primary-700' : 'text-ink-secondary hover:bg-surface-subtle'}`}>
                 Tất cả <span className="tabular-nums">({queueTotal})</span>
               </button>
               {QUEUE_KINDS.filter(k => queue.totals[TOTAL_KEY[k]] > 0).map(k => (
                 <button key={k} type="button" aria-pressed={kindFilter === k} onClick={() => pickKind(k)}
-                  className={`min-h-9 shrink-0 rounded-lg px-3 text-small font-medium ${kindFilter === k ? 'bg-primary-50 text-primary-700' : 'text-ink-secondary hover:bg-surface-subtle'}`}>
+                  className={`min-h-9 max-sm:min-h-11 shrink-0 rounded-lg px-3 text-small font-medium ${kindFilter === k ? 'bg-primary-50 text-primary-700' : 'text-ink-secondary hover:bg-surface-subtle'}`}>
                   {KIND_META[k].label} <span className="tabular-nums">({queue.totals[TOTAL_KEY[k]]})</span>
                 </button>
               ))}
@@ -157,12 +157,12 @@ export default function Dashboard() {
                 const parts = [item.projectName, item.groupName, item.kind === 'Review' ? null : item.assigneeName].filter(Boolean);
                 return (
                   <li key={`${item.kind}-${item.taskId ?? item.requestId ?? i}`}
-                    className="grid min-h-11 gap-y-1 py-3.5 sm:grid-cols-[8.5rem_minmax(0,1fr)_auto] sm:items-center sm:gap-x-3 sm:gap-y-0">
+                    className="relative grid min-h-11 gap-y-1 py-3.5 sm:grid-cols-[8.5rem_minmax(0,1fr)_auto] sm:items-center sm:gap-x-3 sm:gap-y-0">
                     <Badge variant={meta.variant} className="justify-self-start">{meta.label}</Badge>
                     <span className="min-w-0">
                       {item.taskId ? (
                         <Link to={`/tasks/${item.taskId}`} state={NAV_STATE} title={item.title}
-                          className="line-clamp-2 text-small font-medium text-ink hover:text-primary-700 [overflow-wrap:anywhere]">
+                          className="line-clamp-2 text-small font-medium text-ink hover:text-primary-700 [overflow-wrap:anywhere] after:absolute after:inset-0 after:content-['']">
                           {item.title}
                         </Link>
                       ) : (
@@ -173,7 +173,7 @@ export default function Dashboard() {
                     </span>
                     {action && (
                       <Link to={action.href} state={NAV_STATE}
-                        className="inline-flex min-h-9 items-center text-small font-medium text-primary-700 hover:underline sm:justify-self-end">
+                        className="relative z-10 inline-flex items-center max-sm:min-h-11 max-sm:-my-3 text-small font-medium text-primary-700 hover:underline sm:justify-self-end">
                         {action.label}
                       </Link>
                     )}
@@ -206,7 +206,7 @@ export default function Dashboard() {
               const count = tb.key === 'all' ? openTasks.length : (tabCounts.get(tb.key) ?? 0);
               return (
                 <button key={tb.key} type="button" aria-pressed={tab === tb.key} onClick={() => setTab(tb.key)}
-                  className={`min-h-9 shrink-0 rounded-lg px-3 text-small font-medium ${tab === tb.key ? 'bg-primary-50 text-primary-700' : 'text-ink-secondary hover:bg-surface-subtle'}`}>
+                  className={`min-h-9 max-sm:min-h-11 shrink-0 rounded-lg px-3 text-small font-medium ${tab === tb.key ? 'bg-primary-50 text-primary-700' : 'text-ink-secondary hover:bg-surface-subtle'}`}>
                   {tb.label} <span className="tabular-nums">({count})</span>
                 </button>
               );
@@ -216,7 +216,7 @@ export default function Dashboard() {
         {calDate && (
           <p className="mt-3 flex flex-wrap items-center gap-2 text-small text-ink-secondary">
             Đang lọc công việc đến hạn ngày {formatDate(`${calDate}T00:00:00+07:00`)}.
-            <button type="button" className="font-medium text-primary-700 hover:underline" onClick={() => setCalDate(null)}>Bỏ lọc ngày</button>
+            <button type="button" className="inline-flex items-center max-sm:min-h-11 max-sm:-my-3 font-medium text-primary-700 hover:underline" onClick={() => setCalDate(null)}>Bỏ lọc ngày</button>
           </p>
         )}
         {tabTasks.length === 0 ? (
@@ -232,7 +232,7 @@ export default function Dashboard() {
               {tabTasks.slice(0, 8).map(t => <MyTaskRow key={t.id} task={t} navState={NAV_STATE} />)}
             </ul>
             {tabTasks.length > 8 && (
-              <Link to="/my-tasks" className="mt-3 inline-flex min-h-9 items-center text-small font-medium text-primary-700 hover:underline">
+              <Link to="/my-tasks" className="mt-3 inline-flex min-h-9 max-sm:min-h-11 max-sm:-my-1 items-center text-small font-medium text-primary-700 hover:underline">
                 Xem tất cả trong Việc của tôi ({tabTasks.length})
               </Link>
             )}
@@ -252,18 +252,18 @@ export default function Dashboard() {
             </h3>
             <ul className="mt-3 divide-y divide-line">
               {incoming.slice(0, 5).map(r => (
-                <li key={r.id} className="flex items-center gap-3 py-2.5 min-w-0">
-                  <Badge variant="accent" className="shrink-0">{REQUEST_TYPE_LABEL[r.requestType] ?? r.requestType}</Badge>
-                  <span className="min-w-0 flex-1">
-                    <Link to={`/tasks/${r.taskId}`} state={NAV_STATE}
-                      className="block truncate text-small font-medium text-ink hover:text-primary-700">{r.taskTitle}</Link>
-                    <span className="block truncate text-caption text-ink-muted">{r.requestedByName} · {r.groupName}</span>
-                  </span>
-                  <Link to={`/groups/${r.groupId}/marketplace?tab=${r.status === 'AwaitingRecipient' ? 'action' : 'open'}`}
-                    state={NAV_STATE}
-                    className={buttonClasses({ variant: 'secondary', size: 'sm', className: 'min-h-9 shrink-0 whitespace-nowrap' })}>
-                    {r.status === 'AwaitingRecipient' ? 'Phản hồi' : 'Xem và nhận'}
-                  </Link>
+                <li key={r.id} className="relative py-3 min-w-0">
+                  <Badge variant="accent">{REQUEST_TYPE_LABEL[r.requestType] ?? r.requestType}</Badge>
+                  <Link to={`/tasks/${r.taskId}`} state={NAV_STATE} title={r.taskTitle}
+                    className="mt-1.5 line-clamp-2 text-small font-medium text-ink hover:text-primary-700 [overflow-wrap:anywhere] after:absolute after:inset-0 after:content-['']">{r.taskTitle}</Link>
+                  <div className="mt-1 flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate text-caption text-ink-muted">{r.requestedByName} · {r.groupName}</span>
+                    <Link to={`/groups/${r.groupId}/marketplace?tab=${r.status === 'AwaitingRecipient' ? 'action' : 'open'}`}
+                      state={NAV_STATE}
+                      className={buttonClasses({ variant: 'secondary', size: 'sm', className: 'relative z-10 max-sm:-my-1 shrink-0 whitespace-nowrap' })}>
+                      {r.status === 'AwaitingRecipient' ? 'Phản hồi' : 'Xem và nhận'}
+                    </Link>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -280,7 +280,7 @@ export default function Dashboard() {
             <span className="flex items-center gap-2 text-ink-secondary whitespace-nowrap">
               <span aria-hidden="true" className="h-2 w-2 rounded-full bg-primary-600" />Có công việc đến hạn
             </span>
-            <Link to="/calendar" className="min-h-9 inline-flex items-center font-medium text-primary-700 hover:underline whitespace-nowrap">Mở lịch đầy đủ</Link>
+            <Link to="/calendar" className="min-h-9 max-sm:min-h-11 max-sm:-my-1 inline-flex items-center font-medium text-primary-700 hover:underline whitespace-nowrap">Mở lịch đầy đủ</Link>
           </div>
         </Card>
       </section>
@@ -294,7 +294,7 @@ export default function Dashboard() {
                 <li key={g.groupId} className="min-w-0">
                   <div className="flex items-center justify-between gap-2 min-w-0">
                     <Link to={`/groups/${g.groupId}`} state={NAV_STATE}
-                      className="truncate text-small font-medium text-ink hover:text-primary-700">{g.groupName}</Link>
+                      className="inline-flex items-center max-sm:min-h-11 max-sm:-my-3 truncate text-small font-medium text-ink hover:text-primary-700">{g.groupName}</Link>
                   </div>
                   <StatusBar size="sm" showLegend={false} counts={{
                     ToDo: g.counts.toDo, InProgress: g.counts.inProgress, Submitted: g.counts.submitted,
@@ -319,7 +319,7 @@ export default function Dashboard() {
               {memberGroups.map(g => (
                 <li key={g.id} className="flex items-center justify-between gap-2 min-w-0">
                   <Link to={`/groups/${g.id}`} state={NAV_STATE}
-                    className="truncate text-small font-medium text-ink hover:text-primary-700">{g.name}</Link>
+                    className="inline-flex items-center max-sm:min-h-11 max-sm:-my-3 truncate text-small font-medium text-ink hover:text-primary-700">{g.name}</Link>
                   <Badge value="Member">Thành viên</Badge>
                 </li>
               ))}

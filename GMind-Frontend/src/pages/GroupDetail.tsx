@@ -20,6 +20,7 @@ import GroupSettingsDialog from '../components/groups/GroupSettingsDialog';
 import { qk } from '../services/query-keys';
 import { useToast } from '../components/ui/Toast';
 import { useCurrentUserId } from '../hooks/use-current-user-id';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatDate, formatDateTime } from '../utils/presentation';
 import { deadlineState } from '../utils/task-time';
 
@@ -50,6 +51,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string | null }) {
     retry: (n, e) => status(e) !== 403 && status(e) !== 404 && n < 1,
   });
   const group = wsQ.data?.group;
+  useDocumentTitle(group?.name);
   const isLeader = group?.myRole === 'Leader';
 
   const invitesQ = useQuery({
@@ -249,7 +251,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string | null }) {
                             className="grid gap-y-2 py-3 min-w-0 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_5.5rem_4.5rem_4.5rem] sm:items-center sm:gap-x-3 sm:gap-y-0">
                             <span className="min-w-0">
                               <Link to={`/groups/${id}/members/${m.userId}`}
-                                className="text-sm font-medium text-primary-700 hover:underline [overflow-wrap:anywhere]">
+                                className="inline-flex items-center max-sm:min-h-11 max-sm:-my-3 text-sm font-medium text-primary-700 hover:underline [overflow-wrap:anywhere]">
                                 {m.displayName}
                               </Link>
                               {!m.isActiveMember && <span className="text-sm text-ink-secondary"> (đã rời nhóm)</span>}
@@ -277,7 +279,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string | null }) {
                   <Card className="p-4 sm:p-6">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <h3 className="font-semibold text-ink">Hoạt động gần đây</h3>
-                      <Link to={`/groups/${id}/activity`} className="min-h-9 inline-flex items-center text-sm font-medium text-primary-700 hover:underline">
+                      <Link to={`/groups/${id}/activity`} className="min-h-9 max-sm:min-h-11 max-sm:-my-1 inline-flex items-center text-sm font-medium text-primary-700 hover:underline">
                         Xem nhật ký đầy đủ
                       </Link>
                     </div>
@@ -312,7 +314,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string | null }) {
                           <span className="min-w-0 flex-1">
                             {(isLeader || isMe) ? (
                               <Link to={`/groups/${id}/members/${m.userId}`}
-                                className="text-sm font-medium text-primary-700 hover:underline [overflow-wrap:anywhere]">
+                                className="inline-flex items-center max-sm:min-h-11 max-sm:-my-3 text-sm font-medium text-primary-700 hover:underline [overflow-wrap:anywhere]">
                                 {m.displayName}
                               </Link>
                             ) : (
@@ -354,7 +356,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string | null }) {
                   <Card className="p-4 sm:p-6">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <h3 className="font-semibold text-ink">Mã mời</h3>
-                      <Button size="sm" variant="secondary" className="min-h-9 gap-1" onClick={() => setInviteOpen(true)}>
+                      <Button size="sm" variant="secondary" className="min-h-9 max-sm:min-h-11 max-sm:-my-1 gap-1" onClick={() => setInviteOpen(true)}>
                         <Icon name="plus" size={14} />Tạo mã mời
                       </Button>
                     </div>
@@ -368,7 +370,7 @@ function GroupWorkspace({ id, userId }: { id: string; userId: string | null }) {
                             </ul>
                             {deadInvites.length > 0 && (
                               <details className="mt-4 border-t border-line pt-3">
-                                <summary className="min-h-9 cursor-pointer text-sm font-medium text-ink-secondary hover:text-ink">
+                                <summary className="min-h-9 max-sm:min-h-11 max-sm:-my-1 inline-flex items-center cursor-pointer text-sm font-medium text-ink-secondary hover:text-ink">
                                   Mã không còn hiệu lực ({deadInvites.length})
                                 </summary>
                                 <ul className="mt-1 divide-y divide-line">
@@ -454,7 +456,7 @@ function InviteRow({ invite, onRevoke }: { invite: InviteListItemDto; onRevoke?:
       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-ink-muted">{invite.createdByName} · {formatDate(invite.createdAt)}</span>
         {onRevoke && (
-          <Button size="sm" variant="danger" className="min-h-9" onClick={onRevoke}>Thu hồi</Button>
+          <Button size="sm" variant="danger" className="min-h-9 max-sm:min-h-11 max-sm:-my-1" onClick={onRevoke}>Thu hồi</Button>
         )}
       </div>
     </li>
@@ -480,7 +482,7 @@ function ArchivedProjects({ rows, canRestore, onRestore }: {
                 Lưu trữ {formatDate(p.archivedAt)} · {p.completedCount}/{p.taskCount} công việc
               </span>
             </span>
-            {canRestore && <Button size="sm" variant="secondary" className="min-h-9" onClick={() => onRestore(p)}>Khôi phục</Button>}
+            {canRestore && <Button size="sm" variant="secondary" className="min-h-9 max-sm:min-h-11 max-sm:-my-1" onClick={() => onRestore(p)}>Khôi phục</Button>}
           </li>
         ))}
       </ul>
@@ -704,12 +706,12 @@ function InviteDialog({ groupId, onClose }: { groupId: string; onClose: () => vo
           <fieldset>
             <legend className="text-sm font-medium text-ink-secondary">Số lượt dùng</legend>
             <div className="mt-2 space-y-2">
-              <label className="flex items-center gap-2 text-sm text-ink">
+              <label className="flex min-h-11 items-center gap-2 text-sm text-ink">
                 <input type="radio" name="invite-uses" checked={limitMode === 'unlimited'} disabled={createM.isPending}
                   onChange={() => setLimitMode('unlimited')} className="h-4 w-4 accent-primary-600" />
                 Không giới hạn
               </label>
-              <label className="flex items-center gap-2 text-sm text-ink">
+              <label className="flex min-h-11 items-center gap-2 text-sm text-ink">
                 <input type="radio" name="invite-uses" checked={limitMode === 'limited'} disabled={createM.isPending}
                   onChange={() => setLimitMode('limited')} className="h-4 w-4 accent-primary-600" />
                 Giới hạn

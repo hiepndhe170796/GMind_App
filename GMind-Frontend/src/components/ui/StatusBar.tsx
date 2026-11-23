@@ -3,7 +3,7 @@ import { STATUS_LABEL } from '../../utils/presentation';
 export type TaskStatusName = 'ToDo' | 'InProgress' | 'Submitted' | 'ChangesRequested' | 'Completed';
 
 const ORDER: { key: TaskStatusName; bar: string; dot: string }[] = [
-  { key: 'ToDo', bar: 'bg-slate-300', dot: 'bg-slate-300' },
+  { key: 'ToDo', bar: 'bg-line-strong', dot: 'bg-line-strong' },
   { key: 'InProgress', bar: 'bg-primary-500', dot: 'bg-primary-500' },
   { key: 'Submitted', bar: 'bg-accent-500', dot: 'bg-accent-500' },
   { key: 'ChangesRequested', bar: 'bg-warning-500', dot: 'bg-warning-500' },

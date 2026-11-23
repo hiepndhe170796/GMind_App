@@ -10,9 +10,9 @@ export function Breadcrumb({ items, hideCurrentBelowSm = false }: { items: { lab
     <nav aria-label="Đường dẫn" className="flex flex-wrap items-center gap-1.5 text-sm">
       {items.map((it, i) => (
         <span key={i} className={`flex items-center gap-1.5 min-w-0${hideCurrentBelowSm && i === items.length - 1 ? ' max-sm:hidden' : ''}`}>
-          {i > 0 && <Icon name="chevron-right" size={14} className="text-slate-500" />}
+          {i > 0 && <Icon name="chevron-right" size={14} className="text-ink-muted" />}
           {it.to
-            ? <Link to={it.to} className="min-h-9 inline-flex items-center text-primary-700 font-medium hover:underline">{it.label}</Link>
+            ? <Link to={it.to} className="min-h-9 max-sm:min-h-11 inline-flex items-center text-primary-700 font-medium hover:underline">{it.label}</Link>
             : <span className="text-ink-muted [overflow-wrap:anywhere]" aria-current="page">{it.label}</span>}
         </span>
       ))}

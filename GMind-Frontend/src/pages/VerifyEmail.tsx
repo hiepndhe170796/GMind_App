@@ -5,6 +5,7 @@ import Button from '../components/ui/Button';
 import Icon from '../components/ui/Icon';
 import { authService } from '../services/auth';
 import { getSessionSnapshot, updateSessionUser } from '../services/session';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 type State = 'missing' | 'verifying' | 'success' | 'failed';
 
@@ -18,6 +19,7 @@ function takeToken(): string {
 }
 
 export default function VerifyEmail() {
+  useDocumentTitle('Xác minh email');
   const [token] = useState(takeToken);
   const [state, setState] = useState<State>(token ? 'verifying' : 'missing');
   const [message, setMessage] = useState('');
@@ -56,8 +58,8 @@ export default function VerifyEmail() {
 
   const loggedIn = !!getSessionSnapshot();
   const action = loggedIn
-    ? <Link to="/profile"><Button variant="primary" className="min-w-40">Về hồ sơ</Button></Link>
-    : <Link to="/login"><Button variant="primary" className="min-w-40">Đăng nhập</Button></Link>;
+    ? <Link to="/profile" className="inline-block"><Button variant="primary" className="min-w-40">Về hồ sơ</Button></Link>
+    : <Link to="/login" className="inline-block"><Button variant="primary" className="min-w-40">Đăng nhập</Button></Link>;
 
   return (
     <AuthLayout>

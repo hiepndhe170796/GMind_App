@@ -99,7 +99,7 @@ export default function MiniCalendar({ tasks, selectedDate, onSelect, today }: {
         </div>
       </div>
       <p id={helpId} className="sr-only">Dùng phím mũi tên để di chuyển giữa các ngày.</p>
-      <div ref={gridRef} role="group" aria-label="Chọn ngày đến hạn" aria-describedby={helpId} className="grid grid-cols-7 gap-1 text-center">
+      <div ref={gridRef} role="group" aria-label="Chọn ngày đến hạn" aria-describedby={helpId} className="grid grid-cols-7 gap-1 max-sm:gap-0.5 text-center">
         {WEEK.map(d => <span key={d} className="text-[11px] font-medium text-ink-muted py-1">{d}</span>)}
         {cells.map((d) => {
           const k = key(d);
@@ -111,7 +111,7 @@ export default function MiniCalendar({ tasks, selectedDate, onSelect, today }: {
             <button key={k} type="button" data-date={k} tabIndex={k === focusedDate ? 0 : -1}
               aria-label={dayLabel(d, n)} aria-pressed={selected} aria-current={isToday ? 'date' : undefined}
               onClick={() => select(k, inMonth)} onKeyDown={e => onKeyDown(e, d)}
-              className={`relative min-h-10 rounded-lg text-sm transition-colors ${selected ? 'bg-primary-600 text-white' : isToday ? 'bg-primary-50 text-primary-700 font-semibold ring-1 ring-inset ring-primary-600' : inMonth ? 'text-ink hover:bg-surface-subtle' : 'text-ink-muted hover:bg-surface-subtle'}`}>
+              className={`relative min-h-10 max-sm:min-h-11 rounded-lg text-sm transition-colors ${selected ? 'bg-primary-600 text-white' : isToday ? 'bg-primary-50 text-primary-700 font-semibold ring-1 ring-inset ring-primary-600' : inMonth ? 'text-ink hover:bg-surface-subtle' : 'text-ink-muted hover:bg-surface-subtle'}`}>
               {d.getUTCDate()}
               {n > 0 && <span aria-hidden="true" className={`absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${selected ? 'bg-white' : 'bg-primary-600'}`} />}
             </button>

@@ -97,7 +97,7 @@ export default function Groups() {
               </div>
               <Button type="submit" variant="secondary" className="min-h-11">Tìm</Button>
               {hasFilters && (
-                <button type="button" className="min-h-9 text-primary-700 font-medium hover:underline"
+                <button type="button" className="min-h-9 max-sm:min-h-11 max-sm:-my-1 text-primary-700 font-medium hover:underline"
                   onClick={() => { setQ(''); setSearch(''); setRole(''); }}>Xóa lọc</button>
               )}
             </form>
@@ -107,7 +107,7 @@ export default function Groups() {
             {filtered.length === 0 ? (
               <Card className="p-4 sm:p-6">
                 <EmptyState illustration="search" title="Không có nhóm khớp bộ lọc" body="Thử từ khóa hoặc vai trò khác."
-                  action={<button className="min-h-9 text-primary-700 font-medium hover:underline" onClick={() => { setQ(''); setSearch(''); setRole(''); }}>Xóa bộ lọc</button>} />
+                  action={<button className="min-h-9 max-sm:min-h-11 max-sm:-my-1 text-primary-700 font-medium hover:underline" onClick={() => { setQ(''); setSearch(''); setRole(''); }}>Xóa bộ lọc</button>} />
               </Card>
             ) : (
               <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

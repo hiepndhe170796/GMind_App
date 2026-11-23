@@ -14,6 +14,7 @@ import { SubmitTaskDialog, RequestChangesDialog } from '../components/tasks/Task
 import { useToast } from '../components/ui/Toast';
 import { useCurrentUserId } from '../hooks/use-current-user-id';
 import { useRemindTask } from '../hooks/use-remind-task';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { qk } from '../services/query-keys';
 import {
   tasksService, hasTaskDetails, TaskStatus,
@@ -77,6 +78,7 @@ function TaskPage({ id }: { id: string }) {
     queryKey: qk.task(me, id), queryFn: () => tasksService.get(id), enabled: !!me && !!id,
   });
   const task = taskQ.data;
+  useDocumentTitle(task?.title);
   const detail = task && hasTaskDetails(task) ? task : null;
   const perms = detail?.permissions ?? PERMS_NONE;
 
@@ -502,7 +504,7 @@ function ProgressPanel({ task, me, invalidate, className = '' }: { task: TaskDet
           <input id="task-progress" type="range" min={0} max={100} step={5} value={value}
             disabled={progressM.isPending}
             onChange={(e) => setValue(Number(e.target.value))}
-            className="w-full accent-primary-600" />
+            className="h-11 w-full accent-primary-600" />
           <div className="mt-2 flex justify-end">
             <Button size="sm" variant="secondary" disabled={progressM.isPending || value === saved} isLoading={progressM.isPending}
               onClick={() => progressM.mutate(value)}>Lưu tiến độ</Button>
@@ -579,11 +581,11 @@ function SubtasksCard({ taskId, detail, subtasks, perms, busy, invalidate }: {
                   aria-label={done ? `Mở lại ${s.title}` : target === TaskStatus.InProgress ? `Bắt đầu ${s.title}` : `Hoàn thành ${s.title}`}
                   aria-pressed={done}
                   onClick={() => target != null && toggleM.mutate({ subId: s.id, status: target })}
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${done ? 'border-success-600 bg-success-600 text-white' : 'border-line bg-white text-transparent hover:border-primary-500'}`}>
+                  className={`relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 before:content-[''] max-sm:before:absolute max-sm:before:-inset-2.5 ${done ? 'border-success-600 bg-success-600 text-white' : 'border-line bg-white text-transparent hover:border-primary-500'}`}>
                   <Icon name="check" size={14} />
                 </button>
                 <div className="min-w-0 flex-1">
-                  <Link to={`/tasks/${s.id}`} className={`text-small font-medium hover:underline [overflow-wrap:anywhere] ${done ? 'text-ink-muted line-through' : 'text-ink'}`}>{s.title}</Link>
+                  <Link to={`/tasks/${s.id}`} className={`inline-flex items-center max-sm:min-h-11 max-sm:-my-3 text-small font-medium hover:underline [overflow-wrap:anywhere] ${done ? 'text-ink-muted line-through' : 'text-ink'}`}>{s.title}</Link>
                   <p className="text-caption text-ink-muted">
                     {s.assigneeName || 'Chưa giao'}{s.deadlineAt ? ` · ${sdl.label || formatDateTime(s.deadlineAt)}` : ''}
                   </p>
@@ -789,11 +791,11 @@ function CommentsCard({ taskId, comments, busy, invalidate, onDelete, canComment
                     {(c.canEdit || c.canDelete) && (
                       <div className="mt-1 flex gap-3">
                         {c.canEdit && (
-                          <button type="button" className="text-caption font-medium text-primary-700 hover:underline"
+                          <button type="button" className="inline-flex items-center max-sm:min-h-11 max-sm:min-w-11 max-sm:-my-3 text-caption font-medium text-primary-700 hover:underline"
                             onClick={() => { setEditingId(c.id); setEditBody(c.body); }}>Sửa</button>
                         )}
                         {c.canDelete && (
-                          <button type="button" className="text-caption font-medium text-danger-700 hover:underline"
+                          <button type="button" className="inline-flex items-center max-sm:min-h-11 max-sm:min-w-11 max-sm:-my-3 text-caption font-medium text-danger-700 hover:underline"
                             onClick={() => onDelete(c.id)}>Xóa</button>
                         )}
                       </div>
@@ -975,7 +977,7 @@ function HelpersCard({ taskId, active, ended, invalidate, className = '' }: {
       <ul className="mt-2 divide-y divide-line">{active.map(h => row(h, true))}</ul>
       {ended.length > 0 && (
         <details className="mt-3 border-t border-line pt-3">
-          <summary className="min-h-9 cursor-pointer text-small font-medium text-ink-secondary hover:text-ink">Đã kết thúc ({ended.length})</summary>
+          <summary className="min-h-9 max-sm:min-h-11 max-sm:-my-1 inline-flex items-center cursor-pointer text-small font-medium text-ink-secondary hover:text-ink">Đã kết thúc ({ended.length})</summary>
           <ul className="mt-1 divide-y divide-line">{ended.map(h => row(h, false))}</ul>
         </details>
       )}

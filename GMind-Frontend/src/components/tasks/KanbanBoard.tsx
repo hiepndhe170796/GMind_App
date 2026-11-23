@@ -38,7 +38,7 @@ function TaskCardFace({ task }: { task: TaskSummaryDto }) {
       </div>
       {task.progressPercent != null && (
         <div className="mt-2 flex items-center gap-2" role="img" aria-label={`Tiến độ ${task.progressPercent}%`}>
-          <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+          <div className="h-1.5 flex-1 rounded-full bg-line">
             <div className="h-1.5 rounded-full bg-primary-500" style={{ width: `${task.progressPercent}%` }} />
           </div>
           <span className="text-caption tabular-nums text-ink-muted">{task.progressPercent}%</span>
@@ -61,10 +61,10 @@ function BoardCard({ task, justApproved, busy, onTransition }: {
   return (
     <div ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform) }}
-      className={`rounded-xl border border-line bg-white p-3 ${isDragging ? 'opacity-40 shadow-none' : 'shadow-card'} ${justApproved ? 'motion-safe:animate-[gm-approve-pop_.6s_ease-out] ring-2 ring-success-300' : ''}`}>
+      className={`relative rounded-xl border border-line bg-white p-3 ${isDragging ? 'opacity-40 shadow-none' : 'shadow-card'} ${justApproved ? 'motion-safe:animate-[gm-approve-pop_.6s_ease-out] ring-2 ring-success-300' : ''}`}>
       <div className="flex items-start gap-1">
         <Link to={`/tasks/${task.id}`}
-          className="min-w-0 flex-1 text-small font-semibold text-ink hover:text-primary-700 [overflow-wrap:anywhere]">
+          className="min-w-0 flex-1 text-small font-semibold text-ink hover:text-primary-700 [overflow-wrap:anywhere] after:absolute after:inset-0 after:content-['']">
           <span className="line-clamp-2">{task.title}</span>
         </Link>
       </div>
@@ -85,18 +85,18 @@ function BoardCard({ task, justApproved, busy, onTransition }: {
       </div>
       {task.progressPercent != null && (
         <div className="mt-2 flex items-center gap-2" role="img" aria-label={`Tiến độ ${task.progressPercent}%`}>
-          <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+          <div className="h-1.5 flex-1 rounded-full bg-line">
             <div className="h-1.5 rounded-full bg-primary-500" style={{ width: `${task.progressPercent}%` }} />
           </div>
           <span className="text-caption tabular-nums text-ink-muted">{task.progressPercent}%</span>
         </div>
       )}
       {movable && (
-        <div className="mt-2 flex items-center gap-1.5">
+        <div className="relative z-10 mt-2 flex items-center gap-1.5 max-sm:gap-2">
           <button type="button" {...attributes} {...listeners}
             aria-label={`Kéo thẻ "${task.title}" để chuyển trạng thái`}
-            className="shrink-0 cursor-grab touch-none rounded-md p-1 text-ink-muted hover:bg-surface-subtle hover:text-ink active:cursor-grabbing">
-            <Icon name="grip" size={14} />
+            className="flex shrink-0 cursor-grab touch-none items-center justify-center rounded-md p-1 text-ink-muted hover:bg-surface-subtle hover:text-ink active:cursor-grabbing max-sm:h-11 max-sm:w-11 max-sm:rounded-lg max-sm:border max-sm:border-line max-sm:bg-surface max-sm:p-0">
+            <Icon name="grip" size={14} className="max-sm:h-5 max-sm:w-5" />
           </button>
           <StatusTransitionMenu current={task.status} targets={allowed} busy={busy} align="left"
             onChoose={(t) => onTransition(task, t)} />

@@ -33,6 +33,7 @@
 @layer components {
   .app-surface :is(input:not([type=checkbox],[type=radio],[type=file],[type=range],[type=color]), select, textarea) {
     min-height: 2.75rem;
+    padding-inline: 0.75rem;
     border: 1px solid theme('colors.line.strong');
     border-radius: 10px;
     background-color: theme('colors.white');

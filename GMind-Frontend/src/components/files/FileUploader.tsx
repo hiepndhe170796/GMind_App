@@ -135,7 +135,7 @@ export default function FileUploader({ upload, onUploaded, busy }: {
             <li key={`rej-${r.id}`} role="alert" className="flex items-center gap-2 rounded-lg bg-danger-50 px-3 py-2 text-small text-danger-700 min-w-0">
               <span className="min-w-0 flex-1"><span className="font-medium">{r.name}</span> — {r.message}</span>
               <button type="button" aria-label={`Bỏ qua ${r.name}`} onClick={() => setRejects(x => x.filter(y => y.id !== r.id))}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg hover:bg-danger-100">
+                className="flex h-9 w-9 max-sm:h-11 max-sm:w-11 shrink-0 items-center justify-center rounded-lg hover:bg-danger-100">
                 <Icon name="close" size={14} />
               </button>
             </li>
@@ -148,12 +148,12 @@ export default function FileUploader({ upload, onUploaded, busy }: {
                 {r.status === 'error' ? (
                   <button type="button" aria-label={`Đóng lỗi tải ${r.name}`}
                     onClick={() => { rowsRef.current = rowsRef.current.filter(x => x.id !== r.id); sync(); }}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-subtle">
+                    className="flex h-9 w-9 max-sm:h-11 max-sm:w-11 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-subtle">
                     <Icon name="close" size={14} />
                   </button>
                 ) : (
                   <button type="button" onClick={() => cancelRow(r)}
-                    className="min-h-9 rounded-lg px-2 text-small font-medium text-ink-secondary hover:bg-surface-subtle">
+                    className="min-h-9 max-sm:min-h-11 max-sm:-my-1 rounded-lg px-2 text-small font-medium text-ink-secondary hover:bg-surface-subtle">
                     Hủy
                   </button>
                 )}

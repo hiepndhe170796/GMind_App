@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -11,21 +11,10 @@ import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
-import JoinGroup from './pages/JoinGroup';
-import Dashboard from './pages/Dashboard';
-import GroupDetail from './pages/GroupDetail';
-import ActivityLogPage from './pages/ActivityLogPage';
-import MemberDetail from './pages/MemberDetail';
-import Groups from './pages/Groups';
-import ProjectDetail from './pages/ProjectDetail';
-import TaskDetail from './pages/TaskDetail';
-import MyTasks from './pages/MyTasks';
-import Profile from './pages/Profile';
-import Settings from './pages/Settings';
-import Notifications from './pages/Notifications';
-import Marketplace from './pages/Marketplace';
-import Calendar from './pages/Calendar';
-import DevMailbox from './pages/DevMailbox';
+import {
+  ActivityLogPage, Calendar, Dashboard, DevMailbox, GroupDetail, Groups, JoinGroup,
+  Marketplace, MemberDetail, MyTasks, Notifications, Profile, ProjectDetail, Settings, TaskDetail,
+} from './routes/lazy-pages';
 
 /**
  * One QueryClient per app. Cached data is cleared whenever the signed-in user
@@ -61,7 +50,9 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
-        {import.meta.env.DEV && <Route path="/dev/mailbox" element={<DevMailbox />} />}
+        {import.meta.env.DEV && <Route path="/dev/mailbox" element={
+          <Suspense fallback={<p role="status" className="p-6 text-sm text-ink-muted">Đang tải…</p>}><DevMailbox /></Suspense>
+        } />}
         <Route element={<ProtectedRoute />}>
           <Route path="/join-group" element={<JoinGroup />} />
           <Route path="/join/:code" element={<JoinGroup />} />

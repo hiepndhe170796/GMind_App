@@ -6,8 +6,10 @@ import Input from '../components/ui/Input';
 import { authService } from '../services/auth';
 import { validateAuthFields, focusAuthError, authErrorMessage, type AuthFieldErrors } from '../utils/auth-form';
 import { safeReturnPath } from '../utils/return-path';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 export default function Register() {
+  useDocumentTitle('Đăng ký');
   const navigate = useNavigate();
   const location = useLocation();
   const returnTo = safeReturnPath((location.state as { from?: unknown } | null)?.from) ?? '/join-group';

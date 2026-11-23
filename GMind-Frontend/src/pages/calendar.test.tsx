@@ -2,23 +2,32 @@
 import type { ReactNode } from 'react';
 import { act } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Calendar from './Calendar';
 import { dashboardService, type MyTaskDto } from '../services/dashboard';
-import { clearSession } from '../services/session';
+import { clearSession, saveSession } from '../services/session';
+import { qk } from '../services/query-keys';
 
 vi.mock('../layouts/MainLayout', () => ({ default: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
 vi.mock('../services/auth', () => ({
   authService: { isLoggedIn: () => true, currentUser: () => ({ id: 'u1', displayName: 'Me', email: 'm@x.dev' }) },
 }));
 
+const UID = 'u1';
 const t = (id: string, deadlineAt?: string, over: Partial<MyTaskDto> = {}): MyTaskDto =>
   ({ id, projectId: 'p1', projectName: 'Web', title: `Task ${id}`, status: 'ToDo', priority: 'Medium', deadlineAt, ...over });
 const deferred = <T,>() => { let resolve!: (v: T) => void, reject!: (e?: unknown) => void; const promise = new Promise<T>((r, j) => { resolve = r; reject = j; }); return { promise, resolve, reject }; };
-const renderCal = (entry = '/calendar') => render(
-  <MemoryRouter initialEntries={[entry]}><Routes><Route path="/calendar" element={<Calendar />} /></Routes></MemoryRouter>);
-afterEach(() => { cleanup(); vi.restoreAllMocks(); clearSession(); });
+const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false, gcTime: 0 } } });
+const renderCal = (entry = '/calendar', client = newClient()) => {
+  saveSession({ accessToken: 'at', refreshToken: 'rt', expiresAt: '2100-01-01', user: { id: UID, displayName: 'Me', email: 'm@x.dev' } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[entry]}><Routes><Route path="/calendar" element={<Calendar />} /></Routes></MemoryRouter>
+    </QueryClientProvider>);
+};
+afterEach(() => { cleanup(); vi.restoreAllMocks(); clearSession(); localStorage.clear(); });
 
 describe('Calendar', () => {
   it('uses one full-width empty state instead of an empty day pane when no tasks are assigned', async () => {
@@ -144,22 +153,36 @@ describe('Calendar', () => {
     expect(document.activeElement).toBe(document.querySelector('[data-cal-date="2026-03-16"]'));
   });
 
-  it('500 initial shows retry; 403 clears; quiet500 keeps rows+GET-only retry', async () => {
+  it('500 initial shows retry; invalidation refetch failure keeps rows + warns; retry clears', async () => {
+    const client = newClient();
     vi.spyOn(dashboardService, 'myTasks')
       .mockRejectedValueOnce({ status: 500, message: 'boom' })
       .mockResolvedValueOnce([t('a', '2026-02-10T00:00:00Z')])
       .mockRejectedValueOnce({ status: 500, message: 'boom2' })
       .mockResolvedValue([t('a', '2026-02-10T00:00:00Z')]);
-    renderCal('/calendar?month=2026-02');
+    renderCal('/calendar?month=2026-02', client);
     expect(await screen.findByRole('button', { name: 'Thử lại' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
     expect(await screen.findByText('Task a')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Làm mới' }));
-    await waitFor(() => expect(screen.getByText('Task a')).toBeTruthy());
-    expect(await screen.findByRole('button', { name: 'Tải lại' })).toBeTruthy();
+    await act(async () => { await client.invalidateQueries({ queryKey: qk.myTasks(UID) }); });
+    expect(await screen.findByText(/Chưa làm mới được lịch/)).toBeTruthy();
+    expect(screen.getByText('Task a')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+    await waitFor(() => expect(screen.queryByText(/Chưa làm mới được lịch/)).toBeNull());
+    expect(screen.getByText('Task a')).toBeTruthy();
   });
 
-  it('403 wipes rows; unmount before fetch ignores result', async () => {
+  it('shares the my-tasks cache: qk.myTasks invalidation refetches', async () => {
+    const client = newClient();
+    const my = vi.spyOn(dashboardService, 'myTasks').mockResolvedValue([t('a', '2026-02-10T00:00:00Z')]);
+    renderCal('/calendar?month=2026-02', client);
+    await screen.findAllByText('Task a');
+    expect(my).toHaveBeenCalledTimes(1);
+    await act(async () => { await client.invalidateQueries({ queryKey: qk.myTasks(UID) }); });
+    await waitFor(() => expect(my).toHaveBeenCalledTimes(2));
+  });
+
+  it('403 initial shows retry; unmount before fetch ignores result', async () => {
     vi.spyOn(dashboardService, 'myTasks').mockRejectedValue({ status: 403, message: 'out' });
     renderCal();
     expect(await screen.findByRole('button', { name: 'Thử lại' })).toBeTruthy();
@@ -169,6 +192,6 @@ describe('Calendar', () => {
     const { unmount } = renderCal();
     unmount();
     await act(async () => { d.resolve([t('a')]); await d.promise; });
-    expect(dashboardService.myTasks).toHaveBeenCalledTimes(1);
+    expect(dashboardService.myTasks).toHaveBeenCalledTimes(2);
   });
 });

@@ -16,6 +16,7 @@ import KanbanBoard, { BOARD_COLUMNS } from '../components/tasks/KanbanBoard';
 import StatusTransitionMenu, { transitionLabel } from '../components/tasks/StatusTransitionMenu';
 import { useToast } from '../components/ui/Toast';
 import { useCurrentUserId } from '../hooks/use-current-user-id';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { qk } from '../services/query-keys';
 import { projectsService, projectsManage, projectLinks, type ProjectDto } from '../services/projects';
 import { tasksService, TaskStatus, type TaskSummaryDto } from '../services/tasks';
@@ -243,6 +244,7 @@ export default function ProjectDetail() {
 
   /* ---------- render ---------- */
   const project = projectQ.data;
+  useDocumentTitle(project?.name);
   const loadErr = projectQ.error ?? tasksQ.error;
   const loading = projectQ.isPending || tasksQ.isPending || (!!groupId && groupQ.isPending);
 
@@ -385,7 +387,7 @@ export default function ProjectDetail() {
                 ))}
               </div>
               {activeFilterCount > 0 && (
-                <button type="button" className="min-h-9 text-small font-medium text-primary-700 hover:underline" onClick={clearFilters}>Xóa lọc</button>
+                <button type="button" className="min-h-9 max-sm:min-h-11 max-sm:-my-1 text-small font-medium text-primary-700 hover:underline" onClick={clearFilters}>Xóa lọc</button>
               )}
             </div>
           </ResponsiveFilters>
@@ -574,38 +576,42 @@ function TaskRow({ task: t, childrenTasks, viaChild, expanded, onToggle, navStat
     );
   };
   const childRow = (c: TaskSummaryDto) => (
-    <li key={c.id} className="flex flex-wrap items-center gap-3 min-w-0">
+    <li key={c.id} className="relative flex flex-wrap items-center gap-3 min-w-0">
       <span className="min-w-0 flex-1">
         <Link to={`/tasks/${c.id}`} state={navState} title={c.title}
-          className="line-clamp-2 min-w-0 text-small font-medium text-ink hover:text-primary-700 [overflow-wrap:anywhere]">{c.title}</Link>
+          className="line-clamp-2 min-w-0 text-small font-medium text-ink hover:text-primary-700 [overflow-wrap:anywhere] after:absolute after:inset-0 after:content-['']">{c.title}</Link>
         <span className="mt-1 block">{meta(c)}</span>
       </span>
-      <StatusTransitionMenu current={c.status} targets={c.permissions?.allowedTransitions ?? []} busy={busy}
-        onChoose={(t) => onTransition(c, t)} />
+      <span className="relative z-10 inline-flex">
+        <StatusTransitionMenu current={c.status} targets={c.permissions?.allowedTransitions ?? []} busy={busy}
+          onChoose={(t) => onTransition(c, t)} />
+      </span>
     </li>
   );
   return (
     <li className="px-4 sm:px-5 py-4">
-      <div className="flex flex-wrap items-center gap-3 min-w-0">
+      <div className="relative flex flex-wrap items-center gap-3 min-w-0">
         {(t.subtaskCount ?? 0) > 0 && (
           <button type="button" aria-expanded={expanded} aria-controls={`subs-${t.id}`}
             aria-label={expanded ? `Thu gọn công việc con của ${t.title}` : `Mở công việc con của ${t.title}`}
             onClick={onToggle}
-            className="shrink-0 rounded-md p-1 text-ink-muted hover:bg-surface-subtle">
+            className="relative z-10 shrink-0 rounded-md p-1 text-ink-muted hover:bg-surface-subtle before:content-[''] max-sm:before:absolute max-sm:before:-inset-3">
             <Icon name="chevron-down" size={14} className={`transition-transform ${expanded ? 'rotate-180' : '-rotate-90'}`} />
           </button>
         )}
         <span className="min-w-0 flex-1">
           <Link to={`/tasks/${t.id}`} state={navState} title={t.title}
-            className="line-clamp-2 min-w-0 font-medium text-ink hover:text-primary-700 [overflow-wrap:anywhere]">{t.title}</Link>
+            className="line-clamp-2 min-w-0 font-medium text-ink hover:text-primary-700 [overflow-wrap:anywhere] after:absolute after:inset-0 after:content-['']">{t.title}</Link>
           {viaChild && <span className="ml-2 text-caption text-ink-muted">(hiện vì công việc con khớp lọc)</span>}
           <span className="mt-1.5 block">{meta(t)}</span>
         </span>
         {(t.subtaskCount ?? 0) > 0 && (
           <span className="text-caption tabular-nums text-ink-muted">{t.subtasksCompleted ?? 0}/{t.subtaskCount} con</span>
         )}
-        <StatusTransitionMenu current={t.status} targets={t.permissions?.allowedTransitions ?? []} busy={busy}
-          onChoose={(target) => onTransition(t, target)} />
+        <span className="relative z-10 inline-flex">
+          <StatusTransitionMenu current={t.status} targets={t.permissions?.allowedTransitions ?? []} busy={busy}
+            onChoose={(target) => onTransition(t, target)} />
+        </span>
       </div>
       {expanded && childrenTasks.length > 0 && (
         <ul id={`subs-${t.id}`} className="mt-2 ml-4 space-y-2 border-l border-line pl-4">

@@ -5,8 +5,10 @@ import Button, { buttonClasses } from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import { authService } from '../services/auth';
 import { validateAuthFields, focusAuthError, authErrorMessage, type AuthFieldErrors } from '../utils/auth-form';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 export default function ResetPassword() {
+  useDocumentTitle('Đặt lại mật khẩu');
   const location = useLocation();
   const navigate = useNavigate();
   const [token, setToken] = useState(() =>
@@ -58,9 +60,9 @@ export default function ResetPassword() {
         ) : !token ? (
           <div>
             <h1 className="text-display font-bold text-ink">Liên kết không hợp lệ</h1>
-            <p className="mt-3 text-sm text-slate-600">Liên kết đặt lại mật khẩu thiếu mã xác nhận hoặc đã bị cắt. Hãy yêu cầu một liên kết mới.</p>
+            <p className="mt-3 text-sm text-ink-secondary">Liên kết đặt lại mật khẩu thiếu mã xác nhận hoặc đã bị cắt. Hãy yêu cầu một liên kết mới.</p>
             <div className="mt-5 text-center text-sm">
-              <Link to="/forgot-password" className="text-primary-700 font-medium hover:underline">Yêu cầu liên kết mới</Link>
+              <Link to="/forgot-password" className="inline-flex items-center max-sm:min-h-11 text-primary-700 font-medium hover:underline">Yêu cầu liên kết mới</Link>
             </div>
           </div>
         ) : (
@@ -81,7 +83,7 @@ export default function ResetPassword() {
                 <div>
                   <p role="alert" className="text-sm text-danger-700">{error}</p>
                   {error.includes('hết hạn') && (
-                    <Link to="/forgot-password" className="mt-2 inline-block text-sm text-primary-700 font-medium hover:underline">Yêu cầu liên kết mới</Link>
+                    <Link to="/forgot-password" className="mt-2 inline-flex items-center max-sm:min-h-11 text-sm text-primary-700 font-medium hover:underline">Yêu cầu liên kết mới</Link>
                   )}
                 </div>
               )}
@@ -90,7 +92,7 @@ export default function ResetPassword() {
           </div>
         )}
         {!done && <div className="mt-8 border-t border-line pt-6 text-center text-small text-ink-secondary">
-          <Link to="/login" className="text-primary-700 font-medium hover:underline">Về đăng nhập</Link>
+          <Link to="/login" className="inline-flex items-center max-sm:min-h-11 text-primary-700 font-medium hover:underline">Về đăng nhập</Link>
         </div>}
       </>
     </AuthLayout>

@@ -42,7 +42,7 @@ export default function CalendarMonth({ month, selected, today, byDate, onSelect
       <div className="gcal-grid" ref={gridRef}>
         {WEEKDAYS.map((w, i) => (
           <div key={i} aria-hidden="true"
-            className={`border-b border-r border-slate-200 bg-slate-50/70 py-1.5 text-center text-xs font-semibold text-slate-600 ${i === 6 ? 'border-r-0' : ''}`}>{w}</div>
+            className={`border-b border-r border-line bg-surface-subtle py-1.5 text-center text-xs font-semibold text-ink-muted ${i === 6 ? 'border-r-0' : ''}`}>{w}</div>
         ))}
         {cells.map(({ date, inMonth }, ci) => {
           if (!isDay(date)) return <div key={date} className="gcal-cell" aria-hidden="true" />;
@@ -65,7 +65,7 @@ export default function CalendarMonth({ month, selected, today, byDate, onSelect
               {tasks.length > 0 && (
                 <span className="gcal-dots" aria-hidden="true">
                   <span className="cal-count">{tasks.length}</span>
-                  {tasks.slice(0, 3).map(t => <i key={t.id} data-overdue={t.overdue || undefined} />)}
+                  {tasks.slice(0, 3).map(t => <i key={t.id} data-status={t.status} data-overdue={t.overdue || undefined} />)}
                 </span>
               )}
               <div className="gcal-events">

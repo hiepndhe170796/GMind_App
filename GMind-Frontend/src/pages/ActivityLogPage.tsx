@@ -12,6 +12,7 @@ import { errMsg, status } from '../components/workspace/utils';
 import { groupsService, type ActivityItemDto } from '../services/groups';
 import { qk } from '../services/query-keys';
 import { useCurrentUserId } from '../hooks/use-current-user-id';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { dayKey, timestamp } from '../utils/presentation';
 
 const CATEGORIES: { value: string; label: string }[] = [
@@ -47,6 +48,7 @@ export default function ActivityLogPage() {
   const from = params.get('from') ?? '';
   const to = params.get('to') ?? '';
   const [dateError, setDateError] = useState('');
+  useDocumentTitle('Nhật ký hoạt động');
 
   const groupQ = useQuery({
     queryKey: qk.group(me ?? '', id ?? ''),
@@ -163,7 +165,7 @@ export default function ActivityLogPage() {
                 </div>
                 <div className="flex items-end justify-end gap-3 md:col-span-3 xl:col-span-1">
                   {hasFilters && (
-                    <button type="button" className="min-h-9 text-sm font-medium text-primary-700 hover:underline"
+                    <button type="button" className="min-h-9 max-sm:min-h-11 max-sm:-my-1 text-sm font-medium text-primary-700 hover:underline"
                       onClick={clearFilters}>Xóa bộ lọc</button>
                   )}
                 </div>
@@ -181,7 +183,7 @@ export default function ActivityLogPage() {
                   <EmptyState illustration="search" title="Không có hoạt động phù hợp."
                     body={hasFilters ? 'Thử nới hoặc xóa bộ lọc.' : 'Chưa có hoạt động nào được ghi lại.'}
                     action={hasFilters
-                      ? <button className="min-h-9 text-primary-700 font-medium hover:underline" onClick={clearFilters}>Xóa bộ lọc</button>
+                      ? <button className="min-h-9 max-sm:min-h-11 max-sm:-my-1 text-primary-700 font-medium hover:underline" onClick={clearFilters}>Xóa bộ lọc</button>
                       : undefined} />
                 </Card>
               ) : (
@@ -203,7 +205,7 @@ export default function ActivityLogPage() {
                                 <span>{timeFmt.format(timestamp(a.createdAt))}</span>
                                 {a.projectName && <span>· {a.projectName}</span>}
                                 {a.taskId && (
-                                  <Link to={`/tasks/${a.taskId}`} className="font-medium text-primary-700 hover:underline">
+                                  <Link to={`/tasks/${a.taskId}`} className="inline-flex items-center max-sm:min-h-11 max-sm:-my-3 font-medium text-primary-700 hover:underline">
                                     Mở công việc
                                   </Link>
                                 )}

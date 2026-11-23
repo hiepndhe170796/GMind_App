@@ -114,7 +114,7 @@ export default function ActionMenu({ label, items, triggerClassName, align = 'en
                 disabled={item.disabled}
                 aria-disabled={item.disabled || undefined}
                 title={item.disabled ? item.disabledReason : undefined}
-                className={`flex w-full min-h-10 items-center rounded-lg px-3 py-2 text-left text-sm font-medium
+                className={`flex w-full min-h-10 max-sm:min-h-11 items-center rounded-lg px-3 py-2 text-left text-sm font-medium
                   focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600
                   ${item.danger ? 'text-danger-700 hover:bg-danger-50' : 'text-ink hover:bg-surface-subtle'}
                   disabled:cursor-not-allowed disabled:opacity-50`}

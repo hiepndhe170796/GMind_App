@@ -180,7 +180,6 @@ describe('Notifications inbox', () => {
     fireEvent.click(read);
     expect(notificationsService.markRead).toHaveBeenCalledTimes(1);
     expect((unreadFilter() as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: 'Làm mới' }) as HTMLButtonElement).disabled).toBe(true);
     data = data.map(n => ({ ...n, isRead: true }));
     await act(async () => { gate.resolve({}); });
   });

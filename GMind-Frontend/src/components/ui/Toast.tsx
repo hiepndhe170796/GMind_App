@@ -68,7 +68,7 @@ function ToastCard({ toast, onClose }: { toast: ToastItem; onClose: (id: number)
           <button
             type="button"
             onClick={() => { toast.action!.onAction(); onClose(toast.id); }}
-            className="mt-1.5 min-h-9 rounded-lg px-2 -ml-2 text-small font-semibold text-primary-700 hover:bg-primary-50"
+            className="mt-1.5 min-h-9 max-sm:min-h-11 max-sm:-my-1 rounded-lg px-2 -ml-2 text-small font-semibold text-primary-700 hover:bg-primary-50"
           >
             {toast.action.label}
           </button>

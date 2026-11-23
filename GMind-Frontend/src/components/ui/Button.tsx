@@ -12,7 +12,7 @@ const variantStyles: Record<ButtonVariant, string> = {
   danger: 'bg-white text-danger-700 border border-danger-100 hover:bg-danger-50',
 };
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'min-h-9 px-3 text-sm',
+  sm: 'min-h-9 max-sm:min-h-11 px-3 text-sm',
   md: 'min-h-11 px-4 text-sm',
   lg: 'min-h-12 px-6 text-base',
 };
